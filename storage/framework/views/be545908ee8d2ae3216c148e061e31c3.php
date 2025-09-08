@@ -447,7 +447,7 @@ unset($__errorArgs, $__bag); ?>
                         <div class="row">
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="computed_records-field" class="form-label">Actas Computadas</label>
+                                    <label for="computed_records-field" class="form-label">Papeletas en Anfora</label>
                                     <input type="number" id="computed_records-field" name="computed_records" class="form-control <?php $__errorArgs = ['computed_records'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -471,7 +471,7 @@ unset($__errorArgs, $__bag); ?>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="annulled_records-field" class="form-label">Actas Anuladas</label>
+                                    <label for="annulled_records-field" class="form-label">Papeletas Anuladas</label>
                                     <input type="number" id="annulled_records-field" name="annulled_records" class="form-control <?php $__errorArgs = ['annulled_records'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -495,7 +495,7 @@ unset($__errorArgs, $__bag); ?>
                             </div>
                             <div class="col-md-3">
                                 <div class="mb-3">
-                                    <label for="enabled_records-field" class="form-label">Actas Habilitadas</label>
+                                    <label for="enabled_records-field" class="form-label">Papeletas Habilitadas</label>
                                     <input type="number" id="enabled_records-field" name="enabled_records" class="form-control <?php $__errorArgs = ['enabled_records'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :

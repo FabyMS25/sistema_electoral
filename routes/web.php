@@ -15,7 +15,7 @@ Auth::routes();
 
 Route::get('index/{locale}', [HomeController::class, 'lang']);
 Route::get('/', [HomeController::class, 'root'])->name('root');
-Route::get('/refresh-dashboard', [HomeController::class, 'refreshDashboard'])->name('refresh-dashboard');
+Route::get('/refresh-dashboard', [HomeController::class, 'getDashboardData'])->name('refresh-dashboard');
 Route::get('/get-provinces/{department}', [HomeController::class, 'getProvinces'])->name('get-provinces');
 Route::get('/get-municipalities/{province}', [HomeController::class, 'getMunicipalities'])->name('get-municipalities');
 

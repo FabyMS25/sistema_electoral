@@ -25,7 +25,10 @@ class CreateUsersTable extends Migration
             $table->rememberToken();
             $table->timestamps();
         });
-        User::create(['name' => 'admin','email' => 'moralessfaby.dev@gmail.com','password' => Hash::make('12345678'),'email_verified_at'=>'2022-01-02 17:04:58','avatar' => 'avatar-1.jpg','created_at' => now(),]);
+        User::create(['name' => 'admin','email' => 'moralessfaby.dev@gmail.com','password' => Hash::make('12345678'),'email_verified_at'=>'2022-01-02 17:04:58','avatar' => 'avatar-6.jpg','created_at' => now(),]);
+        User::create(['name' => 'luisreynaldotarqui','email' => 'luisreynaldotarqui@gmail.com','password' => Hash::make('12345678'),'email_verified_at'=>'2022-01-02 17:04:58','avatar' => 'avatar-3.jpg','created_at' => now(),]);
+        User::create(['name' => 'jhonatan','email' => 'jhonatan.fernandez.vargas@gmail.com','password' => Hash::make('12345678'),'email_verified_at'=>'2022-01-02 17:04:58','avatar' => 'avatar-3.jpg','created_at' => now(),]);
+        User::create(['name' => 'Cnaviaes','email' => 'cnaviaesca@gmail.com','password' => Hash::make('Cnaviaes'),'email_verified_at'=>'2022-01-02 17:04:58','avatar' => 'avatar-3.jpg','created_at' => now(),]);
     }
     /**
      * Reverse the migrations.

@@ -83,75 +83,16 @@ class HomeController extends Controller
         ]);
     }
 
-    private function getElectionData($electionTypeId = null, $departmentId = 2, $provinceId = 14, $municipalityId = 45) {
-        $electionTypes = ElectionType::where('active', true)->get();
-        $departments = Department::all();
-        $provinces = Province::where('department_id', $departmentId)->get();
-        $municipalities = Municipality::where('province_id', $provinceId)->get();
-        if (!$electionTypeId && $electionTypes->count() > 0) {
-            $electionTypeId = $electionTypes->first()->id;
-        }
-        $selectedElectionType = ElectionType::find($electionTypeId);        
-        if (!$selectedElectionType) {
-            return [
-                'electionTypes' => $electionTypes,
-                'departments' => $departments,
-                'provinces' => $provinces,
-                'municipalities' => $municipalities,
-                'selectedDepartment' => $departmentId,
-                'selectedProvince' => $provinceId,
-                'selectedMunicipality' => $municipalityId,
-                'selectedElectionType' => null,
-                'candidates' => collect(),
-                'candidateStats' => [],
-                'totalVotes' => 0,
-                'progressPercentage' => 0,
-                'totalTables' => 0,
-                'reportedTables' => 0,
-                'localityResults' => [],
-                'localityStats' => []
-            ];
-        }
-
-        $candidates = Candidate::where('election_type_id', $selectedElectionType->id)
-            ->where('active', true)
-            ->get();
-        $candidateVotes = Vote::select('candidate_id', DB::raw('SUM(quantity) as total_votes'))
-            ->where('election_type_id', $selectedElectionType->id)
-            ->whereHas('votingTable.institution.locality', function($query) use ($municipalityId) {
-                $query->where('municipality_id', $municipalityId);
-            })
-            ->groupBy('candidate_id')
-            ->with('candidate')
-            ->orderByDesc('total_votes')
-            ->get();            
-        $totalVotes = $candidateVotes->sum('total_votes');
-        $candidateStats = [];
-        $rank = 1;        
-        foreach ($candidateVotes->sortByDesc('total_votes') as $cv) {
-            $percentage = $totalVotes > 0 ? ($cv->total_votes / $totalVotes) * 100 : 0;
-            $trend = $percentage >= 15 ? 'up' : ($percentage < 5 ? 'down' : 'neutral');
-            $candidateStats[$cv->candidate_id] = [
-                'votes' => (int)$cv->total_votes,
-                'percentage' => round($percentage, 1),
-                'trend' => $trend,
-                'rank' => $rank++,
-                'candidate' => $cv->candidate
-            ];
-        }
-
-        $totalTables = VotingTable::whereHas('institution.locality', function($query) use ($municipalityId) {
-                $query->where('municipality_id', $municipalityId);
-            })->count();            
-        $reportedTables = Vote::where('election_type_id', $selectedElectionType->id)
-            ->whereHas('votingTable.institution.locality', function($query) use ($municipalityId) {
-                $query->where('municipality_id', $municipalityId);
-            })
-            ->distinct('voting_table_id')
-            ->count('voting_table_id');            
-        $progressPercentage = $totalTables > 0 ? round(($reportedTables / $totalTables) * 100, 2) : 0;    
-        $localityResults = $this->getLocalityResults($selectedElectionType->id, $municipalityId);
-        $localityStats = $this->getLocalityStats($municipalityId);
+private function getElectionData($electionTypeId = null, $departmentId = 2, $provinceId = 14, $municipalityId = 45) {
+    $electionTypes = ElectionType::where('active', true)->get();
+    $departments = Department::all();
+    $provinces = Province::where('department_id', $departmentId)->get();
+    $municipalities = Municipality::where('province_id', $provinceId)->get();    
+    if (!$electionTypeId && $electionTypes->count() > 0) {
+        $electionTypeId = $electionTypes->first()->id;
+    }    
+    $selectedElectionType = ElectionType::find($electionTypeId);        
+    if (!$selectedElectionType) {
         return [
             'electionTypes' => $electionTypes,
             'departments' => $departments,
@@ -160,17 +101,85 @@ class HomeController extends Controller
             'selectedDepartment' => $departmentId,
             'selectedProvince' => $provinceId,
             'selectedMunicipality' => $municipalityId,
-            'selectedElectionType' => $selectedElectionType,
-            'candidates' => $candidates,
-            'candidateStats' => $candidateStats,
-            'totalVotes' => $totalVotes,
-            'progressPercentage' => $progressPercentage,
-            'totalTables' => $totalTables,
-            'reportedTables' => $reportedTables,
-            'localityResults' => $localityResults,
-            'localityStats' => $localityStats
+            'selectedElectionType' => null,
+            'candidates' => collect(),
+            'candidateStats' => [],
+            'totalVotes' => 0,
+            'progressPercentage' => 0,
+            'totalTables' => 0,
+            'reportedTables' => 0,
+            'localityResults' => [],
+            'localityStats' => []
         ];
     }
+
+    $candidates = Candidate::where('election_type_id', $selectedElectionType->id)
+        ->where('active', true)
+        ->get();    
+    $candidateVotes = Vote::select('candidate_id', DB::raw('SUM(quantity) as total_votes'))
+        ->where('election_type_id', $selectedElectionType->id)
+        ->whereHas('votingTable.institution.locality', function($query) use ($municipalityId) {
+            $query->where('municipality_id', $municipalityId);
+        })
+        ->groupBy('candidate_id')
+        ->with('candidate')
+        ->orderByDesc('total_votes')
+        ->get();            
+    
+    $totalVotes = $candidateVotes->sum('total_votes');
+    $candidateStats = [];
+    $rank = 1;       
+    
+    foreach ($candidateVotes as $cv) {
+        $percentage = $totalVotes > 0 ? ($cv->total_votes / $totalVotes) * 100 : 0;
+        $trend = $percentage >= 15 ? 'up' : ($percentage < 5 ? 'down' : 'neutral');
+        $candidateStats[$cv->candidate_id] = [
+            'votes' => (int)$cv->total_votes,
+            'percentage' => round($percentage, 1),
+            'trend' => $trend,
+            'rank' => $rank++,
+            'candidate' => $cv->candidate
+        ];
+    }
+    uasort($candidateStats, function($a, $b) {
+        return $b['votes'] - $a['votes'];
+    });
+
+    $totalTables = VotingTable::whereHas('institution.locality', function($query) use ($municipalityId) {
+            $query->where('municipality_id', $municipalityId);
+        })->count();            
+    
+    $reportedTables = Vote::where('election_type_id', $selectedElectionType->id)
+        ->whereHas('votingTable.institution.locality', function($query) use ($municipalityId) {
+            $query->where('municipality_id', $municipalityId);
+        })
+        ->distinct('voting_table_id')
+        ->count('voting_table_id');            
+    
+    $progressPercentage = $totalTables > 0 ? round(($reportedTables / $totalTables) * 100, 2) : 0;
+
+    $localityResults = $this->getLocalityResults($selectedElectionType->id, $municipalityId);
+    $localityStats = $this->getLocalityStats($municipalityId);
+    
+    return [
+        'electionTypes' => $electionTypes,
+        'departments' => $departments,
+        'provinces' => $provinces,
+        'municipalities' => $municipalities,
+        'selectedDepartment' => $departmentId,
+        'selectedProvince' => $provinceId,
+        'selectedMunicipality' => $municipalityId,
+        'selectedElectionType' => $selectedElectionType,
+        'candidates' => $candidates,
+        'candidateStats' => $candidateStats,
+        'totalVotes' => $totalVotes,
+        'progressPercentage' => $progressPercentage,
+        'totalTables' => $totalTables,
+        'reportedTables' => $reportedTables,
+        'localityResults' => $localityResults,
+        'localityStats' => $localityStats
+    ];
+}
 
     private function getLocalityResults($electionTypeId, $municipalityId) {
         $localityVotes = DB::table('localities')
@@ -275,6 +284,22 @@ class HomeController extends Controller
         $municipalities = Municipality::where('province_id', $provinceId)->get();
         return response()->json($municipalities);
     }
+    
+    public function getDashboardData(Request $request)
+    {
+        $electionTypeId = $request->get('election_type');
+        $departmentId = $request->get('department', 2);
+        $provinceId = $request->get('province', 14);
+        $municipalityId = $request->get('municipality', 45);
+        
+        $electionData = $this->getElectionData($electionTypeId, $departmentId, $provinceId, $municipalityId);
+        
+        return response()->json([
+            'success' => true,
+            'data' => $electionData,
+            'last_updated' => now()->toDateTimeString()
+        ]);
+    }
 
     /*Language Translation*/
     public function lang($locale){
@@ -324,26 +349,4 @@ class HomeController extends Controller
         $user->save();
         return redirect()->back()->with('success', 'Contraseña actualizada correctamente.');
     }
-    
-public function refreshDashboard(Request $request)
-{
-    $electionTypeId = $request->get('election_type');
-    $departmentId = $request->get('department', 2);
-    $provinceId = $request->get('province', 14);
-    $municipalityId = $request->get('municipality', 45);
-    
-    $data = $this->getElectionData($electionTypeId, $departmentId, $provinceId, $municipalityId);
-    return response()->json([
-        'success' => true,
-        'totalVotes' => $data['totalVotes'],
-        'progressPercentage' => $data['progressPercentage'],
-        'reportedTables' => $data['reportedTables'],
-        'totalTables' => $data['totalTables'],
-        'candidateStats' => $data['candidateStats'],
-        'candidates' => $data['candidates']->toArray(),
-        'localityResults' => $data['localityResults'],
-        'localityStats' => $data['localityStats'],
-        'timestamp' => now()->toDateTimeString()
-    ]);
-}
 }
