@@ -1,26 +1,25 @@
-# Dockerfile
-FROM php:8.2-fpm
+# ===== Stage 1: Build Composer dependencies =====
+FROM composer:2 AS vendor
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    git curl libpq-dev unzip zip \
-    && docker-php-ext-install pdo pdo_pgsql
-
-# Install Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-# Set working directory
-WORKDIR /var/www
-
-# Copy Laravel project
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 COPY . .
 
-# Install dependencies
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+# ===== Stage 2: Runtime (PHP + FPM) =====
+FROM php:8.3-fpm-alpine
+
+# Install required extensions
+RUN apk add --no-cache libpq-dev git zip unzip \
+    && docker-php-ext-install pdo pdo_pgsql
+
+# Copy app from builder
+COPY --from=vendor /app /var/www/html
+
+WORKDIR /var/www/html
 
 # Set permissions
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+RUN chown -R www-data:www-data storage bootstrap/cache
 
 EXPOSE 9000
-
 CMD ["php-fpm"]
