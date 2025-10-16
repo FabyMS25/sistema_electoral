@@ -1,17 +1,14 @@
-version: '3.8'
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: laravel-app
-
     restart: unless-stopped
     env_file:
       - .env.docker
     volumes:
       - .:/var/www/html
-      - /var/www/html/vendor
     depends_on:
       - db
     networks:
@@ -24,13 +21,13 @@ services:
     container_name: postgres-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: laravel
-      POSTGRES_USER: laravel
-      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: counter
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: counter
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5300:5432" # external 5300 -> internal 5432
     networks:
       - laravel-net
 
@@ -39,7 +36,7 @@ services:
     container_name: nginx-server
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "4300:80" # external 4300 -> internal 80
     volumes:
       - .:/var/www/html
       - ./nginx.conf:/etc/nginx/conf.d/default.conf

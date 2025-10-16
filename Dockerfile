@@ -1,36 +1,18 @@
-FROM php:8.3-fpm-alpine
+server {
+    listen 80;
+    server_name localhost;
+    root /var/www/html/public;
 
-# Install system dependencies
-RUN apk add --no-cache \
-    libpq-dev \
-    git \
-    zip \
-    unzip \
-    libpng-dev \
-    libzip-dev \
-    oniguruma-dev \
-    icu-dev \
-    && docker-php-ext-install \
-        pdo_pgsql \
-        gd \
-        zip \
-        intl
+    index index.php index.html;
 
-# Set working directory
-WORKDIR /var/www/html
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
 
-# Copy all project files first
-COPY . .
-
-# Install Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-
-# Install dependencies (now artisan exists)
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-
-# Fix permissions for Laravel storage/bootstrap
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-
-# Expose port 9000 and start PHP-FPM
-EXPOSE 9000
-CMD ["php-fpm"]
+    location ~ \.php$ {
+        fastcgi_pass app:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+    }
+}
