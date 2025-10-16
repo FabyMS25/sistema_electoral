@@ -1,5 +1,4 @@
 services:
-
   app:
     build:
       context: .
@@ -10,15 +9,13 @@ services:
       - .env.docker
     volumes:
       - .:/var/www/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - db
     networks:
       - laravel-net
-    command: >
-      sh -c "until pg_isready -h db -p 5432 -U postgres; do echo 'Waiting for Postgres...'; sleep 2; done &&
-      composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader &&
-      php artisan migrate --seed --force &&
-      php-fpm"
+    ports:
+      - "9000:9000"
 
   db:
     image: postgres:14
@@ -31,21 +28,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5300:5432" # external 5300 -> internal 5432
-    networks:
-      - laravel-net
-
-  nginx:
-    image: nginx:alpine
-    container_name: nginx-server
-    restart: unless-stopped
-    ports:
-      - "4300:80" # external 4300 -> internal 80
-    volumes:
-      - .:/var/www/html
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
-    depends_on:
-      - app
+      - "5300:5432"
     networks:
       - laravel-net
 
@@ -54,3 +37,4 @@ volumes:
 
 networks:
   laravel-net:
+    driver: bridge

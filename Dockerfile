@@ -7,31 +7,51 @@ RUN apk add --no-cache \
     zip \
     unzip \
     libpng-dev \
+    libjpeg-turbo-dev \
+    libwebp-dev \
     libzip-dev \
     oniguruma-dev \
     icu-dev \
-    postgresql-client \ 
-    && docker-php-ext-install \
-        pdo_pgsql \
-        gd \
-        zip \
-        intl
+    postgresql-client \
+    nginx \
+    supervisor
 
-# Set working directory
-WORKDIR /var/www/html
+# Install PHP extensions
+RUN docker-php-ext-configure gd --with-jpeg --with-webp
+RUN docker-php-ext-install \
+    pdo_pgsql \
+    pdo_mysql \
+    gd \
+    zip \
+    intl \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    opcache
 
-# Copy all project files first
-COPY . .
-
-# Install Composer
+# Install and configure Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Install dependencies (now artisan exists)
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+# Create working directory
+WORKDIR /var/www/html
 
-# Fix permissions for Laravel storage/bootstrap
+# Copy composer files first for better caching
+COPY composer.json composer.lock ./
+
+# Install dependencies (including dev dependencies for now)
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+
+# Copy application code
+COPY . .
+
+# Fix permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Expose port 9000 and start PHP-FPM
+# Create supervisor configuration
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
 EXPOSE 9000
-CMD ["php-fpm"]
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
