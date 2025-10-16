@@ -10,8 +10,11 @@ COPY . .
 FROM php:8.3-fpm-alpine
 
 # Install required extensions
-RUN apk add --no-cache libpq-dev git zip unzip \
-    && docker-php-ext-install pdo pdo_pgsql
+# RUN apk add --no-cache libpq-dev git zip unzip \
+#     && docker-php-ext-install pdo pdo_pgsql
+RUN apk add --no-cache libpq-dev git zip unzip freetype-dev libjpeg-turbo-dev libpng-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd pdo pdo_pgsql
 
 # Copy app from builder
 COPY --from=vendor /app /var/www/html
