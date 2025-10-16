@@ -10,6 +10,7 @@ RUN apk add --no-cache \
     libzip-dev \
     oniguruma-dev \
     icu-dev \
+    postgresql-client \ 
     && docker-php-ext-install \
         pdo_pgsql \
         gd \
