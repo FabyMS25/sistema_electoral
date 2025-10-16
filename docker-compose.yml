@@ -16,6 +16,10 @@ services:
       - laravel-net
     ports:
       - "9000:9000"
+    command: >
+      sh -c "until pg_isready -h db -p 5432 -U postgres; do echo 'Waiting for Postgres...'; sleep 2; done &&
+      php artisan migrate --seed --force &&
+      /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"
 
   db:
     image: postgres:14

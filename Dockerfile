@@ -36,14 +36,11 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Create working directory
 WORKDIR /var/www/html
 
-# Copy composer files first for better caching
-COPY composer.json composer.lock ./
-
-# Install dependencies (including dev dependencies for now)
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
-
-# Copy application code
+# Copy ALL application files first
 COPY . .
+
+# Install dependencies
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader
 
 # Fix permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
