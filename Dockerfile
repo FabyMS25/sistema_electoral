@@ -1,28 +1,42 @@
-# ===== Stage 1: Build Composer dependencies =====
-FROM composer:2 AS vendor
+# =========================================================
+# STAGE 1 — PHP dependencies (Composer)
+# =========================================================
+FROM php:8.3-fpm-alpine AS app
 
-WORKDIR /app
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-COPY . .
-
-# ===== Stage 2: Runtime (PHP + FPM) =====
-FROM php:8.3-fpm-alpine
-
-# Install required extensions
-# RUN apk add --no-cache libpq-dev git zip unzip \
-#     && docker-php-ext-install pdo pdo_pgsql
-RUN apk add --no-cache libpq-dev git zip unzip freetype-dev libjpeg-turbo-dev libpng-dev \
+# Install dependencies & GD
+RUN apk add --no-cache \
+    libpq-dev \
+    git \
+    zip \
+    unzip \
+    freetype-dev \
+    libjpeg-turbo-dev \
+    libpng-dev \
+    oniguruma-dev \
+    bash \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd pdo pdo_pgsql
+    && docker-php-ext-install gd pdo pdo_pgsql mbstring
 
-# Copy app from builder
-COPY --from=vendor /app /var/www/html
-
+# Set working directory
 WORKDIR /var/www/html
 
-# Set permissions
-RUN chown -R www-data:www-data storage bootstrap/cache
+# Copy composer files first (for layer caching)
+COPY composer.json composer.lock ./
 
-EXPOSE 9000
+# Install composer dependencies (no-dev)
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
+    && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+# Copy all project files
+COPY . .
+
+# Fix permissions
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+# =========================================================
+# STAGE 2 — Nginx (optional, if you serve via nginx)
+# =========================================================
+# You can skip this part if you use php-fpm directly in your container
+
+# EXPOSE 9000
 CMD ["php-fpm"]
