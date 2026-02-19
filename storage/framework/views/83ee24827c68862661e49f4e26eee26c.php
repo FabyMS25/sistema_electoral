@@ -1,15 +1,10 @@
-<?php $__env->startSection('title'); ?>
-    Landing
-<?php $__env->stopSection(); ?>
+<?php $__env->startSection('title', 'Centro de Monitoreo'); ?>
 <?php $__env->startSection('css'); ?>
     <link href="<?php echo e(URL::asset('build/libs/swiper/swiper-bundle.min.css')); ?>" rel="stylesheet" type="text/css" />
 <?php $__env->stopSection(); ?>
-<?php $__env->startSection('body'); ?>
-    <body data-bs-spy="scroll" data-bs-target="#navbar-example">
-    <?php $__env->stopSection(); ?>
-    <?php $__env->startSection('content'); ?>
-        <!-- Begin page -->
-        <div class="layout-wrapper landing">
+
+<?php $__env->startSection('content'); ?>
+    <div class="layout-wrapper landing">
             <nav class="navbar navbar-expand-lg navbar-landing " id="navbar"><!-- fixed-top -->
                 <div class="container">
                     <a class="navbar-brand" href="index">
@@ -73,7 +68,6 @@
                     </div>
                 </div>
             </section>
-
             <!-- Reviews -->
             <!-- <section class="py-5 bg-primary position-relative">
                 <div class="bg-overlay bg-overlay-pattern opacity-50"></div>
@@ -94,7 +88,6 @@
                     </div>
                 </div>
             </section>
-
             <section class="section" id="reviews">
                 <div class="container">
                     <div class="row align-items-center gy-4">
@@ -251,7 +244,6 @@
                     </div>
                 </div>
             </section>
-
             <section class="py-5 position-relative bg-light">
                 <div class="container">
                     <div class="row text-center gy-4">
@@ -283,35 +275,28 @@
                 </div>
             </section> -->
 
-            <footer class="custom-footer bg-dark py-5 position-relative">
-                <div class="container">
-                    <div class="row text-center text-sm-start align-items-center mt-2">
-                        <div class="col-sm-6">
-                            <div>
-                                <p class="copy-rights mb-0">
-                                    <script>
-                                        document.write(new Date().getFullYear())
-                                    </script> © Conteo Electoral
-                                </p>
-                            </div>
-                        </div>
-                        <div class="col-sm-6">
-                            <div class="text-sm-end mt-3 mt-sm-0">
-                            </div>
-                        </div>
+        <footer class="custom-footer bg-dark py-5 position-relative">
+            <div class="container">
+                <div class="row text-center text-sm-start align-items-center mt-2">
+                    <div class="footer-inner">
+                        <span>
+                            © <?php echo e(date('Y')); ?> Sistema de Procesamiento Electoral
+                        </span>
+                        <span>
+                            Plataforma de análisis y consolidación de datos
+                        </span>
                     </div>
                 </div>
-            </footer>
-            
-            <button onclick="topFunction()" class="btn btn-danger btn-icon landing-back-top" id="back-to-top">
-                <i class="ri-arrow-up-line"></i>
-            </button>
-        </div>
-    <?php $__env->stopSection(); ?>
-    <?php $__env->startSection('script'); ?>
-        <script src="<?php echo e(URL::asset('build/libs/swiper/swiper-bundle.min.js')); ?>"></script>
-        <script src="<?php echo e(URL::asset('build/js/pages/landing.init.js')); ?>"></script>        
-        <?php echo $__env->yieldContent('dashboard-scripts'); ?>
-    <?php $__env->stopSection(); ?>
-
+            </div>
+        </footer>            
+        <button onclick="topFunction()" class="btn btn-danger btn-icon landing-back-top" id="back-to-top">
+            <i class="ri-arrow-up-line"></i>
+        </button>
+    </div>
+<?php $__env->stopSection(); ?>
+<?php $__env->startSection('script'); ?>
+    <script src="<?php echo e(URL::asset('build/libs/swiper/swiper-bundle.min.js')); ?>"></script>
+    <script src="<?php echo e(URL::asset('build/js/pages/landing.init.js')); ?>"></script>        
+    <?php echo $__env->yieldContent('dashboard-scripts'); ?>
+<?php $__env->stopSection(); ?>
 <?php echo $__env->make('layouts.master-without-nav', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\_Mine\corporate\resources\views/landing.blade.php ENDPATH**/ ?>

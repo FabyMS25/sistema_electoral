@@ -1,16 +1,12 @@
 @extends('layouts.master-without-nav')
-@section('title')
-    Landing
-@endsection
+{{-- @extends('layouts.minimal') --}}
+@section('title', 'Centro de Monitoreo')
 @section('css')
     <link href="{{ URL::asset('build/libs/swiper/swiper-bundle.min.css') }}" rel="stylesheet" type="text/css" />
 @endsection
-@section('body')
-    <body data-bs-spy="scroll" data-bs-target="#navbar-example">
-    @endsection
-    @section('content')
-        <!-- Begin page -->
-        <div class="layout-wrapper landing">
+
+@section('content')
+    <div class="layout-wrapper landing">
             <nav class="navbar navbar-expand-lg navbar-landing " id="navbar"><!-- fixed-top -->
                 <div class="container">
                     <a class="navbar-brand" href="index">
@@ -74,7 +70,6 @@
                     </div>
                 </div>
             </section>
-
             <!-- Reviews -->
             <!-- <section class="py-5 bg-primary position-relative">
                 <div class="bg-overlay bg-overlay-pattern opacity-50"></div>
@@ -95,7 +90,6 @@
                     </div>
                 </div>
             </section>
-
             <section class="section" id="reviews">
                 <div class="container">
                     <div class="row align-items-center gy-4">
@@ -252,7 +246,6 @@
                     </div>
                 </div>
             </section>
-
             <section class="py-5 position-relative bg-light">
                 <div class="container">
                     <div class="row text-center gy-4">
@@ -284,33 +277,27 @@
                 </div>
             </section> -->
 
-            <footer class="custom-footer bg-dark py-5 position-relative">
-                <div class="container">
-                    <div class="row text-center text-sm-start align-items-center mt-2">
-                        <div class="col-sm-6">
-                            <div>
-                                <p class="copy-rights mb-0">
-                                    <script>
-                                        document.write(new Date().getFullYear())
-                                    </script> © Conteo Electoral
-                                </p>
-                            </div>
-                        </div>
-                        <div class="col-sm-6">
-                            <div class="text-sm-end mt-3 mt-sm-0">
-                            </div>
-                        </div>
+        <footer class="custom-footer bg-dark py-5 position-relative">
+            <div class="container">
+                <div class="row text-center text-sm-start align-items-center mt-2">
+                    <div class="footer-inner">
+                        <span>
+                            © {{ date('Y') }} Sistema de Procesamiento Electoral
+                        </span>
+                        <span>
+                            Plataforma de análisis y consolidación de datos
+                        </span>
                     </div>
                 </div>
-            </footer>
-            
-            <button onclick="topFunction()" class="btn btn-danger btn-icon landing-back-top" id="back-to-top">
-                <i class="ri-arrow-up-line"></i>
-            </button>
-        </div>
-    @endsection
-    @section('script')
-        <script src="{{ URL::asset('build/libs/swiper/swiper-bundle.min.js') }}"></script>
-        <script src="{{ URL::asset('build/js/pages/landing.init.js') }}"></script>        
-        @yield('dashboard-scripts')
-    @endsection
+            </div>
+        </footer>            
+        <button onclick="topFunction()" class="btn btn-danger btn-icon landing-back-top" id="back-to-top">
+            <i class="ri-arrow-up-line"></i>
+        </button>
+    </div>
+@endsection
+@section('script')
+    <script src="{{ URL::asset('build/libs/swiper/swiper-bundle.min.js') }}"></script>
+    <script src="{{ URL::asset('build/js/pages/landing.init.js') }}"></script>        
+    @yield('dashboard-scripts')
+@endsection
