@@ -1,167 +1,182 @@
 <?php
+// app/Http/Controllers/ManagerController.php
+
 namespace App\Http\Controllers;
-use App\Models\Manager;
+
 use App\Models\User;
+use App\Models\TableDelegate;
 use App\Models\VotingTable;
 use App\Models\Institution;
-use App\Models\Department;
-use App\Models\Municipality;
-use App\Models\Locality;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Auth;
 
 class ManagerController extends Controller
 {
-    public function index()
+    public function __construct()
     {
-        try {
-            $managers = Manager::with(['user', 'votingTable.institution'])->get();            
-            $institutions = Institution::all();            
-        } catch (\Exception $e) {
-            \Log::error('Error loading managers: ' . $e->getMessage());
-            $managers = collect();
-            $institutions = collect();
-            session()->flash('error', 'Error loading managers data.');
-        }        
-        return view('tables-managers', compact('managers', 'institutions'));
+        $this->middleware('auth');
+        $this->middleware('permission:view_table_delegates')->only(['index', 'show']);
+        $this->middleware('permission:assign_table_delegates')->only(['create', 'store', 'edit', 'update', 'destroy']);
     }
 
-    public function getVotingTables($institutionId)
+    /**
+     * Listado de delegados de mesa
+     */
+    public function index(Request $request)
     {
-        try {
-            $votingTables = VotingTable::where('institution_id', $institutionId)
-                ->where('status', 'activo')
-                ->get();
-            
-            return response()->json($votingTables);
-        } catch (\Exception $e) {
-            \Log::error('Error fetching voting tables: ' . $e->getMessage());
-            return response()->json([], 500);
+        $query = TableDelegate::with(['user', 'votingTable.institution', 'assignedBy'])
+            ->where('is_active', true);
+
+        // Filtros
+        if ($request->filled('institution_id')) {
+            $query->whereHas('votingTable', function($q) use ($request) {
+                $q->where('institution_id', $request->institution_id);
+            });
         }
+
+        if ($request->filled('role')) {
+            $query->where('role', $request->role);
+        }
+
+        $delegates = $query->paginate(15);
+        $institutions = Institution::where('active', true)->orderBy('name')->get();
+        $roles = ['presidente', 'secretario', 'vocal'];
+
+        return view('managers.index', compact('delegates', 'institutions', 'roles'));
     }
 
+    /**
+     * Formulario para asignar nuevo delegado
+     */
+    public function create()
+    {
+        $users = User::where('is_active', true)->orderBy('name')->get();
+        $institutions = Institution::where('active', true)->orderBy('name')->get();
+        $roles = ['presidente', 'secretario', 'vocal'];
+
+        return view('managers.create', compact('users', 'institutions', 'roles'));
+    }
+
+    /**
+     * Guardar nuevo delegado
+     */
     public function store(Request $request)
     {
-        try {
-            $request->validate([
-                'name' => 'required|string|max:255',
-                'id_card' => 'nullable|string|max:50|unique:managers,id_card',
-                'role' => 'required|in:presidente,secretario,escrutador',
-                'voting_table_id' => 'required|exists:voting_tables,id',
-                'email' => 'required|email|unique:users,email',
-                'password' => 'required|min:8|confirmed',
-                'institution_id' => 'required|exists:institutions,id',
-            ], [
-                'name.required' => 'El nombre es obligatorio.',
-                'id_card.unique' => 'Este número de identificación ya existe.',
-                'email.required' => 'El correo electrónico es obligatorio.',
-                'email.unique' => 'Este correo electrónico ya está registrado.',
-                'password.required' => 'La contraseña es obligatoria.',
-                'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
-                'password.confirmed' => 'Las contraseñas no coinciden.',
-                'institution_id.required' => 'Debe seleccionar una institución.',
-                'voting_table_id.required' => 'Debe seleccionar una mesa de votación.',
-            ]);
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'voting_table_id' => 'required|exists:voting_tables,id',
+            'role' => 'required|in:presidente,secretario,vocal',
+            'assigned_until' => 'nullable|date|after:today',
+        ]);
 
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'email_verified_at' => now(),
-            ]);
+        // Verificar que la mesa no tenga ya un delegado activo con el mismo rol
+        $existing = TableDelegate::where('voting_table_id', $request->voting_table_id)
+            ->where('role', $request->role)
+            ->where('is_active', true)
+            ->first();
 
-            Manager::create([
-                'name' => $request->name,
-                'id_card' => $request->id_card,
-                'role' => $request->role,
-                'voting_table_id' => $request->voting_table_id,
-                'user_id' => $user->id,
-            ]);
-            
-            return redirect()->route('managers.index')
-                            ->with('success', 'El gestor fue creado con éxito.');
-        } catch (ValidationException $e) {
-            return redirect()->back()
-                            ->withErrors($e->validator)
-                            ->withInput();
-        } catch (\Exception $e) {
-            \Log::error('Error creating manager: ' . $e->getMessage());
-            return redirect()->back()
-                            ->withInput()
-                            ->with('error', 'Error al crear el gestor. Por favor intente nuevamente.');
+        if ($existing) {
+            return back()->with('error', 'Esta mesa ya tiene un ' . $request->role . ' asignado.')
+                ->withInput();
         }
+
+        TableDelegate::create([
+            'user_id' => $request->user_id,
+            'voting_table_id' => $request->voting_table_id,
+            'role' => $request->role,
+            'assigned_at' => now(),
+            'assigned_until' => $request->assigned_until,
+            'assigned_by' => Auth::id(),
+            'is_active' => true,
+        ]);
+
+        return redirect()->route('managers.index')
+            ->with('success', 'Delegado de mesa asignado correctamente.');
     }
 
-    public function update(Request $request, $id)
+    /**
+     * Ver detalle del delegado
+     */
+    public function show(TableDelegate $manager)
     {
-        try {
-            $manager = Manager::findOrFail($id);
-            
-            $request->validate([
-                'name' => 'required|string|max:255',
-                'id_card' => 'nullable|string|max:50|unique:managers,id_card,' . $id,
-                'role' => 'required|in:presidente,secretario,escrutador',
-                'voting_table_id' => 'required|exists:voting_tables,id',
-                'email' => 'required|email|unique:users,email,' . $manager->user_id,
-                'password' => 'nullable|min:8|confirmed',
-                'institution_id' => 'required|exists:institutions,id',
-            ], [
-                'name.required' => 'El nombre es obligatorio.',
-                'id_card.unique' => 'Este número de identificación ya existe.',
-                'email.required' => 'El correo electrónico es obligatorio.',
-                'email.unique' => 'Este correo electrónico ya está registrado.',
-                'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
-                'password.confirmed' => 'Las contraseñas no coinciden.',
-                'institution_id.required' => 'Debe seleccionar una institución.',
-                'voting_table_id.required' => 'Debe seleccionar una mesa de votación.',
-            ]);
-
-            $userData = [
-                'name' => $request->name,
-                'email' => $request->email,
-            ];
-
-            if ($request->password) {
-                $userData['password'] = Hash::make($request->password);
-            }
-
-            $manager->user->update($userData);
-
-            $manager->update([
-                'name' => $request->name,
-                'id_card' => $request->id_card,
-                'role' => $request->role,
-                'voting_table_id' => $request->voting_table_id,
-            ]);
-            
-            return redirect()->route('managers.index')
-                            ->with('success', 'El gestor fue actualizado con éxito.');
-        } catch (ValidationException $e) {
-            return redirect()->back()
-                            ->withErrors($e->validator)
-                            ->withInput();
-        } catch (\Exception $e) {
-            \Log::error('Error updating manager: ' . $e->getMessage());
-            return redirect()->back()
-                            ->withInput()
-                            ->with('error', 'Error al actualizar el gestor. Por favor intente nuevamente.');
-        }
+        $manager->load(['user', 'votingTable.institution', 'assignedBy']);
+        return view('managers.show', compact('manager'));
     }
 
-    public function destroy($id)
+    /**
+     * Formulario de edición
+     */
+    public function edit(TableDelegate $manager)
     {
-        try {
-            $manager = Manager::findOrFail($id);
-            $user = $manager->user;            
-            $manager->delete();
-            $user->delete();            
-            return redirect()->route('managers.index')
-                            ->with('success', 'El gestor fue eliminado correctamente.');
-        } catch (\Exception $e) {
-            \Log::error('Error deleting manager: ' . $e->getMessage());
-            return redirect()->back()
-                            ->with('error', 'Error al eliminar el gestor. Por favor intente nuevamente.');
+        $users = User::where('is_active', true)->orderBy('name')->get();
+        $institutions = Institution::where('active', true)->orderBy('name')->get();
+        $roles = ['presidente', 'secretario', 'vocal'];
+
+        return view('managers.edit', compact('manager', 'users', 'institutions', 'roles'));
+    }
+
+    /**
+     * Actualizar delegado
+     */
+    public function update(Request $request, TableDelegate $manager)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'voting_table_id' => 'required|exists:voting_tables,id',
+            'role' => 'required|in:presidente,secretario,vocal',
+            'assigned_until' => 'nullable|date|after:today',
+            'is_active' => 'boolean',
+        ]);
+
+        // Verificar que no haya conflicto con otro delegado
+        $existing = TableDelegate::where('voting_table_id', $request->voting_table_id)
+            ->where('role', $request->role)
+            ->where('is_active', true)
+            ->where('id', '!=', $manager->id)
+            ->first();
+
+        if ($existing) {
+            return back()->with('error', 'Esta mesa ya tiene un ' . $request->role . ' asignado.')
+                ->withInput();
         }
+
+        $manager->update([
+            'user_id' => $request->user_id,
+            'voting_table_id' => $request->voting_table_id,
+            'role' => $request->role,
+            'assigned_until' => $request->assigned_until,
+            'is_active' => $request->boolean('is_active', true),
+            'updated_by' => Auth::id(),
+        ]);
+
+        return redirect()->route('managers.show', $manager)
+            ->with('success', 'Delegado actualizado correctamente.');
+    }
+
+    /**
+     * Desactivar delegado
+     */
+    public function destroy(TableDelegate $manager)
+    {
+        $manager->update([
+            'is_active' => false,
+            'updated_by' => Auth::id()
+        ]);
+
+        return redirect()->route('managers.index')
+            ->with('success', 'Delegado desactivado correctamente.');
+    }
+
+    /**
+     * Obtener mesas de una institución (para AJAX)
+     */
+    public function getVotingTables($institution)
+    {
+        $tables = VotingTable::where('institution_id', $institution)
+            ->where('status', 'activo')
+            ->orderBy('number')
+            ->get(['id', 'number', 'code']);
+
+        return response()->json($tables);
     }
 }

@@ -1,0 +1,1 @@
+<?php /**PATH D:\_Mine\corporate\resources\views/voting-tables/partials/modal-delete.blade.php ENDPATH**/ ?>

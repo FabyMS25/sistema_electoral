@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,34 +11,99 @@ class Vote extends Model
     protected $fillable = [
         'quantity',
         'percentage',
+        'vote_status', // <-- ESTE CAMPO FALTA
         'voting_table_id',
         'candidate_id',
         'election_type_id',
         'user_id',
-        'verified_at'
-    ];
-    protected $casts = [
-        'quantity' => 'integer',
-        'verified_at' => 'datetime',
+        'verified_at',
+        'verified_by',
+        'corrected_by',
+        'corrected_at',
+        'observation_id'
     ];
 
-    public function candidate(){
+    protected $casts = [
+        'quantity' => 'integer',
+        'percentage' => 'float',
+        'verified_at' => 'datetime',
+        'corrected_at' => 'datetime',
+    ];
+
+    // Constantes para los estados
+    const STATUS_PENDING = 'pending';
+    const STATUS_VERIFIED = 'verified';
+    const STATUS_OBSERVED = 'observed';
+    const STATUS_CORRECTED = 'corrected';
+
+    public static function getStatuses(): array
+    {
+        return [
+            self::STATUS_PENDING => 'Pendiente',
+            self::STATUS_VERIFIED => 'Verificado',
+            self::STATUS_OBSERVED => 'Observado',
+            self::STATUS_CORRECTED => 'Corregido',
+        ];
+    }
+
+    public function candidate()
+    {
         return $this->belongsTo(Candidate::class);
     }
 
-    public function votingTable(){
+    public function votingTable()
+    {
         return $this->belongsTo(VotingTable::class);
     }
         
-    public function electionType(){
+    public function electionType()
+    {
         return $this->belongsTo(ElectionType::class);
     }
 
-    public function user(){
+    public function user()
+    {
         return $this->belongsTo(User::class);
     }
 
-    public function getTallyAttribute(){
+    public function verifiedBy()
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    public function correctedBy()
+    {
+        return $this->belongsTo(User::class, 'corrected_by');
+    }
+
+    public function observation()
+    {
+        return $this->belongsTo(Observation::class);
+    }
+
+    // Métodos de utilidad
+    public function isPending()
+    {
+        return $this->vote_status === self::STATUS_PENDING;
+    }
+
+    public function isVerified()
+    {
+        return $this->vote_status === self::STATUS_VERIFIED;
+    }
+
+    public function isObserved()
+    {
+        return $this->vote_status === self::STATUS_OBSERVED;
+    }
+
+    public function isCorrected()
+    {
+        return $this->vote_status === self::STATUS_CORRECTED;
+    }
+
+    public function getTallyAttribute()
+    {
         $quantity = $this->quantity;
         $groups = floor($quantity / 5);
         $remaining = $quantity % 5;
@@ -56,7 +120,8 @@ class Vote extends Model
         return trim($tally);
     }
 
-    public function getVisualTallyAttribute(){
+    public function getVisualTallyAttribute()
+    {
         $quantity = $this->quantity;
         $groups = floor($quantity / 5);
         $remaining = $quantity % 5;

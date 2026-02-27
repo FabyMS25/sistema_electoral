@@ -1,4 +1,5 @@
 <?php
+// database/seeders/DatabaseSeeder.php
 
 namespace Database\Seeders;
 
@@ -6,21 +7,18 @@ use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     *
-     * @return void
-     */
-    public function run()
+    public function run(): void
     {
-        // \App\Models\User::factory(10)->create();
         $this->call([
-            DepartmentSeeder::class,
+            PermissionRoleSeeder::class,           
+            DepartmentSeeder::class,               
             ProvincesMunicipalitiesSeeder::class,
             LocalitiesSeeder::class,
-            ElectionTypeSeeder::class,
+            ElectionTypeSeeder::class,             
+            AssignAdminPermissionsSeeder::class,   
             
-            // QuillacolloInstitutionsSeeder::class,
+            QuillacolloInstitutionsSeeder::class, 
+            QuillacolloTablesSeeder::class
         ]);
     }
 }

@@ -1,0 +1,1 @@
+<?php /**PATH D:\_Mine\corporate\resources\views/voting-tables/scripts/voting-table-js.blade.php ENDPATH**/ ?>

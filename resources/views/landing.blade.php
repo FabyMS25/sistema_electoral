@@ -10,9 +10,9 @@
             <nav class="navbar navbar-expand-lg navbar-landing " id="navbar"><!-- fixed-top -->
                 <div class="container">
                     <a class="navbar-brand" href="index">
-                        <img src="{{ URL::asset('build/images/logo-dark.png') }}" class="card-logo card-logo-dark" alt="logo dark"
+                        <img src="{{ URL::asset('build/images/lofo_elections_large.png') }}" class="card-logo card-logo-dark" alt="logo dark"
                             height="50">
-                        <img src="{{ URL::asset('build/images/logo-light.png') }}" class="card-logo card-logo-light" alt="logo light"
+                        <img src="{{ URL::asset('build/images/lofo_elections_large.png') }}" class="card-logo card-logo-light" alt="logo light"
                             height="50">
                     </a>
                     <button class="navbar-toggler py-0 fs-20 text-body" type="button" data-bs-toggle="collapse"

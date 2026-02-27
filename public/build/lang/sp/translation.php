@@ -2,6 +2,12 @@
 return [
     "menu"=>"Menú",
     "dashboards"=>"Panel de Control",
+    'users' => 'Usuarios',
+    'list-users' => 'Lista de Usuarios',
+    'create-user' => 'Crear Usuario',
+    'manage-users' => 'Gestión de Usuarios',
+    'roles-permissions' => 'Roles y Permisos',
+    'user-management' => 'Administración de Usuarios',
     "analytics"=>"Analítica",
     "crm"=>"CRM",
     "ecommerce"=>"Comercio electrónico",

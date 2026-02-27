@@ -91,8 +91,6 @@
         <span>Actualizando datos...</span>
     </div>
 </div>
-
-<!-- Redesigned KPI Cards with Modern Look -->
 <div class="row">
     <div class="col-xl-3 col-md-6">
         <div class="card bg-gradient-primary card-animate">
@@ -576,8 +574,6 @@
                 const candidateColors = sortedStats.map(stat => stat.candidate.color || ['#405189', '#0ab39c', '#f7b84b', '#299cdb', '#e66b6b'][Math.floor(Math.random() * 5)]);
                 const candidateVotes = sortedStats.map(stat => stat.votes);
                 const candidatePercentages = sortedStats.map(stat => stat.percentage);
-                
-                // 1. Trend Chart (Mix of bars and line)
                 var trendOptions = {
                     series: [
                         {

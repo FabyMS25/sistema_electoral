@@ -14,6 +14,12 @@ class ElectionTypeSeeder extends Seeder
                 'name' => 'Elecciones Presidenciales 2025',
                 'type' => 'presidente',
                 'election_date' => '2025-10-19',
+                'active' => false,
+            ],
+            [
+                'name' => 'Elecciones Municipales 2026',
+                'type' => 'alcalde',
+                'election_date' => '2026-03-22',
                 'active' => true,
             ],
             [
@@ -27,12 +33,6 @@ class ElectionTypeSeeder extends Seeder
                 'type' => 'diputado', 
                 'election_date' => '2025-10-19',
                 'active' => true,
-            ],
-            [
-                'name' => 'Elecciones Municipales 2025',
-                'type' => 'alcalde',
-                'election_date' => '2025-03-09',
-                'active' => false,
             ],
             [
                 'name' => 'Elecciones Concejales 2025', 
