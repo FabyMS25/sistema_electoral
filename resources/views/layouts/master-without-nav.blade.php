@@ -5,10 +5,9 @@
     <meta charset="utf-8" />
     <title>@yield('title')</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta content="Premium Multipurpose Admin & Dashboard Template" name="description" />
-    <meta content="Themesbrand" name="author" />
-    <!-- App favicon -->
-    <link rel="shortcut icon" href="{{ URL::asset('build/images/lofo_elections_large.png')}}">
+    <meta content="Elections App" name="description" />
+    <meta content="" name="author" />
+    <link rel="shortcut icon" href="{{ URL::asset('build/images/lofo_elections.png')}}">
         @include('layouts.head-css')
   </head>
 

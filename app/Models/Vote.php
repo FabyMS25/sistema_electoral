@@ -11,7 +11,7 @@ class Vote extends Model
     protected $fillable = [
         'quantity',
         'percentage',
-        'vote_status', // <-- ESTE CAMPO FALTA
+        'vote_status',
         'voting_table_id',
         'candidate_id',
         'election_type_id',
@@ -30,7 +30,6 @@ class Vote extends Model
         'corrected_at' => 'datetime',
     ];
 
-    // Constantes para los estados
     const STATUS_PENDING = 'pending';
     const STATUS_VERIFIED = 'verified';
     const STATUS_OBSERVED = 'observed';
@@ -50,73 +49,63 @@ class Vote extends Model
     {
         return $this->belongsTo(Candidate::class);
     }
-
     public function votingTable()
     {
         return $this->belongsTo(VotingTable::class);
-    }
-        
+    }        
     public function electionType()
     {
         return $this->belongsTo(ElectionType::class);
     }
-
+    public function electionCategory()
+    {
+        return $this->belongsTo(ElectionCategory::class);
+    }
     public function user()
     {
         return $this->belongsTo(User::class);
     }
-
     public function verifiedBy()
     {
         return $this->belongsTo(User::class, 'verified_by');
     }
-
     public function correctedBy()
     {
         return $this->belongsTo(User::class, 'corrected_by');
     }
-
     public function observation()
     {
         return $this->belongsTo(Observation::class);
     }
 
-    // Métodos de utilidad
     public function isPending()
     {
         return $this->vote_status === self::STATUS_PENDING;
     }
-
     public function isVerified()
     {
         return $this->vote_status === self::STATUS_VERIFIED;
     }
-
     public function isObserved()
     {
         return $this->vote_status === self::STATUS_OBSERVED;
     }
-
     public function isCorrected()
     {
         return $this->vote_status === self::STATUS_CORRECTED;
     }
-
     public function getTallyAttribute()
     {
         $quantity = $this->quantity;
         $groups = floor($quantity / 5);
-        $remaining = $quantity % 5;
-        
+        $remaining = $quantity % 5;   
         $tally = '';
         for ($i = 0; $i < $groups; $i++) {
             $tally .= '卌 ';
-        }
-        
+        }        
         if ($remaining > 0) {
             $tally .= str_repeat('| ', $remaining);
-        }
-        
+        }        
         return trim($tally);
     }
 
@@ -125,16 +114,13 @@ class Vote extends Model
         $quantity = $this->quantity;
         $groups = floor($quantity / 5);
         $remaining = $quantity % 5;
-        
         $visual = '';
         for ($i = 0; $i < $groups; $i++) {
             $visual .= '<span class="tally-group">□ □ □ □ □</span> ';
-        }
-        
+        }        
         if ($remaining > 0) {
             $visual .= '<span class="tally-remaining">' . str_repeat('■ ', $remaining) . '</span>';
-        }
-        
+        }        
         return trim($visual);
     }
 }

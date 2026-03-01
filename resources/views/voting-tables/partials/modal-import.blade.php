@@ -2,7 +2,7 @@
 <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <form method="POST" action="{{ route('voting-tables.import') }}" enctype="multipart/form-data">
+            <form method="POST" action="{{ route('voting-tables.import') }}" enctype="multipart/form-data" id="import-form">
                 @csrf
                 <div class="modal-header">
                     <h5 class="modal-title" id="importModalLabel">
@@ -36,9 +36,9 @@
                         <strong>Requisitos del archivo:</strong>
                         <ul class="mb-0 mt-2">
                             <li>La primera fila debe contener los encabezados</li>
-                            <li>El recinto debe existir en el sistema</li>
+                            <li>El recinto debe existir en el sistema (coincidir exactamente con el nombre)</li>
                             <li>El número de mesa es obligatorio</li>
-                            <li>Los delegados deben ser usuarios existentes (email, nombre o CI)</li>
+                            <li>Los delegados deben ser usuarios existentes (email, CI o nombre completo)</li>
                         </ul>
                     </div>
                 </div>
@@ -57,7 +57,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const importForm = document.querySelector('#importModal form');
+    const importForm = document.getElementById('import-form');
     const importBtn = document.getElementById('import-submit-btn');
     const fileInput = document.getElementById('import-file');
     
@@ -73,9 +73,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 return;
             }
-            
             importBtn.disabled = true;
             importBtn.innerHTML = '<i class="ri-loader-4-line ri-spin me-1"></i>Importando...';
+            Swal.fire({
+                title: 'Importando...',
+                text: 'Por favor espere mientras se procesa el archivo.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
         });
     }
 });

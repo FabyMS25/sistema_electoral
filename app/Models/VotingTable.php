@@ -13,115 +13,138 @@ class VotingTable extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $table = 'voting_tables';
+
     protected $fillable = [
-        'code',
-        'code_ine',
+        // Códigos
+        'oep_code',
+        'internal_code',
         'number',
         'letter',
         'type',
-        'from_name',
-        'to_name',
-        'from_number',
-        'to_number',
-        'registered_citizens',
-        'voted_citizens',
-        'absent_citizens',
-        'computed_records',
-        'annulled_records',
-        'enabled_records',
-        'blank_votes',
-        'null_votes',
-        'status',
-        'opening_time',
-        'closing_time',
-        'election_date',
+        
+        // Ubicación
+        'municipality_id',
         'institution_id',
         'election_type_id',
+        
+        // Datos pre-electorales
+        'expected_voters',
+        'ballots_received',
+        'ballots_spoiled',
+        
+        // Rango de votantes
+        'voter_range_start_name',
+        'voter_range_end_name',
+        
+        // Personal de mesa
         'president_id',
         'secretary_id',
         'vocal1_id',
         'vocal2_id',
         'vocal3_id',
-        'vocal4_id',
+        'vocal4_name',
+        
+        // Fechas y horas
+        'election_date',
+        'opening_time',
+        'closing_time',
+        
+        // Estado
+        'status',
+        
+        // Control de papeletas
+        'ballots_used',
+        'ballots_leftover',
+        
+        // Resultados Alcalde
+        'valid_votes',
+        'blank_votes',
+        'null_votes',
+        
+        // Resultados Concejal
+        'valid_votes_second',
+        'blank_votes_second',
+        'null_votes_second',
+        
+        // Totales
+        'total_voters',
+        'total_voters_second',
+        
+        // Acta
         'acta_number',
         'acta_photo',
-        'acta_pdf',
         'acta_uploaded_at',
+        'observations',
+        
+        // Auditoría
         'created_by',
         'updated_by',
-        'observations',
     ];
 
     protected $casts = [
-        'registered_citizens' => 'integer',
-        'voted_citizens' => 'integer',
-        'absent_citizens' => 'integer',
-        'computed_records' => 'integer',
-        'annulled_records' => 'integer',
-        'enabled_records' => 'integer',
+        'number' => 'integer',
+        'expected_voters' => 'integer',
+        'ballots_received' => 'integer',
+        'ballots_spoiled' => 'integer',
+        'ballots_used' => 'integer',
+        'ballots_leftover' => 'integer',
+        'valid_votes' => 'integer',
         'blank_votes' => 'integer',
         'null_votes' => 'integer',
-        'number' => 'integer',
-        'from_number' => 'integer',
-        'to_number' => 'integer',
+        'valid_votes_second' => 'integer',
+        'blank_votes_second' => 'integer',
+        'null_votes_second' => 'integer',
+        'total_voters' => 'integer',
+        'total_voters_second' => 'integer',
         'opening_time' => 'datetime',
         'closing_time' => 'datetime',
         'election_date' => 'date',
         'acta_uploaded_at' => 'datetime',
     ];
 
-    public const STATUS_PENDING = 'pendiente';
-    public const STATUS_IN_PROGRESS = 'en_proceso';
-    public const STATUS_CLOSED = 'cerrado';
-    public const STATUS_COMPUTING = 'en_computo';
-    public const STATUS_COMPUTED = 'computado';
-    public const STATUS_OBSERVED = 'observado';
-    public const STATUS_ANNULLED = 'anulado';
+    // Estados
+    public const STATUS_CONFIGURADA = 'configurada';
+    public const STATUS_EN_ESPERA = 'en_espera';
+    public const STATUS_VOTACION = 'votacion';
+    public const STATUS_CERRADA = 'cerrada';
+    public const STATUS_EN_ESCRUTINIO = 'en_escrutinio';
+    public const STATUS_ESCRUTADA = 'escrutada';
+    public const STATUS_OBSERVADA = 'observada';
+    public const STATUS_TRANSMITIDA = 'transmitida';
+    public const STATUS_ANULADA = 'anulada';
 
     public static function getStatuses(): array
     {
         return [
-            self::STATUS_PENDING => 'Pendiente',
-            self::STATUS_IN_PROGRESS => 'En Proceso',
-            self::STATUS_CLOSED => 'Cerrado',
-            self::STATUS_COMPUTING => 'En Cómputo',
-            self::STATUS_COMPUTED => 'Computado',
-            self::STATUS_OBSERVED => 'Observado',
-            self::STATUS_ANNULLED => 'Anulado',
+            self::STATUS_CONFIGURADA => 'Configurada',
+            self::STATUS_EN_ESPERA => 'En Espera',
+            self::STATUS_VOTACION => 'Votación',
+            self::STATUS_CERRADA => 'Cerrada',
+            self::STATUS_EN_ESCRUTINIO => 'En Escrutinio',
+            self::STATUS_ESCRUTADA => 'Escrutada',
+            self::STATUS_OBSERVADA => 'Observada',
+            self::STATUS_TRANSMITIDA => 'Transmitida',
+            self::STATUS_ANULADA => 'Anulada',
         ];
     }
 
-    protected static function booted()
-    {
-        static::creating(function ($votingTable) {
-            if (empty($votingTable->code)) {
-                $votingTable->code = self::generateUniqueCode();
-            }
-        });
-    }
-
-    protected static function generateUniqueCode(): string
-    {
-        $prefix = 'MESA';
-        $number = 1;
-        $lastCode = self::withTrashed()->orderBy('id', 'desc')->value('code');
-        if ($lastCode && preg_match('/MESA(\d+)/', $lastCode, $matches)) {
-            $number = (int)$matches[1] + 1;
-        }
-        return $prefix . str_pad($number, 4, '0', STR_PAD_LEFT);
-    }
-
     // ===== RELACIONES =====
-    
     public function institution(): BelongsTo
     {
         return $this->belongsTo(Institution::class);
     }
-
-    // ¡ESTA ES LA RELACIÓN QUE FALTABA!
     public function electionType(): BelongsTo
     {
-        return $this->belongsTo(ElectionType::class, 'election_type_id');
+        return $this->belongsTo(ElectionType::class);
+    }
+    public function electionCategory()
+    {
+        return $this->belongsTo(ElectionCategory::class, 'election_category_id');
+    }
+    public function municipality(): BelongsTo
+    {
+        return $this->belongsTo(Municipality::class);
     }
 
     public function president(): BelongsTo
@@ -149,26 +172,6 @@ class VotingTable extends Model
         return $this->belongsTo(User::class, 'vocal3_id');
     }
 
-    public function vocal4(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'vocal4_id');
-    }
-
-    public function createdBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function updatedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
-
-    public function delegates(): HasMany
-    {
-        return $this->hasMany(TableDelegate::class, 'voting_table_id');
-    }
-
     public function votes(): HasMany
     {
         return $this->hasMany(Vote::class);
@@ -183,39 +186,72 @@ class VotingTable extends Model
     {
         return $this->hasMany(Acta::class);
     }
-
-    // ===== HELPERS =====
-    
-    public function getActiveDelegateAttribute()
+    public function candidate()
     {
-        return $this->delegates()
-            ->where('is_active', true)
-            ->where(function($q) {
-                $q->whereNull('assigned_until')
-                  ->orWhere('assigned_until', '>=', now());
-            })
-            ->with('user')
-            ->first();
+        return $this->belongsTo(Candidate::class);
+    }
+
+    // ===== MÉTODOS DE NEGOCIO =====    
+    public function validateResults(): array
+    {
+        $errors = [];        
+        $totalMayor = $this->valid_votes + $this->blank_votes + $this->null_votes;
+        $totalCouncil = $this->valid_votes_second + $this->blank_votes_second + $this->null_votes_second;
+        $this->total_voters = $totalMayor;
+        $this->total_voters_second = $totalCouncil;
+        $this->ballots_used = $totalMayor;        
+        if ($totalMayor != $totalCouncil) {
+            $errors[] = "El número de votantes en Alcaldes ($totalMayor) debe ser igual al de Concejales ($totalCouncil)";
+        }        
+        if ($totalMayor > $this->expected_voters) {
+            $errors[] = "Los votantes ($totalMayor) exceden los habilitados ({$this->expected_voters})";
+        }        
+        $totalBallotsAvailable = $this->ballots_received - $this->ballots_spoiled;
+        $this->ballots_leftover = $this->ballots_received - $totalMayor - $this->ballots_spoiled;
+        if ($totalMayor > $totalBallotsAvailable) {
+            $errors[] = "Papeletas usadas ($totalMayor) exceden disponibles ($totalBallotsAvailable)";
+        }        
+        if ($this->ballots_leftover < 0) {
+            $errors[] = "Error en cálculo de papeletas sobrantes";
+        }        
+        return $errors;
+    }
+
+    public function isConsistent(): bool
+    {
+        return empty($this->validateResults());
+    }
+        
+    public function getAbsentVotersAttribute(): int
+    {
+        return max(0, $this->expected_voters - $this->total_voters);
+    }
+
+    public function getParticipationPercentageAttribute(): float
+    {
+        if ($this->expected_voters == 0) return 0;
+        return round(($this->total_voters / $this->expected_voters) * 100, 2);
     }
 
     public function getStatusBadgeAttribute(): string
     {
-        return match($this->status) {
-            self::STATUS_PENDING => '<span class="badge bg-warning">Pendiente</span>',
-            self::STATUS_IN_PROGRESS => '<span class="badge bg-info">En Proceso</span>',
-            self::STATUS_CLOSED => '<span class="badge bg-secondary">Cerrado</span>',
-            self::STATUS_COMPUTING => '<span class="badge bg-primary">En Cómputo</span>',
-            self::STATUS_COMPUTED => '<span class="badge bg-success">Computado</span>',
-            self::STATUS_OBSERVED => '<span class="badge bg-danger">Observado</span>',
-            self::STATUS_ANNULLED => '<span class="badge bg-dark">Anulado</span>',
-            default => '<span class="badge bg-light">Desconocido</span>',
-        };
-    }
-
-    public function getProgressPercentageAttribute(): float
-    {
-        if ($this->registered_citizens == 0) return 0;
-        return round(($this->voted_citizens / $this->registered_citizens) * 100, 2);
+        $colors = [
+            self::STATUS_CONFIGURADA => 'secondary',
+            self::STATUS_EN_ESPERA => 'info',
+            self::STATUS_VOTACION => 'primary',
+            self::STATUS_CERRADA => 'warning',
+            self::STATUS_EN_ESCRUTINIO => 'dark',
+            self::STATUS_ESCRUTADA => 'success',
+            self::STATUS_OBSERVADA => 'danger',
+            self::STATUS_TRANSMITIDA => 'success',
+            self::STATUS_ANULADA => 'dark',
+        ];
+        
+        $statuses = self::getStatuses();
+        $color = $colors[$this->status] ?? 'secondary';
+        $label = $statuses[$this->status] ?? $this->status;
+        
+        return "<span class='badge bg-{$color}'>{$label}</span>";
     }
 
     public function getTypeLabelAttribute(): string
@@ -230,6 +266,6 @@ class VotingTable extends Model
 
     public function getFullCodeAttribute(): string
     {
-        return $this->code . ($this->letter ? '-' . $this->letter : '');
+        return $this->internal_code ?? $this->oep_code;
     }
 }

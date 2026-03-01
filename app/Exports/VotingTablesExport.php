@@ -23,8 +23,11 @@ class VotingTablesExport
                 'vocal1',
                 'vocal2',
                 'vocal3',
-                'vocal4'
             ]);
+
+            if (!empty($filters['selected_ids'])) {
+                $query->whereIn('id', $filters['selected_ids']);
+            }
 
             if (!empty($filters['institution_id'])) {
                 $query->where('institution_id', $filters['institution_id']);
@@ -43,10 +46,10 @@ class VotingTablesExport
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
 
-            // Headers
+            // Headers actualizados con los nuevos campos
             $headers = [
-                'A1' => 'Código Mesa',
-                'B1' => 'Código INE',
+                'A1' => 'Código OEP',
+                'B1' => 'Código Interno',
                 'C1' => 'N° Mesa',
                 'D1' => 'Letra',
                 'E1' => 'Tipo',
@@ -57,32 +60,33 @@ class VotingTablesExport
                 'J1' => 'Municipio',
                 'K1' => 'Localidad',
                 'L1' => 'Tipo Elección',
-                'M1' => 'Desde Apellido',
-                'N1' => 'Hasta Apellido',
-                'O1' => 'Desde C.I.',
-                'P1' => 'Hasta C.I.',
-                'Q1' => 'Ciudadanos Habilitados',
-                'R1' => 'Votaron',
-                'S1' => 'Ausentes',
-                'T1' => 'Votos Válidos',
-                'U1' => 'Votos Blanco',
-                'V1' => 'Votos Nulos',
-                'W1' => 'Papeletas Computadas',
-                'X1' => 'Papeletas Anuladas',
-                'Y1' => 'Papeletas Habilitadas',
-                'Z1' => 'Presidente',
-                'AA1' => 'Secretario',
-                'AB1' => 'Vocal 1',
-                'AC1' => 'Vocal 2',
-                'AD1' => 'Vocal 3',
-                'AE1' => 'Vocal 4',
-                'AF1' => 'Hora Apertura',
-                'AG1' => 'Hora Cierre',
-                'AH1' => 'Fecha Elección',
-                'AI1' => 'N° Acta',
-                'AJ1' => 'Fecha Subida Acta',
-                'AK1' => 'Estado',
-                'AL1' => 'Observaciones'
+                'M1' => 'Rango Desde (Apellido)',
+                'N1' => 'Rango Hasta (Apellido)',
+                'O1' => 'Votantes Esperados',
+                'P1' => 'Papeletas Recibidas',
+                'Q1' => 'Papeletas Deterioradas',
+                'R1' => 'Votos Válidos Alcalde',
+                'S1' => 'Votos Blancos Alcalde',
+                'T1' => 'Votos Nulos Alcalde',
+                'U1' => 'Votos Válidos Concejal',
+                'V1' => 'Votos Blancos Concejal',
+                'W1' => 'Votos Nulos Concejal',
+                'X1' => 'Total Votantes',
+                'Y1' => 'Papeletas Usadas',
+                'Z1' => 'Papeletas Sobrantes',
+                'AA1' => 'Presidente',
+                'AB1' => 'Secretario',
+                'AC1' => 'Vocal 1',
+                'AD1' => 'Vocal 2',
+                'AE1' => 'Vocal 3',
+                'AF1' => 'Vocal 4',
+                'AG1' => 'Hora Apertura',
+                'AH1' => 'Hora Cierre',
+                'AI1' => 'Fecha Elección',
+                'AJ1' => 'N° Acta',
+                'AK1' => 'Fecha Subida Acta',
+                'AL1' => 'Estado',
+                'AM1' => 'Observaciones'
             ];
 
             foreach ($headers as $cell => $value) {
@@ -90,7 +94,7 @@ class VotingTablesExport
             }
 
             // Style headers
-            $headerRange = 'A1:AL1';
+            $headerRange = 'A1:AM1';
             $sheet->getStyle($headerRange)->getFont()->setBold(true);
             $sheet->getStyle($headerRange)->getFill()
                   ->setFillType(Fill::FILL_SOLID)
@@ -100,11 +104,12 @@ class VotingTablesExport
 
             $row = 2;
             foreach ($votingTables as $table) {
-                // Calculate valid votes
-                $validVotes = $table->computed_records - $table->blank_votes - $table->null_votes;
+                // Calcular papeletas usadas y sobrantes
+                $ballotsUsed = $table->total_voters;
+                $ballotsLeftover = $table->ballots_received - $ballotsUsed - $table->ballots_spoiled;
 
-                $sheet->setCellValue('A' . $row, $table->code ?? '');
-                $sheet->setCellValue('B' . $row, $table->code_ine ?? '');
+                $sheet->setCellValue('A' . $row, $table->oep_code ?? '');
+                $sheet->setCellValue('B' . $row, $table->internal_code ?? '');
                 $sheet->setCellValue('C' . $row, $table->number ?? '');
                 $sheet->setCellValue('D' . $row, $table->letter ?? '');
                 $sheet->setCellValue('E' . $row, $this->getTypeLabel($table->type));
@@ -115,38 +120,42 @@ class VotingTablesExport
                 $sheet->setCellValue('J' . $row, $table->institution->municipality->name ?? '');
                 $sheet->setCellValue('K' . $row, $table->institution->locality->name ?? '');
                 $sheet->setCellValue('L' . $row, $table->electionType->name ?? '');
-                $sheet->setCellValue('M' . $row, $table->from_name ?? '');
-                $sheet->setCellValue('N' . $row, $table->to_name ?? '');
-                $sheet->setCellValue('O' . $row, $table->from_number ?? '');
-                $sheet->setCellValue('P' . $row, $table->to_number ?? '');
-                $sheet->setCellValue('Q' . $row, $table->registered_citizens ?? 0);
-                $sheet->setCellValue('R' . $row, $table->voted_citizens ?? 0);
-                $sheet->setCellValue('S' . $row, ($table->registered_citizens - $table->voted_citizens) ?? 0);
-                $sheet->setCellValue('T' . $row, $validVotes);
-                $sheet->setCellValue('U' . $row, $table->blank_votes ?? 0);
-                $sheet->setCellValue('V' . $row, $table->null_votes ?? 0);
-                $sheet->setCellValue('W' . $row, $table->computed_records ?? 0);
-                $sheet->setCellValue('X' . $row, $table->annulled_records ?? 0);
-                $sheet->setCellValue('Y' . $row, $table->enabled_records ?? 0);
-                $sheet->setCellValue('Z' . $row, $table->president ? $table->president->name . ' ' . ($table->president->last_name ?? '') : '');
-                $sheet->setCellValue('AA' . $row, $table->secretary ? $table->secretary->name . ' ' . ($table->secretary->last_name ?? '') : '');
-                $sheet->setCellValue('AB' . $row, $table->vocal1 ? $table->vocal1->name . ' ' . ($table->vocal1->last_name ?? '') : '');
-                $sheet->setCellValue('AC' . $row, $table->vocal2 ? $table->vocal2->name . ' ' . ($table->vocal2->last_name ?? '') : '');
-                $sheet->setCellValue('AD' . $row, $table->vocal3 ? $table->vocal3->name . ' ' . ($table->vocal3->last_name ?? '') : '');
-                $sheet->setCellValue('AE' . $row, $table->vocal4 ? $table->vocal4->name . ' ' . ($table->vocal4->last_name ?? '') : '');
-                $sheet->setCellValue('AF' . $row, $table->opening_time ? \Carbon\Carbon::parse($table->opening_time)->format('H:i') : '');
-                $sheet->setCellValue('AG' . $row, $table->closing_time ? \Carbon\Carbon::parse($table->closing_time)->format('H:i') : '');
-                $sheet->setCellValue('AH' . $row, $table->election_date ? \Carbon\Carbon::parse($table->election_date)->format('d/m/Y') : '');
-                $sheet->setCellValue('AI' . $row, $table->acta_number ?? '');
-                $sheet->setCellValue('AJ' . $row, $table->acta_uploaded_at ? \Carbon\Carbon::parse($table->acta_uploaded_at)->format('d/m/Y H:i') : '');
-                $sheet->setCellValue('AK' . $row, $this->getStatusLabel($table->status));
-                $sheet->setCellValue('AL' . $row, $table->observations ?? '');
+                $sheet->setCellValue('M' . $row, $table->voter_range_start_name ?? '');
+                $sheet->setCellValue('N' . $row, $table->voter_range_end_name ?? '');
+                $sheet->setCellValue('O' . $row, $table->expected_voters ?? 0);
+                $sheet->setCellValue('P' . $row, $table->ballots_received ?? 0);
+                $sheet->setCellValue('Q' . $row, $table->ballots_spoiled ?? 0);
+                $sheet->setCellValue('R' . $row, $table->valid_votes ?? 0);
+                $sheet->setCellValue('S' . $row, $table->blank_votes ?? 0);
+                $sheet->setCellValue('T' . $row, $table->null_votes ?? 0);
+                $sheet->setCellValue('U' . $row, $table->valid_votes_second ?? 0);
+                $sheet->setCellValue('V' . $row, $table->blank_votes_second ?? 0);
+                $sheet->setCellValue('W' . $row, $table->null_votes_second ?? 0);
+                $sheet->setCellValue('X' . $row, $table->total_voters ?? 0);
+                $sheet->setCellValue('Y' . $row, $ballotsUsed);
+                $sheet->setCellValue('Z' . $row, max(0, $ballotsLeftover));
+                $sheet->setCellValue('AA' . $row, $table->president ? $table->president->name . ' ' . ($table->president->last_name ?? '') : '');
+                $sheet->setCellValue('AB' . $row, $table->secretary ? $table->secretary->name . ' ' . ($table->secretary->last_name ?? '') : '');
+                $sheet->setCellValue('AC' . $row, $table->vocal1 ? $table->vocal1->name . ' ' . ($table->vocal1->last_name ?? '') : '');
+                $sheet->setCellValue('AD' . $row, $table->vocal2 ? $table->vocal2->name . ' ' . ($table->vocal2->last_name ?? '') : '');
+                $sheet->setCellValue('AE' . $row, $table->vocal3 ? $table->vocal3->name . ' ' . ($table->vocal3->last_name ?? '') : '');
+                $sheet->setCellValue('AF' . $row, $table->vocal4_name ?? '');
+                $sheet->setCellValue('AG' . $row, $table->opening_time ? \Carbon\Carbon::parse($table->opening_time)->format('H:i') : '');
+                $sheet->setCellValue('AH' . $row, $table->closing_time ? \Carbon\Carbon::parse($table->closing_time)->format('H:i') : '');
+                $sheet->setCellValue('AI' . $row, $table->election_date ? \Carbon\Carbon::parse($table->election_date)->format('d/m/Y') : '');
+                $sheet->setCellValue('AJ' . $row, $table->acta_number ?? '');
+                $sheet->setCellValue('AK' . $row, $table->acta_uploaded_at ? \Carbon\Carbon::parse($table->acta_uploaded_at)->format('d/m/Y H:i') : '');
+                $sheet->setCellValue('AL' . $row, $this->getStatusLabel($table->status));
+                $sheet->setCellValue('AM' . $row, $table->observations ?? '');
 
                 $row++;
             }
 
             // Auto-size columns
-            foreach (range('A', 'AL') as $column) {
+            $columns = range('A', 'M'); // A-M son 13 columnas
+            $columns = array_merge($columns, ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ', 'AK', 'AL', 'AM']);
+            
+            foreach ($columns as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
 
@@ -173,8 +182,8 @@ class VotingTablesExport
             $sheet = $spreadsheet->getActiveSheet();
 
             $headers = [
-                'A1' => 'Código Mesa',
-                'B1' => 'Código INE',
+                'A1' => 'Código OEP',
+                'B1' => 'Código Interno',
                 'C1' => 'N° Mesa',
                 'D1' => 'Letra',
                 'E1' => 'Tipo',
@@ -185,46 +194,44 @@ class VotingTablesExport
                 'J1' => 'Municipio',
                 'K1' => 'Localidad',
                 'L1' => 'Tipo Elección',
-                'M1' => 'Desde Apellido',
-                'N1' => 'Hasta Apellido',
-                'O1' => 'Desde C.I.',
-                'P1' => 'Hasta C.I.',
-                'Q1' => 'Ciudadanos Habilitados',
-                'R1' => 'Votaron',
-                'S1' => 'Votos Válidos',
-                'T1' => 'Votos Blanco',
-                'U1' => 'Votos Nulos',
-                'V1' => 'Papeletas Computadas',
-                'W1' => 'Papeletas Anuladas',
-                'X1' => 'Papeletas Habilitadas',
-                'Y1' => 'Presidente',
-                'Z1' => 'Secretario',
-                'AA1' => 'Vocal 1',
-                'AB1' => 'Vocal 2',
-                'AC1' => 'Vocal 3',
-                'AD1' => 'Vocal 4',
-                'AE1' => 'Hora Apertura',
-                'AF1' => 'Hora Cierre',
-                'AG1' => 'Fecha Elección',
-                'AH1' => 'N° Acta',
-                'AI1' => 'Estado'
+                'M1' => 'Rango Desde (Apellido)',
+                'N1' => 'Rango Hasta (Apellido)',
+                'O1' => 'Votantes Esperados',
+                'P1' => 'Papeletas Recibidas',
+                'Q1' => 'Papeletas Deterioradas',
+                'R1' => 'Votos Válidos Alcalde',
+                'S1' => 'Votos Blancos Alcalde',
+                'T1' => 'Votos Nulos Alcalde',
+                'U1' => 'Votos Válidos Concejal',
+                'V1' => 'Votos Blancos Concejal',
+                'W1' => 'Votos Nulos Concejal',
+                'X1' => 'Presidente',
+                'Y1' => 'Secretario',
+                'Z1' => 'Vocal 1',
+                'AA1' => 'Vocal 2',
+                'AB1' => 'Vocal 3',
+                'AC1' => 'Vocal 4',
+                'AD1' => 'Hora Apertura',
+                'AE1' => 'Hora Cierre',
+                'AF1' => 'Fecha Elección',
+                'AG1' => 'N° Acta',
+                'AH1' => 'Estado'
             ];
 
             foreach ($headers as $cell => $value) {
                 $sheet->setCellValue($cell, $value);
             }
 
-            $headerRange = 'A1:AI1';
+            $headerRange = 'A1:AH1';
             $sheet->getStyle($headerRange)->getFont()->setBold(true);
             $sheet->getStyle($headerRange)->getFill()
                   ->setFillType(Fill::FILL_SOLID)
                   ->getStartColor()->setRGB('E3F2FD');
 
-            // Sample data
+            // Sample data actualizado
             $sampleData = [
-                ['MESA001', 'INE001', '1', 'A', 'mixta', 'UNIDAD EDUCATIVA SIMÓN BOLÍVAR', 'INST0001', 'Cochabamba', 'Quillacollo', 'Quillacollo', 'Quillacollo (Urbano)', 'Elecciones Generales 2025', 'ACOSTA', 'ZEBALLOS', '1000000', '1999999', '350', '320', '305', '5', '10', '320', '5', '310', '', '', '', '', '', '', '08:00', '17:00', '19/10/2025', 'ACTA-001', 'pendiente'],
-                ['MESA002', 'INE002', '2', 'B', 'mixta', 'COLEGIO NACIONAL QUILLACOLLO', 'INST0002', 'Cochabamba', 'Quillacollo', 'Quillacollo', 'Centro', 'Elecciones Generales 2025', 'FLORES', 'PEREZ', '2000000', '2999999', '280', '250', '240', '4', '6', '250', '4', '240', '', '', '', '', '', '', '08:15', '17:00', '19/10/2025', 'ACTA-002', 'pendiente'],
-                ['', '', '3', '', 'mixta', 'UNIDAD EDUCATIVA ADELA ZAMUDIO', '', 'Cochabamba', 'Quillacollo', 'Quillacollo', 'El Paso', 'Elecciones Generales 2025', '', '', '', '', '320', '300', '290', '5', '5', '300', '5', '290', '', '', '', '', '', '', '', '', '', '', 'pendiente']
+                ['303182-1', 'REC-QUI-001-M01', '1', 'A', 'mixta', 'UNIDAD EDUCATIVA ADELA ZAMUDIO', 'REC-QUI-001', 'Cochabamba', 'Quillacollo', 'Quillacollo', 'Quillacollo (Urbano)', 'Elecciones Municipales 2026', 'ACOSTA', 'ZEBALLOS', '350', '350', '0', '305', '5', '10', '300', '4', '6', 'Juan Pérez', 'María Gómez', 'Carlos López', 'Ana Silva', 'Luis Torres', '08:00', '17:00', '22/03/2026', 'ACTA-001', 'configurada'],
+                ['303182-2', 'REC-QUI-002-M02', '2', 'B', 'mixta', 'COLEGIO NACIONAL QUILLACOLLO', 'REC-QUI-002', 'Cochabamba', 'Quillacollo', 'Quillacollo', 'Centro', 'Elecciones Municipales 2026', 'FLORES', 'PEREZ', '280', '280', '0', '240', '4', '6', '235', '5', '5', 'Pedro Rodríguez', 'Laura Fernández', 'Diego Castro', 'Sofía Méndez', 'Javier Ruiz', '08:15', '17:00', '22/03/2026', 'ACTA-002', 'configurada'],
             ];
 
             $row = 2;
@@ -237,24 +244,27 @@ class VotingTablesExport
                 $row++;
             }
 
-            // Auto-size columns
-            foreach (range('A', 'AI') as $column) {
+            $columns = range('A', 'H'); // A-H
+            $columns = array_merge($columns, ['I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH']);
+            
+            foreach ($columns as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
 
-            // Add instructions
             $instructionRow = $row + 2;
             $sheet->setCellValue('A' . $instructionRow, 'INSTRUCCIONES:');
             $sheet->getStyle('A' . $instructionRow)->getFont()->setBold(true);
 
             $instructions = [
-                'El código de mesa se genera automáticamente si se deja vacío',
-                'Los campos N° Mesa, Recinto y Estado son obligatorios',
+                'El código OEP y código Interno se generan automáticamente si se dejan vacíos',
+                'Los campos N° Mesa, Recinto, Tipo Elección y Estado son obligatorios',
                 'Para el campo Tipo use: mixta, masculina o femenina',
-                'Para el campo Estado use: pendiente, en_proceso, cerrado, en_computo, computado, observado, anulado',
-                'Los presidentes, secretarios y vocales deben ser emails o nombres completos válidos',
+                'Para el campo Estado use: ' . implode(', ', array_keys(VotingTable::getStatuses())),
+                'Los presidentes, secretarios y vocales deben ser emails o nombres de usuarios existentes',
                 'Las fechas deben tener formato dd/mm/aaaa',
                 'Las horas deben tener formato HH:MM (24h)',
+                'Los votos de Alcalde y Concejal se registran por separado',
+                'El total de votantes debe ser igual en ambas categorías',
                 'Elimine estas filas de ejemplo antes de importar sus datos'
             ];
 
@@ -290,15 +300,7 @@ class VotingTablesExport
 
     private function getStatusLabel($status)
     {
-        return match($status) {
-            'pendiente' => 'Pendiente',
-            'en_proceso' => 'En Proceso',
-            'cerrado' => 'Cerrado',
-            'en_computo' => 'En Cómputo',
-            'computado' => 'Computado',
-            'observado' => 'Observado',
-            'anulado' => 'Anulado',
-            default => $status,
-        };
+        $statuses = VotingTable::getStatuses();
+        return $statuses[$status] ?? $status;
     }
 }

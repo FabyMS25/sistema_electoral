@@ -4,12 +4,11 @@
 namespace App\Models;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection; // ALIAS para evitar confusión
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Support\Collection; // Para Support Collection
 
 class User extends Authenticatable
 {
@@ -42,40 +41,22 @@ class User extends Authenticatable
         'last_login_at' => 'datetime'
     ];
 
-    // Relaciones con roles y permisos
-    public function roles()
+    // ===== RELACIONES =====
+    
+    public function roles(): BelongsToMany
     {
-        return $this->belongsToMany(Role::class, 'role_user')
-                    ->withTimestamps();
+        return $this->belongsToMany(Role::class)
+            ->withPivot('scope', 'scope_id', 'scope_type')
+            ->withTimestamps();
     }
 
-    public function permissions()
+    public function permissions(): BelongsToMany
     {
-        return $this->belongsToMany(Permission::class, 'permission_user')
-                    ->withTimestamps();
+        return $this->belongsToMany(Permission::class)
+            ->withPivot('scope', 'scope_id', 'scope_type')
+            ->withTimestamps();
     }
     
-    public function recintoDelegations()
-    {
-        return $this->hasMany(RecintoDelegate::class, 'user_id');
-    }
-
-    public function tableDelegations()
-    {
-        return $this->hasMany(TableDelegate::class, 'user_id');
-    }
-
-    public function reviewerAssignments()
-    {
-        return $this->hasMany(Reviewer::class, 'user_id');
-    }
-
-    public function modifierAssignments()
-    {
-        return $this->hasMany(Modifier::class, 'user_id');
-    }
-
-    // Relaciones para auditoría
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -96,14 +77,11 @@ class User extends Authenticatable
         return $this->hasMany(Observation::class, 'resolved_by');
     }
 
-    // Cache de permisos - CORREGIDO: Usamos Collection de Support
-    private ?Collection $allPermissionsCache = null;
+    // ===== CACHE DE PERMISOS =====
+    
+    private $allPermissionsCache = null;
 
-    /**
-     * Obtener todos los permisos del usuario (roles + directos)
-     * CORREGIDO: Retorna Collection, no EloquentCollection
-     */
-    public function getAllPermissionsAttribute(): Collection
+    public function getAllPermissionsAttribute()
     {
         if ($this->allPermissionsCache === null) {
             $rolePermissions = $this->roles->flatMap(function($role) {
@@ -120,92 +98,128 @@ class User extends Authenticatable
         return $this->allPermissionsCache;
     }
 
-    /**
-     * Verificar si tiene un permiso específico
-     */
+    // ===== MÉTODOS DE PERMISOS =====
+    
     public function hasPermission(string $permissionName): bool
     {
         return $this->all_permissions->contains('name', $permissionName);
     }
+    
+    public function hasPermissionTo($permissionName, $scope = null, $scopeId = null): bool
+    {
+        // 1. SUPER ADMIN - Si tiene rol admin con ámbito global, puede todo
+        $isGlobalAdmin = $this->roles()
+            ->where('name', 'administrador')
+            ->wherePivot('scope', 'global')
+            ->exists();
+        
+        if ($isGlobalAdmin) {
+            return true;
+        }
+        
+        // 2. Verificar permisos directos del usuario
+        $directPermission = $this->permissions()
+            ->where('name', $permissionName)
+            ->where(function($q) use ($scope, $scopeId) {
+                $q->where('scope', 'global')
+                  ->orWhere(function($q2) use ($scope, $scopeId) {
+                      $q2->where('scope', $scope)
+                         ->where('scope_id', $scopeId);
+                  });
+            })->exists();
 
-    /**
-     * Verificar si tiene un rol específico
-     */
+        if ($directPermission) return true;
+
+        // 3. Verificar a través de roles
+        foreach ($this->roles as $role) {
+            $hasPermission = $role->permissions()
+                ->where('name', $permissionName)
+                ->exists();
+
+            if ($hasPermission) {
+                // Verificar ámbito del rol
+                if ($role->pivot->scope === 'global') return true;
+                if ($role->pivot->scope === $scope && $role->pivot->scope_id == $scopeId) return true;
+            }
+        }
+
+        return false;
+    }
+    
+    // ===== OBTENER ASIGNACIONES POR ÁMBITO =====
+    
+    public function getAssignedRecintos()
+    {
+        $recintoIds = $this->roles()
+            ->where('scope', 'recinto')
+            ->where('scope_type', Institution::class)
+            ->pluck('scope_id')
+            ->unique();
+
+        return Institution::whereIn('id', $recintoIds)->get();
+    }
+
+    public function getAssignedMesas()
+    {
+        $mesaIds = $this->roles()
+            ->where('scope', 'mesa')
+            ->where('scope_type', VotingTable::class)
+            ->pluck('scope_id')
+            ->unique();
+
+        return VotingTable::whereIn('id', $mesaIds)->get();
+    }
+
+    public function getAssignedInstitutionId()
+    {
+        $assignment = $this->roles()
+            ->where('scope', 'recinto')
+            ->where('scope_type', Institution::class)
+            ->first();
+            
+        return $assignment ? $assignment->pivot->scope_id : null;
+    }
+
+    public function getAssignedVotingTableId()
+    {
+        $assignment = $this->roles()
+            ->where('scope', 'mesa')
+            ->where('scope_type', VotingTable::class)
+            ->first();
+            
+        return $assignment ? $assignment->pivot->scope_id : null;
+    }
+
+    // ===== MÉTODOS DE ROLES =====
+    
     public function hasRole(string $roleName): bool
     {
         return $this->roles->contains('name', $roleName);
     }
 
-    /**
-     * Verificar si tiene alguno de los roles dados
-     */
     public function hasAnyRole(array $roleNames): bool
     {
         return $this->roles->whereIn('name', $roleNames)->isNotEmpty();
     }
 
-    /**
-     * Obtener el recinto asignado actualmente (si es delegado de recinto)
-     */
-    public function getAssignedRecintoAttribute()
+    public function hasAllRoles(array $roleNames): bool
     {
-        $activeDelegate = $this->recintoDelegations()
-            ->where('is_active', true)
-            ->where(function($q) {
-                $q->whereNull('assigned_until')
-                  ->orWhere('assigned_until', '>=', now());
-            })
-            ->with('institution')
-            ->first();
-            
-        return $activeDelegate ? $activeDelegate->institution : null;
+        $userRoleNames = $this->roles->pluck('name')->toArray();
+        return empty(array_diff($roleNames, $userRoleNames));
     }
 
-    /**
-     * Obtener la mesa asignada actualmente (si es delegado de mesa)
-     */
-    public function getAssignedVotingTableAttribute()
+    public function getRoleNamesAttribute(): string
     {
-        $activeDelegate = $this->tableDelegations()
-            ->where('is_active', true)
-            ->where(function($q) {
-                $q->whereNull('assigned_until')
-                  ->orWhere('assigned_until', '>=', now());
-            })
-            ->with('votingTable')
-            ->first();
-            
-        return $activeDelegate ? $activeDelegate->votingTable : null;
+        return $this->roles->pluck('display_name')->implode(', ');
     }
 
-    /**
-     * Obtener todas las asignaciones activas del usuario
-     */
-    public function getActiveAssignmentsAttribute()
-    {
-        return [
-            'recinto' => $this->assigned_recinto,
-            'voting_table' => $this->assigned_voting_table,
-            'reviewer_assignments' => $this->reviewerAssignments()
-                ->where('is_active', true)
-                ->get(),
-            'modifier_assignments' => $this->modifierAssignments()
-                ->where('is_active', true)
-                ->get()
-        ];
-    }
-
-    /**
-     * Scope para usuarios activos
-     */
+    // ===== SCOPES =====
+    
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
-    /**
-     * Scope para usuarios por rol
-     */
     public function scopeByRole($query, string $roleName)
     {
         return $query->whereHas('roles', function($q) use ($roleName) {
@@ -213,9 +227,17 @@ class User extends Authenticatable
         });
     }
 
-    /**
-     * Limpiar caché cuando se actualiza el usuario
-     */
+    public function scopeByRecinto($query, $institutionId)
+    {
+        return $query->whereHas('roles', function($q) use ($institutionId) {
+            $q->where('scope', 'recinto')
+              ->where('scope_id', $institutionId)
+              ->where('scope_type', Institution::class);
+        });
+    }
+
+    // ===== BOOT =====
+    
     protected static function booted()
     {
         static::saved(function ($user) {

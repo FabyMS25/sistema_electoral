@@ -8,67 +8,25 @@
 @section('css')
     <link href="{{ URL::asset('build/libs/sweetalert2/sweetalert2.min.css') }}" rel="stylesheet" />
     <style>
-        .candidate-card {
-            transition: all 0.2s;
-            border: 1px solid #e9e9ef;
-            border-radius: 0.5rem;
-            padding: 0.75rem;
-            margin-bottom: 0.5rem;
+        
+        .role-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
         }
-        .candidate-card:hover {
-            background-color: #f8f9fa;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        .observation-badge {
+            cursor: pointer;
         }
-        .candidate-color {
-            width: 20px;
-            height: 20px;
+        .validation-status {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
             border-radius: 4px;
             display: inline-block;
-            margin-right: 8px;
         }
-        .vote-input {
-            width: 100px;
-            text-align: center;
-            font-weight: bold;
-            border: 2px solid #e9e9ef;
-            border-radius: 0.5rem;
-            padding: 0.5rem;
-        }
-        .vote-input:focus {
-            border-color: #0ab39c;
-            outline: none;
-        }
-        .table-card {
-            transition: all 0.2s;
-            border-left: 4px solid transparent;
-        }
-        .table-card.pendiente {
-            border-left-color: #f7b84b;
-        }
-        .table-card.en_proceso {
-            border-left-color: #0ab39c;
-        }
-        .table-card.activo {
-            border-left-color: #0ab39c;
-        }
-        .table-card.cerrado {
-            border-left-color: #f06548;
-            opacity: 0.8;
-            background-color: #f8f9fa;
-        }
-        .total-badge {
-            font-size: 1rem;
-            padding: 0.5rem 1rem;
-        }
-        .quick-actions {
-            position: sticky;
-            bottom: 20px;
-            z-index: 100;
-            background: white;
-            padding: 1rem;
-            border-radius: 1rem;
-            box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
         }
     </style>
 @endsection
@@ -83,32 +41,84 @@
         @endslot
     @endcomponent
 
-    <!-- Filtros -->
     @include('voting-table-votes.partials.filters')
-
-    <!-- Resumen General -->
+    @include('voting-table-votes.partials.quick-stats')
     @include('voting-table-votes.partials.summary-cards')
 
-    <!-- Lista de Mesas -->
-    <div class="row mt-4">
+    @if(request()->has('institution_id') || request()->has('status') || request()->has('table_number'))
+        <div class="alert alert-info">
+            <i class="ri-information-line me-1"></i>
+            Mostrando resultados para los filtros aplicados. 
+            <a href="{{ route('voting-table-votes.index', ['election_type_id' => $electionTypeId]) }}" class="alert-link">
+                Limpiar filtros
+            </a>
+        </div>
+    @endif
+
+    <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">
                         <i class="ri-table-line me-1"></i>
                         Mesas de Votación
+                        <span class="badge bg-primary ms-2">{{ $votingTables->count() }} encontradas</span>
                     </h5>
+                    <div class="action-buttons">
+                        @can('review_votes')
+                            <button class="btn btn-sm btn-info" id="reviewAllBtn" title="Revisar todas">
+                                <i class="ri-eye-line me-1"></i>Revisar
+                            </button>
+                        @endcan
+                        @can('validate_votes')
+                            <button class="btn btn-sm btn-success" id="validateAllBtn" title="Validar todas">
+                                <i class="ri-check-line me-1"></i>Validar
+                            </button>
+                        @endcan
+                        @can('correct_votes')
+                            <button class="btn btn-sm btn-warning" id="correctAllBtn" title="Corregir todas">
+                                <i class="ri-refund-line me-1"></i>Corregir
+                            </button>
+                        @endcan
+                        @can('register_votes')
+                            <button class="btn btn-sm btn-success" id="saveAllBtn">
+                                <i class="ri-save-line me-1"></i>Guardar
+                            </button>
+                            <button class="btn btn-sm btn-warning" id="closeAllBtn">
+                                <i class="ri-lock-line me-1"></i>Cerrar
+                            </button>
+                        @endcan
+                    </div>
                 </div>
                 <div class="card-body">
                     @forelse($votingTables as $table)
-                        @include('voting-table-votes.partials.table-row', ['table' => $table])
+                        @include('voting-table-votes.partials.table-row', [
+                            'table' => $table,
+                            'userCan' => [
+                                'register' => auth()->user()->hasPermission('register_votes'),
+                                'review' => auth()->user()->hasPermission('review_votes'),
+                                'correct' => auth()->user()->hasPermission('correct_votes'),
+                                'validate' => auth()->user()->hasPermission('validate_votes'),
+                                'observe' => auth()->user()->hasPermission('create_observations'),
+                                'upload_acta' => auth()->user()->hasPermission('upload_actas'),
+                                'close' => auth()->user()->hasPermission('close_tables')
+                            ]
+                        ])
                     @empty
                         <div class="text-center py-5">
                             <lord-icon src="https://cdn.lordicon.com/msoeawqm.json" trigger="loop"
                                 colors="primary:#121331,secondary:#08a88a" style="width:75px;height:75px">
                             </lord-icon>
                             <h5 class="mt-3">No hay mesas disponibles</h5>
-                            <p class="text-muted">No se encontraron mesas para los filtros seleccionados.</p>
+                            <p class="text-muted">
+                                No se encontraron mesas para los filtros seleccionados.
+                                @if(request()->has('institution_id') || request()->has('status') || request()->has('table_number'))
+                                    <br>
+                                    <a href="{{ route('voting-table-votes.index', ['election_type_id' => $electionTypeId]) }}" class="btn btn-link">
+                                        Limpiar filtros
+                                    </a>
+                                @endif
+                            </p>
                         </div>
                     @endforelse
                 </div>
@@ -118,31 +128,13 @@
 
     <!-- Acciones Rápidas -->
     @if($votingTables->isNotEmpty())
-        <div class="quick-actions">
-            <div class="container-fluid">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <span class="text-muted">
-                            <i class="ri-information-line me-1"></i>
-                            {{ $votingTables->count() }} mesas visibles
-                        </span>
-                    </div>
-                    <div class="col-md-6 text-end">
-                        <button class="btn btn-success me-2" id="saveAllBtn">
-                            <i class="ri-save-line me-1"></i>
-                            Guardar Todos
-                        </button>
-                        <button class="btn btn-warning" id="closeAllBtn">
-                            <i class="ri-lock-line me-1"></i>
-                            Cerrar Todos
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @include('voting-table-votes.partials.quick-actions')
     @endif
 
     <!-- Modales -->
+    @include('voting-table-votes.partials.modals.observation-modal')
+    @include('voting-table-votes.partials.modals.upload-acta-modal')
+    @include('voting-table-votes.partials.modals.validation-modal')
     @include('voting-table-votes.partials.modals.confirm-close')
     @include('voting-table-votes.partials.modals.bulk-update')
 @endsection
@@ -153,10 +145,17 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Inicializar con datos de candidatos
             window.candidates = @json($candidates);
             window.electionTypeId = {{ $electionTypeId ?? 'null' }};
             window.institutionId = {{ $institutionId ?? 'null' }};
+            window.userPermissions = {
+                register: {{ auth()->user()->hasPermission('register_votes') ? 'true' : 'false' }},
+                review: {{ auth()->user()->hasPermission('review_votes') ? 'true' : 'false' }},
+                correct: {{ auth()->user()->hasPermission('correct_votes') ? 'true' : 'false' }},
+                validate: {{ auth()->user()->hasPermission('validate_votes') ? 'true' : 'false' }},
+                observe: {{ auth()->user()->hasPermission('create_observations') ? 'true' : 'false' }},
+                uploadActa: {{ auth()->user()->hasPermission('upload_actas') ? 'true' : 'false' }}
+            };
         });
     </script>
 @endsection

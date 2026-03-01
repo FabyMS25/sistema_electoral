@@ -1,66 +1,102 @@
 {{-- resources/views/voting-tables/partials/stats-cards.blade.php --}}
 @php
     $totalTables = $votingTables->total();
-    $totalCitizens = $votingTables->sum('registered_citizens');
-    $totalVoted = $votingTables->sum('voted_citizens');
-    $totalComputed = $votingTables->sum('computed_records');
-    $pendingTables = $votingTables->where('status', 'pendiente')->count();
-    $computedTables = $votingTables->where('status', 'computado')->count();
+    $totalExpectedVoters = $votingTables->sum('expected_voters');
+    $totalActualVoters = $votingTables->sum('total_voters');
+    $pendingTables = $votingTables->whereIn('status', ['configurada', 'en_espera', 'votacion'])->count();
+    $computedTables = $votingTables->whereIn('status', ['escrutada', 'transmitida'])->count();
+    $observedTables = $votingTables->where('status', 'observada')->count();
+    $annulledTables = $votingTables->where('status', 'anulada')->count();
+    $totalActas = $votingTables->filter(function($table) {
+        return $table->total_voters > 0 || 
+               $table->total_voters_second > 0 || 
+               $table->valid_votes > 0 || 
+               $table->valid_votes_second > 0;
+    })->count();
+    $participationPercentage = $totalExpectedVoters > 0 ? round(($totalActualVoters/$totalExpectedVoters)*100, 1) : 0;
+    $pendingPercentage = $totalTables > 0 ? round(($pendingTables/$totalTables)*100, 1) : 0;
+    $computedPercentage = $totalTables > 0 ? round(($computedTables/$totalTables)*100, 1) : 0;
 @endphp
 
-<div class="row mb-4">
-    <div class="col-xl-2 col-md-4">
+<div class="row">
+    <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-primary text-white">
             <div class="card-body">
                 <h6 class="text-white-50 mb-2">Total Mesas</h6>
                 <h3 class="mb-0 text-white">{{ number_format($totalTables) }}</h3>
+                <small class="text-white-50">Registradas</small>
             </div>
         </div>
     </div>
     
-    <div class="col-xl-2 col-md-4">
+    <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-info text-white">
             <div class="card-body">
                 <h6 class="text-white-50 mb-2">Electores</h6>
-                <h3 class="mb-0 text-white">{{ number_format($totalCitizens) }}</h3>
+                <h3 class="mb-0 text-white">{{ number_format($totalExpectedVoters) }}</h3>
+                <small class="text-white-50">Habilitados</small>
             </div>
         </div>
     </div>
     
-    <div class="col-xl-2 col-md-4">
+    <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-success text-white">
             <div class="card-body">
                 <h6 class="text-white-50 mb-2">Votaron</h6>
-                <h3 class="mb-0 text-white">{{ number_format($totalVoted) }}</h3>
-                <small>{{ $totalCitizens > 0 ? round(($totalVoted/$totalCitizens)*100, 1) : 0 }}%</small>
+                <h3 class="mb-0 text-white">{{ number_format($totalActualVoters) }}</h3>
+                <small class="text-white-50">{{ $participationPercentage }}% participación</small>
             </div>
         </div>
     </div>
     
-    <div class="col-xl-2 col-md-4">
+    <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-warning text-white">
             <div class="card-body">
                 <h6 class="text-white-50 mb-2">Pendientes</h6>
                 <h3 class="mb-0 text-white">{{ number_format($pendingTables) }}</h3>
+                <small class="text-white-50">{{ $pendingPercentage }}% del total</small>
             </div>
         </div>
     </div>
     
-    <div class="col-xl-2 col-md-4">
+    <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-success text-white">
             <div class="card-body">
-                <h6 class="text-white-50 mb-2">Computadas</h6>
+                <h6 class="text-white-50 mb-2">Escrutadas</h6>
                 <h3 class="mb-0 text-white">{{ number_format($computedTables) }}</h3>
+                <small class="text-white-50">{{ $computedPercentage }}% procesado</small>
             </div>
         </div>
     </div>
     
-    <div class="col-xl-2 col-md-4">
+    <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-danger text-white">
             <div class="card-body">
                 <h6 class="text-white-50 mb-2">Actas</h6>
-                <h3 class="mb-0 text-white">{{ number_format($totalComputed) }}</h3>
+                <h3 class="mb-0 text-white">{{ number_format($totalActas) }}</h3>
+                <small class="text-white-50">Con votos registrados</small>
             </div>
         </div>
     </div>
 </div>
+
+@if($observedTables > 0 || $annulledTables > 0)
+<div class="row mt-2">
+    <div class="col-12">
+        <div class="d-flex gap-2 justify-content-end">
+            @if($observedTables > 0)
+            <span class="badge bg-danger-subtle text-danger">
+                <i class="ri-error-warning-line me-1"></i>
+                {{ $observedTables }} mesas observadas
+            </span>
+            @endif
+            @if($annulledTables > 0)
+            <span class="badge bg-dark-subtle text-dark">
+                <i class="ri-forbid-line me-1"></i>
+                {{ $annulledTables }} mesas anuladas
+            </span>
+            @endif
+        </div>
+    </div>
+</div>
+@endif

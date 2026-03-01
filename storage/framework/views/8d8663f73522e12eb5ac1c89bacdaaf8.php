@@ -5,10 +5,9 @@
     <meta charset="utf-8" />
     <title><?php echo $__env->yieldContent('title'); ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta content="Premium Multipurpose Admin & Dashboard Template" name="description" />
-    <meta content="Themesbrand" name="author" />
-    <!-- App favicon -->
-    <link rel="shortcut icon" href="<?php echo e(URL::asset('build/images/lofo_elections_large.png')); ?>">
+    <meta content="Elections App" name="description" />
+    <meta content="" name="author" />
+    <link rel="shortcut icon" href="<?php echo e(URL::asset('build/images/lofo_elections.png')); ?>">
         <?php echo $__env->make('layouts.head-css', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
   </head>
 

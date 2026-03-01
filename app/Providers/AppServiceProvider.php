@@ -1,32 +1,27 @@
 <?php
-
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
-
+use Illuminate\Pagination\Paginator;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     *
-     * @return void
-     */
-    public function register()
+    public function register(): void
     {
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     *
-     * @return void
-     */
-    public function boot()
+    public function boot(): void
     {
-        //
         Schema::defaultStringLength(191);
-
+        Paginator::useBootstrapFive();
+        
+        // Compartir datos con todas las vistas (opcional)
+        view()->composer('*', function ($view) {
+            if (auth()->check()) {
+                $view->with('currentUser', auth()->user());
+            }
+        });
     }
 }

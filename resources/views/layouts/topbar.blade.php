@@ -144,7 +144,7 @@
                     </button>
                     <div class="dropdown-menu dropdown-menu-end">
                         <h6 class="dropdown-header">Bienvenid@ {{ Auth::user()->name }}!</h6>
-                        <a class="dropdown-item" href="{{ route('profile') }}">
+                        <a class="dropdown-item" href="{{ route('profile.index') }}">
                             <i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i> 
                             <span class="align-middle">Perfil</span>
                         </a>

@@ -144,7 +144,7 @@
                     </button>
                     <div class="dropdown-menu dropdown-menu-end">
                         <h6 class="dropdown-header">Bienvenid@ <?php echo e(Auth::user()->name); ?>!</h6>
-                        <a class="dropdown-item" href="<?php echo e(route('profile')); ?>">
+                        <a class="dropdown-item" href="<?php echo e(route('profile.index')); ?>">
                             <i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i> 
                             <span class="align-middle">Perfil</span>
                         </a>
@@ -195,5 +195,4 @@
 
         </div><!-- /.modal-content -->
     </div><!-- /.modal-dialog -->
-</div><!-- /.modal -->
-<?php /**PATH D:\_Mine\corporate\resources\views/layouts/topbar.blade.php ENDPATH**/ ?>
+</div><!-- /.modal --><?php /**PATH D:\_Mine\corporate\resources\views/layouts/topbar.blade.php ENDPATH**/ ?>

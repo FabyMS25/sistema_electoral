@@ -1,87 +1,4 @@
-<div class="row mb-2">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <div class="row g-3">
-                    <div class="col-md-8 d-flex gap-3">
-                        <h5 class="card-title mb-0 mt-2">Tipo de Elección: </h5>
-                        <form method="GET" action="{{ url()->current() }}">
-                            <div class="row">
-                            <div class="col-md-8">
-                                <select name="election_type" class="form-select" onchange="this.form.submit()">
-                                    @foreach($electionTypes as $electionType)
-                                        <option value="{{ $electionType->id }}" 
-                                            {{ $selectedElectionType && $selectedElectionType->id == $electionType->id ? 'selected' : '' }}>
-                                            {{ $electionType->name }} ({{ $electionType->type }})
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <button type="submit" class="btn btn-primary w-100">Filtrar Resultados</button>
-                            </div>
-                            </div>
-                        </form>
-                    </div>             
-                    <div class="col-md-4">
-                        <div class="d-flex justify-content-end align-items-center">
-                            <button class="btn btn-sm btn-outline-primary" onclick="refreshDashboard()">
-                                <i class="ri-refresh-line"></i> Actualizar ahora
-                            </button>
-                            <div class="ms-2">
-                                <small class="text-muted" id="last-update-time">
-                                    Última actualización: {{ now()->format('H:i:s') }}
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body">
-                <form method="GET" action="{{ url()->current() }}" class="row g-3 p-1" id="locationFilterForm">
-                    <input type="hidden" name="election_type" value="{{ $selectedElectionType ? $selectedElectionType->id : '' }}">
-                    <div class="col-md-3">
-                        <label for="department" class="form-label mb-0">Departamento</label>
-                        <select name="department" id="department" class="form-select" onchange="updateProvinces()">
-                            @foreach($departments as $department)
-                                <option value="{{ $department->id }}" 
-                                    {{ $selectedDepartment == $department->id ? 'selected' : '' }}>
-                                    {{ $department->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>                    
-                    <div class="col-md-3">
-                        <label for="province" class="form-label mb-0">Provincia</label>
-                        <select name="province" id="province" class="form-select" onchange="updateMunicipalities()">
-                            @foreach($provinces as $province)
-                                <option value="{{ $province->id }}" 
-                                    {{ $selectedProvince == $province->id ? 'selected' : '' }}>
-                                    {{ $province->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>                    
-                    <div class="col-md-3">
-                        <label for="municipality" class="form-label mb-0">Municipio</label>
-                        <select name="municipality" id="municipality" class="form-select" onchange="this.form.submit()">
-                            @foreach($municipalities as $municipality)
-                                <option value="{{ $municipality->id }}" 
-                                    {{ $selectedMunicipality == $municipality->id ? 'selected' : '' }}>
-                                    {{ $municipality->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>                    
-                    <div class="col-md-3 mt-1">
-                        <label class="form-label d-block">&nbsp;</label>
-                        <button type="submit" class="btn btn-primary w-100">Filtrar Resultados</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+@include('partials.dashboard-filters')
 
 <div id="loading-indicator" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 9999; background: #fff; padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
     <div class="d-flex align-items-center">
@@ -92,13 +9,14 @@
     </div>
 </div>
 <div class="row">
+    <!-- Tarjeta de Votos Totales - Alcalde -->
     <div class="col-xl-3 col-md-6">
         <div class="card bg-gradient-primary card-animate">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <p class="text-white text-opacity-75 text-uppercase fw-medium mb-2">Votos Totales</p>
-                        <h3 class="text-white mb-0"><span class="counter-value" data-target="{{ $totalVotes }}">0</span></h3>
+                        <p class="text-white text-opacity-75 text-uppercase fw-medium mb-2">Votos Alcalde</p>
+                        <h3 class="text-white mb-0"><span class="counter-value" data-target="{{ $totalVotesAlcalde }}">0</span></h3>
                         <small class="text-white text-opacity-75">Emitidos en vivo</small>
                     </div>
                     <div class="avatar-sm">
@@ -116,6 +34,34 @@
             </div>
         </div>
     </div>
+
+    <!-- Tarjeta de Votos Totales - Concejal -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card bg-gradient-info card-animate">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-white text-opacity-75 text-uppercase fw-medium mb-2">Votos Concejal</p>
+                        <h3 class="text-white mb-0"><span class="counter-value" data-target="{{ $totalVotesConcejal }}">0</span></h3>
+                        <small class="text-white text-opacity-75">Emitidos en vivo</small>
+                    </div>
+                    <div class="avatar-sm">
+                        <span class="avatar-title bg-white bg-opacity-25 rounded-circle fs-2">
+                            <i class="ri-bar-chart-grouped-line text-white"></i>
+                        </span>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-white text-info me-2">{{ $progressPercentage }}%</span>
+                        <span class="text-white text-opacity-75">mesas reportadas</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tarjeta de Mesas Reportadas -->
     <div class="col-xl-3 col-md-6">
         <div class="card bg-gradient-success card-animate">
             <div class="card-body">
@@ -141,17 +87,22 @@
             </div>
         </div>
     </div>
+
+    <!-- Tarjeta de Candidato Líder (Alcalde) -->
     <div class="col-xl-3 col-md-6">
         <div class="card bg-gradient-warning card-animate">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <p class="text-white text-opacity-75 text-uppercase fw-medium mb-2">Candidato Líder</p>
-                        @if(count($candidateStats) > 0)
-                            @php $leadingCandidate = reset($candidateStats); @endphp
-                            <h5 class="text-white mb-0">{{ $leadingCandidate['candidate']->name ?? 'N/A' }}</h5>
+                        <p class="text-white text-opacity-75 text-uppercase fw-medium mb-2">Líder Alcalde</p>
+                        @if(count($alcaldeStats) > 0)
+                            @php 
+                                $sortedAlcalde = collect($alcaldeStats)->sortByDesc('votes')->first();
+                                $leadingAlcalde = $sortedAlcalde;
+                            @endphp
+                            <h5 class="text-white mb-0">{{ $leadingAlcalde['candidate']->name ?? 'N/A' }}</h5>
                             <small class="text-white text-opacity-75">
-                                {{ number_format($leadingCandidate['votes']) }} votos ({{ $leadingCandidate['percentage'] }}%)
+                                {{ number_format($leadingAlcalde['votes']) }} votos ({{ $leadingAlcalde['percentage'] }}%)
                             </small>
                         @else
                             <h5 class="text-white mb-0">Sin votos</h5>
@@ -166,16 +117,26 @@
             </div>
         </div>
     </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="card bg-gradient-info card-animate">
+
+    <!-- Segunda fila: Líder Concejal y Participación -->
+    <div class="col-xl-3 col-md-6 mt-3">
+        <div class="card bg-gradient-purple card-animate">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <p class="text-white text-opacity-75 text-uppercase fw-medium mb-2">Participación</p>
-                        <h3 class="text-white mb-0">
-                            <span class="counter-value" data-target="{{ $reportedTables > 0 ? round(($totalVotes / ($reportedTables * 300)) * 100, 1) : 0 }}">0</span>%
-                        </h3>
-                        <small class="text-white text-opacity-75">estimado por mesa</small>
+                        <p class="text-white text-opacity-75 text-uppercase fw-medium mb-2">Líder Concejal</p>
+                        @if(count($concejalStats) > 0)
+                            @php 
+                                $sortedConcejal = collect($concejalStats)->sortByDesc('votes')->first();
+                                $leadingConcejal = $sortedConcejal;
+                            @endphp
+                            <h5 class="text-white mb-0">{{ $leadingConcejal['candidate']->name ?? 'N/A' }}</h5>
+                            <small class="text-white text-opacity-75">
+                                {{ number_format($leadingConcejal['votes']) }} votos ({{ $leadingConcejal['percentage'] }}%)
+                            </small>
+                        @else
+                            <h5 class="text-white mb-0">Sin votos</h5>
+                        @endif
                     </div>
                     <div class="avatar-sm">
                         <span class="avatar-title bg-white bg-opacity-25 rounded-circle fs-2">
@@ -186,47 +147,132 @@
             </div>
         </div>
     </div>
-</div>
 
+    <div class="col-xl-3 col-md-6 mt-3">
+        <div class="card bg-gradient-pink card-animate">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-white text-opacity-75 text-uppercase fw-medium mb-2">Participación</p>
+                        <h3 class="text-white mb-0">
+                            <span class="counter-value" data-target="{{ $reportedTables > 0 ? round(($totalVotesAlcalde / ($reportedTables * 300)) * 100, 1) : 0 }}">0</span>%
+                        </h3>
+                        <small class="text-white text-opacity-75">promedio por mesa</small>
+                    </div>
+                    <div class="avatar-sm">
+                        <span class="avatar-title bg-white bg-opacity-25 rounded-circle fs-2">
+                            <i class="ri-pie-chart-line text-white"></i>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Tendencia de Votos - Alcalde</h5>
+            </div>
+            <div class="card-body">
+                <div id="candidates_trend_chart"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Distribución Alcalde</h5>
+            </div>
+            <div class="card-body">
+                <div id="candidates_pie_chart_alcalde"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Distribución Concejal</h5>
+            </div>
+            <div class="card-body">
+                <div id="candidates_pie_chart_concejal"></div>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- Main Visualization Row - Redesigned -->
 <div class="row mt-4">
-    <div class="col-xl-8">
+    <div class="col-xl-6">
         <div class="card">
             <div class="card-header">
                 <div class="d-flex align-items-center">
-                    <h5 class="card-title mb-0 flex-grow-1">Resultados por Candidato - Tendencia</h5>
+                    <h5 class="card-title mb-0 flex-grow-1">Alcalde - Tendencia</h5>
                     <div class="flex-shrink-0">
                         <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-sm btn-soft-primary active" data-chart-view="bars">Barras</button>
-                            <button type="button" class="btn btn-sm btn-soft-primary" data-chart-view="line">Línea</button>
+                            <button type="button" class="btn btn-sm btn-soft-primary active" data-chart-view="bars-alcalde">Barras</button>
+                            <button type="button" class="btn btn-sm btn-soft-primary" data-chart-view="line-alcalde">Línea</button>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="card-body">
-                <div id="candidates_trend_chart" style="height: 350px;"></div>
+                <div id="candidates_trend_chart_alcalde" style="height: 350px;"></div>
             </div>
         </div>
     </div>
     
-    <div class="col-xl-4">
+    <div class="col-xl-6">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">Distribución 3D</h5>
+                <div class="d-flex align-items-center">
+                    <h5 class="card-title mb-0 flex-grow-1">Concejal - Tendencia</h5>
+                    <div class="flex-shrink-0">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-sm btn-soft-primary active" data-chart-view="bars-concejal">Barras</button>
+                            <button type="button" class="btn btn-sm btn-soft-primary" data-chart-view="line-concejal">Línea</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="card-body">
-                <div id="candidates_pie_chart" style="height: 350px;"></div>
+                <div id="candidates_trend_chart_concejal" style="height: 350px;"></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Second Row - New Chart Types -->
+<!-- Second Row - Pie Charts -->
+<div class="row">
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Distribución Alcalde</h5>
+            </div>
+            <div class="card-body">
+                <div id="candidates_pie_chart_alcalde" style="height: 350px;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Distribución Concejal</h5>
+            </div>
+            <div class="card-body">
+                <div id="candidates_pie_chart_concejal" style="height: 350px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Third Row - Localities Analysis -->
 <div class="row">
     <div class="col-xl-5">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">Análisis por Localidad - Radial</h5>
+                <h5 class="card-title mb-0">Progreso por Localidad</h5>
             </div>
             <div class="card-body">
                 <div id="locality_radial_chart" style="height: 350px;"></div>
@@ -237,49 +283,54 @@
     <div class="col-xl-7">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">Comparativo de Candidatos por Localidad</h5>
+                <h5 class="card-title mb-0">Mapa de Calor - Alcalde por Localidad</h5>
             </div>
             <div class="card-body">
-                <div id="candidates_heatmap" style="height: 350px;"></div>
+                <div id="candidates_heatmap_alcalde" style="height: 350px;"></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Third Row - Advanced Visualizations -->
+<!-- Fourth Row - Additional Heatmap for Concejal -->
 <div class="row">
-    <div class="col-xl-6">
+    <div class="col-xl-7">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">Progreso de Escrutinio - Gauge</h5>
+                <h5 class="card-title mb-0">Mapa de Calor - Concejal por Localidad</h5>
             </div>
             <div class="card-body">
-                <div id="progress_gauge" style="height: 300px;"></div>
+                <div id="candidates_heatmap_concejal" style="height: 350px;"></div>
             </div>
         </div>
     </div>
     
-    <div class="col-xl-6">
+    <div class="col-xl-5">
         <div class="card">
             <div class="card-header">
-                <h5 class="card-title mb-0">Participación por Localidad</h5>
+                <h5 class="card-title mb-0">Progreso General</h5>
             </div>
             <div class="card-body">
-                <div id="participation_bubbles" style="height: 300px;"></div>
+                <div id="progress_gauge" style="height: 350px;"></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Fourth Row - Detailed Data -->
+<!-- Fifth Row - Detailed Data Tabs -->
 <div class="row">
     <div class="col-xl-12">
         <div class="card">
             <div class="card-header">
                 <ul class="nav nav-tabs-custom card-header-tabs border-bottom-0" role="tablist">
                     <li class="nav-item">
-                        <a class="nav-link active" data-bs-toggle="tab" href="#candidates_tab" role="tab">
-                            <i class="ri-user-star-line me-1 align-bottom"></i> Candidatos
+                        <a class="nav-link active" data-bs-toggle="tab" href="#alcalde_tab" role="tab">
+                            <i class="ri-user-star-line me-1 align-bottom"></i> Alcalde
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#concejal_tab" role="tab">
+                            <i class="ri-user-star-line me-1 align-bottom"></i> Concejal
                         </a>
                     </li>
                     <li class="nav-item">
@@ -296,8 +347,8 @@
             </div>
             <div class="card-body">
                 <div class="tab-content">
-                    <!-- Candidates Tab -->
-                    <div class="tab-pane active" id="candidates_tab" role="tabpanel">
+                    <!-- Alcalde Tab -->
+                    <div class="tab-pane active" id="alcalde_tab" role="tabpanel">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="table-light">
@@ -312,10 +363,10 @@
                                 </thead>
                                 <tbody>
                                     @php
-                                        $sortedStats = collect($candidateStats)->sortByDesc('votes')->values();
+                                        $sortedAlcalde = collect($alcaldeStats)->sortByDesc('votes')->values();
                                         $prevVotes = null;
                                     @endphp
-                                    @foreach($sortedStats as $index => $stats)
+                                    @foreach($sortedAlcalde as $index => $stats)
                                         @php 
                                             $candidate = $stats['candidate'];
                                             $difference = $prevVotes !== null ? $prevVotes - $stats['votes'] : 0;
@@ -382,7 +433,93 @@
                         </div>
                     </div>
                     
-                    <!-- Localities Tab -->
+                    <!-- Concejal Tab -->
+                    <div class="tab-pane" id="concejal_tab" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Posición</th>
+                                        <th>Candidato</th>
+                                        <th>Partido</th>
+                                        <th>Votos</th>
+                                        <th>Porcentaje</th>
+                                        <th>Diferencia</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @php
+                                        $sortedConcejal = collect($concejalStats)->sortByDesc('votes')->values();
+                                        $prevVotes = null;
+                                    @endphp
+                                    @foreach($sortedConcejal as $index => $stats)
+                                        @php 
+                                            $candidate = $stats['candidate'];
+                                            $difference = $prevVotes !== null ? $prevVotes - $stats['votes'] : 0;
+                                            $prevVotes = $stats['votes'];
+                                        @endphp
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-{{ $index == 0 ? 'success' : ($index == 1 ? 'info' : ($index == 2 ? 'warning' : 'secondary')) }} rounded-pill fs-12">
+                                                    #{{ $index + 1 }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    @if($candidate->photo)
+                                                        <img src="{{ asset('storage/' . $candidate->photo) }}" 
+                                                             alt="{{ $candidate->name }}" 
+                                                             class="rounded-circle avatar-sm me-2"
+                                                             style="width: 32px; height: 32px; object-fit: cover;">
+                                                    @else
+                                                        <div class="avatar-sm me-2">
+                                                            <span class="avatar-title rounded-circle bg-soft-info text-info">
+                                                                {{ substr($candidate->name, 0, 1) }}
+                                                            </span>
+                                                        </div>
+                                                    @endif
+                                                    <div>
+                                                        <h6 class="mb-0">{{ $candidate->name }}</h6>
+                                                        <small class="text-muted">{{ $candidate->party }}</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-light text-dark">{{ $candidate->party }}</span>
+                                            </td>
+                                            <td>
+                                                <h6 class="mb-0">{{ number_format($stats['votes']) }}</h6>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="fw-semibold">{{ $stats['percentage'] }}%</span>
+                                                    <div class="progress" style="width: 80px; height: 6px;">
+                                                        <div class="progress-bar bg-{{ $index == 0 ? 'success' : ($index == 1 ? 'info' : ($index == 2 ? 'warning' : 'secondary')) }}" 
+                                                             role="progressbar" 
+                                                             style="width: {{ $stats['percentage'] }}%"></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                @if($index > 0)
+                                                    <span class="text-muted">
+                                                        <i class="ri-arrow-down-line text-danger"></i>
+                                                        {{ number_format($difference) }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-success">
+                                                        <i class="ri-arrow-up-line"></i> Líder
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Localities Tab (actualizado para mostrar ambas categorías) -->
                     <div class="tab-pane" id="localities_tab" role="tabpanel">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0">
@@ -393,8 +530,10 @@
                                         <th>Mesas</th>
                                         <th>Reportadas</th>
                                         <th>Avance</th>
-                                        <th>Votos</th>
-                                        <th>Candidato Ganador</th>
+                                        <th>Votos Alcalde</th>
+                                        <th>Votos Concejal</th>
+                                        <th>Ganador Alcalde</th>
+                                        <th>Ganador Concejal</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -402,14 +541,33 @@
                                         @php
                                             $progress = $locality->total_tables > 0 ? round(($locality->reported_tables / $locality->total_tables) * 100) : 0;
                                             $localityData = $localityResults[$locality->id] ?? null;
-                                            $winningCandidate = null;
-                                            $maxVotes = 0;
+                                            
+                                            // Ganador Alcalde
+                                            $winningAlcalde = null;
+                                            $maxVotesAlcalde = 0;
+                                            
+                                            // Ganador Concejal
+                                            $winningConcejal = null;
+                                            $maxVotesConcejal = 0;
                                             
                                             if ($localityData && isset($localityData['candidates'])) {
-                                                foreach ($localityData['candidates'] as $candidate) {
-                                                    if ($candidate['votes'] > $maxVotes) {
-                                                        $maxVotes = $candidate['votes'];
-                                                        $winningCandidate = $candidate;
+                                                // Alcalde (ALC)
+                                                if (isset($localityData['candidates']['ALC'])) {
+                                                    foreach ($localityData['candidates']['ALC'] as $candidate) {
+                                                        if ($candidate['votes'] > $maxVotesAlcalde) {
+                                                            $maxVotesAlcalde = $candidate['votes'];
+                                                            $winningAlcalde = $candidate;
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                // Concejal (CON)
+                                                if (isset($localityData['candidates']['CON'])) {
+                                                    foreach ($localityData['candidates']['CON'] as $candidate) {
+                                                        if ($candidate['votes'] > $maxVotesConcejal) {
+                                                            $maxVotesConcejal = $candidate['votes'];
+                                                            $winningConcejal = $candidate;
+                                                        }
                                                     }
                                                 }
                                             }
@@ -429,14 +587,28 @@
                                                 </div>
                                             </td>
                                             <td>
-                                                <span class="badge bg-light text-dark">
-                                                    {{ number_format($localityData['total_votes'] ?? 0) }}
+                                                <span class="badge bg-primary">
+                                                    {{ number_format($localityData['total_votes_alcalde'] ?? 0) }}
                                                 </span>
                                             </td>
                                             <td>
-                                                @if($winningCandidate)
+                                                <span class="badge bg-info">
+                                                    {{ number_format($localityData['total_votes_concejal'] ?? 0) }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if($winningAlcalde)
                                                     <span class="badge bg-success">
-                                                        {{ $winningCandidate['name'] }} ({{ $winningCandidate['percentage'] }}%)
+                                                        {{ $winningAlcalde['name'] }} ({{ $winningAlcalde['percentage'] }}%)
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-secondary">Sin datos</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @if($winningConcejal)
+                                                    <span class="badge bg-info">
+                                                        {{ $winningConcejal['name'] }} ({{ $winningConcejal['percentage'] }}%)
                                                     </span>
                                                 @else
                                                     <span class="badge bg-secondary">Sin datos</span>
@@ -449,7 +621,7 @@
                         </div>
                     </div>
                     
-                    <!-- Tables Tab -->
+                    <!-- Tables Tab (sin cambios) -->
                     <div class="tab-pane" id="tables_tab" role="tabpanel">
                         <div class="row">
                             <div class="col-md-4">
@@ -498,6 +670,29 @@
         </div>
     </div>
 </div>
+<div class="row">
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Progreso por Localidad</h5>
+            </div>
+            <div class="card-body">
+                <div id="locality_radial_chart"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Progreso General</h5>
+            </div>
+            <div class="card-body">
+                <div id="progress_gauge"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <div class="auto-refresh-controls" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
     <div class="btn-group btn-group-sm">
@@ -520,71 +715,66 @@
 </div>
 
 @section('dashboard-scripts')
+    <style>
+        .bg-gradient-primary { background: linear-gradient(135deg, #405189 0%, #2a3a6b 100%); }
+        .bg-gradient-success { background: linear-gradient(135deg, #0ab39c 0%, #078b7a 100%); }
+        .bg-gradient-warning { background: linear-gradient(135deg, #f7b84b 0%, #f5a219 100%); }
+        .bg-gradient-info { background: linear-gradient(135deg, #299cdb 0%, #1b7ab3 100%); }
+        .bg-gradient-purple { background: linear-gradient(135deg, #9b59b6 0%, #6c3483 100%); }
+        .bg-gradient-pink { background: linear-gradient(135deg, #fd6e8a 0%, #f5496b 100%); }
+        .table-status .card { transition: transform 0.2s; }
+        .table-status .card:hover { transform: translateY(-5px); }
+    </style>
     <script src="{{ URL::asset('build/libs/apexcharts/apexcharts.min.js') }}"></script>
     <script src="{{ URL::asset('build/libs/jsvectormap/jsvectormap.min.js') }}"></script>
     <script src="{{ URL::asset('build/libs/jsvectormap/maps/quillacollo-merc.js') }}"></script>
     <script src="{{ URL::asset('build/libs/swiper/swiper-bundle.min.js') }}"></script>
     <script src="{{ URL::asset('build/js/app.js') }}"></script>
-    
-    <style>
-        .bg-gradient-primary {
-            background: linear-gradient(135deg, #405189 0%, #2a3a6b 100%);
-        }
-        .bg-gradient-success {
-            background: linear-gradient(135deg, #0ab39c 0%, #078b7a 100%);
-        }
-        .bg-gradient-warning {
-            background: linear-gradient(135deg, #f7b84b 0%, #f5a219 100%);
-        }
-        .bg-gradient-info {
-            background: linear-gradient(135deg, #299cdb 0%, #1b7ab3 100%);
-        }
-        .table-status .card {
-            transition: transform 0.2s;
-        }
-        .table-status .card:hover {
-            transform: translateY(-5px);
-        }
-    </style>
-    
     <script>      
         document.addEventListener('DOMContentLoaded', function() { 
             let refreshInterval = 120000;
             let refreshTimer = null;
             let isRefreshing = false;      
-            let charts = {}; 
-            
+            let charts = {};            
             initializeCharts();
             startAutoRefresh();  
-            
-            // Chart view toggle
             document.querySelectorAll('[data-chart-view]').forEach(btn => {
                 btn.addEventListener('click', function() {
                     document.querySelectorAll('[data-chart-view]').forEach(b => b.classList.remove('active'));
-                    this.classList.add('active');
-                    
+                    this.classList.add('active');                    
                     const view = this.getAttribute('data-chart-view');
                     updateChartView(view);
                 });
             });
             
             function initializeCharts() {
-                const sortedStats = Object.values(@json($candidateStats)).sort((a, b) => b.votes - a.votes);
-                const candidateNames = sortedStats.map(stat => stat.candidate.name);
-                const candidateColors = sortedStats.map(stat => stat.candidate.color || ['#405189', '#0ab39c', '#f7b84b', '#299cdb', '#e66b6b'][Math.floor(Math.random() * 5)]);
-                const candidateVotes = sortedStats.map(stat => stat.votes);
-                const candidatePercentages = sortedStats.map(stat => stat.percentage);
+                // ===== DATOS DE ALCALDE =====
+                const sortedAlcaldeStats = Object.values(@json($alcaldeStats)).sort((a, b) => b.votes - a.votes);
+                const alcaldeNames = sortedAlcaldeStats.map(stat => stat.candidate.name);
+                const alcaldeColors = sortedAlcaldeStats.map(stat => stat.candidate.color || '#405189');
+                const alcaldeVotes = sortedAlcaldeStats.map(stat => stat.votes);
+                const alcaldePercentages = sortedAlcaldeStats.map(stat => stat.percentage);                
+                // ===== DATOS DE CONCEJAL =====
+                const sortedConcejalStats = Object.values(@json($concejalStats)).sort((a, b) => b.votes - a.votes);
+                const concejalNames = sortedConcejalStats.map(stat => stat.candidate.name);
+                const concejalColors = sortedConcejalStats.map(stat => stat.candidate.color || '#299cdb');
+                const concejalVotes = sortedConcejalStats.map(stat => stat.votes);
+                const concejalPercentages = sortedConcejalStats.map(stat => stat.percentage);                
+                // ===== DATOS DE LOCALIDADES =====
+                const localityData = Object.values(@json($localityResults));
+                const localityNames = localityData.map(l => l.name).slice(0, 6);                
+                // 1. Trend Chart (Alcalde por defecto)
                 var trendOptions = {
                     series: [
                         {
-                            name: 'Votos',
+                            name: 'Votos Alcalde',
                             type: 'column',
-                            data: candidateVotes
+                            data: alcaldeVotes
                         },
                         {
                             name: 'Porcentaje',
                             type: 'line',
-                            data: candidatePercentages
+                            data: alcaldePercentages
                         }
                     ],
                     chart: {
@@ -604,7 +794,7 @@
                             return val + '%';
                         }
                     },
-                    labels: candidateNames,
+                    labels: alcaldeNames,
                     xaxis: {
                         type: 'category'
                     },
@@ -643,9 +833,9 @@
                 charts.trendChart = new ApexCharts(document.querySelector("#candidates_trend_chart"), trendOptions);
                 charts.trendChart.render();
                 
-                // 2. 3D Pie Chart
-                var pieOptions = {
-                    series: candidateVotes,
+                // 2. Pie Chart Alcalde
+                var pieOptionsAlcalde = {
+                    series: alcaldeVotes,
                     chart: {
                         type: 'pie',
                         height: 350,
@@ -655,18 +845,23 @@
                             speed: 800
                         }
                     },
-                    labels: candidateNames,
-                    colors: candidateColors,
+                    labels: alcaldeNames,
+                    colors: alcaldeColors,
                     legend: {
                         position: 'bottom'
+                    },
+                    title: {
+                        text: 'Alcalde',
+                        align: 'center',
+                        style: {
+                            fontSize: '16px',
+                            fontWeight: 600
+                        }
                     },
                     dataLabels: {
                         enabled: true,
                         formatter: function(val, opts) {
                             return opts.w.globals.labels[opts.seriesIndex] + ': ' + val.toFixed(1) + '%';
-                        },
-                        dropShadow: {
-                            enabled: true
                         }
                     },
                     tooltip: {
@@ -679,8 +874,6 @@
                     plotOptions: {
                         pie: {
                             expandOnClick: true,
-                            customScale: 1,
-                            offsetY: 0,
                             donut: {
                                 size: '40%'
                             }
@@ -688,18 +881,66 @@
                     }
                 };
                 
-                charts.pieChart = new ApexCharts(document.querySelector("#candidates_pie_chart"), pieOptions);
-                charts.pieChart.render();
+                charts.pieChartAlcalde = new ApexCharts(document.querySelector("#candidates_pie_chart_alcalde"), pieOptionsAlcalde);
+                charts.pieChartAlcalde.render();
                 
-                // 3. Radial Bar Chart for Localities
-                const localityProgress = Object.values(@json($localityResults)).map(l => {
+                // 3. Pie Chart Concejal
+                var pieOptionsConcejal = {
+                    series: concejalVotes,
+                    chart: {
+                        type: 'pie',
+                        height: 350,
+                        animations: {
+                            enabled: true,
+                            easing: 'easeinout',
+                            speed: 800
+                        }
+                    },
+                    labels: concejalNames,
+                    colors: concejalColors,
+                    legend: {
+                        position: 'bottom'
+                    },
+                    title: {
+                        text: 'Concejal',
+                        align: 'center',
+                        style: {
+                            fontSize: '16px',
+                            fontWeight: 600
+                        }
+                    },
+                    dataLabels: {
+                        enabled: true,
+                        formatter: function(val, opts) {
+                            return opts.w.globals.labels[opts.seriesIndex] + ': ' + val.toFixed(1) + '%';
+                        }
+                    },
+                    tooltip: {
+                        y: {
+                            formatter: function(val) {
+                                return val.toLocaleString() + ' votos';
+                            }
+                        }
+                    },
+                    plotOptions: {
+                        pie: {
+                            expandOnClick: true,
+                            donut: {
+                                size: '40%'
+                            }
+                        }
+                    }
+                };
+                
+                charts.pieChartConcejal = new ApexCharts(document.querySelector("#candidates_pie_chart_concejal"), pieOptionsConcejal);
+                charts.pieChartConcejal.render();
+                
+                // 4. Radial Bar Chart for Localities
+                const localityProgress = localityData.map(l => {
                     const totalTables = l.total_tables || 0;
                     const reportedTables = l.reported_tables || 0;
                     return totalTables > 0 ? Math.round((reportedTables / totalTables) * 100) : 0;
-                });
-                
-                const localityNames = Object.values(@json($localityResults)).map(l => l.name).slice(0, 6);
-                
+                });                
                 var radialOptions = {
                     series: localityProgress.slice(0, 6),
                     chart: {
@@ -750,74 +991,7 @@
                 };
                 
                 charts.radialChart = new ApexCharts(document.querySelector("#locality_radial_chart"), radialOptions);
-                charts.radialChart.render();
-                
-                // 4. Heatmap for Candidates by Locality
-                const heatmapData = candidateNames.map((candidate, idx) => {
-                    return {
-                        name: candidate,
-                        data: Object.values(@json($localityResults)).map(locality => {
-                            const candidateData = locality.candidates.find(c => c.name === candidate);
-                            return candidateData ? candidateData.votes : 0;
-                        })
-                    };
-                });
-                
-                var heatmapOptions = {
-                    series: heatmapData,
-                    chart: {
-                        type: 'heatmap',
-                        height: 350,
-                        toolbar: {
-                            show: true
-                        }
-                    },
-                    dataLabels: {
-                        enabled: false
-                    },
-                    colors: ['#405189'],
-                    xaxis: {
-                        categories: Object.values(@json($localityResults)).map(l => l.name),
-                        labels: {
-                            rotate: -45,
-                            rotateAlways: true,
-                            style: {
-                                fontSize: '11px'
-                            }
-                        }
-                    },
-                    title: {
-                        text: 'Distribución de Votos por Localidad',
-                        align: 'center'
-                    },
-                    plotOptions: {
-                        heatmap: {
-                            shadeIntensity: 0.5,
-                            radius: 0,
-                            useFillColorAsStroke: true,
-                            colorScale: {
-                                ranges: [
-                                    { from: 0, to: 1000, name: 'Bajo', color: '#c2e0ff' },
-                                    { from: 1001, to: 5000, name: 'Medio', color: '#8bb5ff' },
-                                    { from: 5001, to: 10000, name: 'Alto', color: '#5487ff' },
-                                    { from: 10001, to: 50000, name: 'Muy Alto', color: '#2d5ad2' },
-                                    { from: 50001, to: 1000000, name: 'Máximo', color: '#0a1e5c' }
-                                ]
-                            }
-                        }
-                    },
-                    tooltip: {
-                        y: {
-                            formatter: function(val) {
-                                return val.toLocaleString() + ' votos';
-                            }
-                        }
-                    }
-                };
-                
-                charts.heatmapChart = new ApexCharts(document.querySelector("#candidates_heatmap"), heatmapOptions);
-                charts.heatmapChart.render();
-                
+                charts.radialChart.render();                
                 // 5. Progress Gauge
                 var gaugeOptions = {
                     series: [{{ $progressPercentage }}],
@@ -878,97 +1052,28 @@
                     tooltip: {
                         enabled: false
                     }
-                };
-                
+                };                
                 charts.gaugeChart = new ApexCharts(document.querySelector("#progress_gauge"), gaugeOptions);
                 charts.gaugeChart.render();
-                
-                // 6. Bubble Chart for Participation
-                const bubbleData = Object.values(@json($localityResults)).map((locality, index) => {
-                    return {
-                        x: locality.total_votes || 0,
-                        y: locality.total_tables || 0,
-                        z: locality.reported_tables || 0,
-                        name: locality.name
-                    };
-                });
-                
-                var bubbleOptions = {
-                    series: [{
-                        name: 'Localidades',
-                        data: bubbleData
-                    }],
-                    chart: {
-                        type: 'bubble',
-                        height: 300,
-                        toolbar: {
-                            show: true
-                        }
-                    },
-                    dataLabels: {
-                        enabled: false
-                    },
-                    fill: {
-                        opacity: 0.8,
-                        colors: ['#405189']
-                    },
-                    title: {
-                        text: 'Votos vs Mesas por Localidad',
-                        align: 'center'
-                    },
-                    xaxis: {
-                        title: {
-                            text: 'Votos Totales'
-                        },
-                        labels: {
-                            formatter: function(val) {
-                                return val.toLocaleString();
-                            }
-                        }
-                    },
-                    yaxis: {
-                        title: {
-                            text: 'Mesas Totales'
-                        }
-                    },
-                    tooltip: {
-                        custom: function({ series, seriesIndex, dataPointIndex, w }) {
-                            const data = w.globals.initialSeries[seriesIndex].data[dataPointIndex];
-                            return '<div class="p-2">' +
-                                '<h6>' + data.name + '</h6>' +
-                                '<p class="mb-0">Votos: ' + data.x.toLocaleString() + '</p>' +
-                                '<p class="mb-0">Mesas Totales: ' + data.y + '</p>' +
-                                '<p class="mb-0">Mesas Reportadas: ' + data.z + '</p>' +
-                                '<p class="mb-0">Avance: ' + Math.round((data.z / data.y) * 100) + '%</p>' +
-                                '</div>';
-                        }
-                    }
-                };
-                
-                charts.bubbleChart = new ApexCharts(document.querySelector("#participation_bubbles"), bubbleOptions);
-                charts.bubbleChart.render();
             }
             
             function updateChartView(view) {
-                if (!charts.trendChart) return;
-                
-                const sortedStats = Object.values(@json($candidateStats)).sort((a, b) => b.votes - a.votes);
-                const candidateVotes = sortedStats.map(stat => stat.votes);
-                const candidatePercentages = sortedStats.map(stat => stat.percentage);
-                
+                if (!charts.trendChart) return;                
+                const sortedAlcaldeStats = Object.values(@json($alcaldeStats)).sort((a, b) => b.votes - a.votes);
+                const alcaldeVotes = sortedAlcaldeStats.map(stat => stat.votes);
+                const alcaldePercentages = sortedAlcaldeStats.map(stat => stat.percentage);
                 if (view === 'bars') {
                     charts.trendChart.updateOptions({
                         series: [
-                            { name: 'Votos', type: 'column', data: candidateVotes },
-                            { name: 'Porcentaje', type: 'line', data: candidatePercentages }
+                            { name: 'Votos Alcalde', type: 'column', data: alcaldeVotes },
+                            { name: 'Porcentaje', type: 'line', data: alcaldePercentages }
                         ]
                     });
                 } else {
-                    // Line view - show just the line for percentage
                     charts.trendChart.updateOptions({
                         series: [
-                            { name: 'Votos', type: 'line', data: candidateVotes },
-                            { name: 'Porcentaje', type: 'line', data: candidatePercentages }
+                            { name: 'Votos Alcalde', type: 'line', data: alcaldeVotes },
+                            { name: 'Porcentaje', type: 'line', data: alcaldePercentages }
                         ]
                     });
                 }
@@ -978,12 +1083,10 @@
                 if (isRefreshing) return;                
                 isRefreshing = true;
                 showLoadingIndicator();
-                
                 const electionType = document.querySelector('select[name="election_type"]').value;
                 const department = document.querySelector('select[name="department"]').value;
                 const province = document.querySelector('select[name="province"]').value;
                 const municipality = document.querySelector('select[name="municipality"]').value;
-                
                 fetch(`/refresh-dashboard?election_type=${electionType}&department=${department}&province=${province}&municipality=${municipality}`)
                     .then(response => response.json())
                     .then(data => {
@@ -1002,129 +1105,98 @@
             }
             
             function updateDashboard(data) {
-                // Update counters
-                updateCounter('.col-xl-3:first-child .counter-value', data.totalVotes);
-                updateCounter('.col-xl-3:nth-child(2) .counter-value', data.reportedTables);
-                updateCounter('.col-xl-3:nth-child(4) .counter-value', data.reportedTables > 0 ? Math.round((data.totalVotes / (data.reportedTables * 300)) * 100) : 0);
-                
-                // Update progress bar
+                updateCounter('.bg-gradient-primary .counter-value', data.totalVotesAlcalde);
+                updateCounter('.bg-gradient-info .counter-value', data.totalVotesConcejal);
+                updateCounter('.bg-gradient-success .counter-value', data.reportedTables);
                 const progressBar = document.querySelector('.bg-gradient-success .progress-bar');
                 if (progressBar) {
                     progressBar.style.width = data.progressPercentage + '%';
                 }
-                
-                // Update leader info
-                if (Object.keys(data.candidateStats).length > 0) {
-                    const sortedCandidates = Object.values(data.candidateStats).sort((a, b) => b.votes - a.votes);
-                    const leadingCandidate = sortedCandidates[0];
-                    const leaderContainer = document.querySelector('.bg-gradient-warning');
-                    
-                    if (leaderContainer) {
-                        const nameElement = leaderContainer.querySelector('h5');
-                        const detailsElement = leaderContainer.querySelector('small');
-                        
+                if (Object.keys(data.alcaldeStats).length > 0) {
+                    const sortedAlcalde = Object.values(data.alcaldeStats).sort((a, b) => b.votes - a.votes);
+                    const leadingAlcalde = sortedAlcalde[0];
+                    const alcaldeContainer = document.querySelector('.bg-gradient-warning');   
+                    if (alcaldeContainer) {
+                        const nameElement = alcaldeContainer.querySelector('h5');
+                        const detailsElement = alcaldeContainer.querySelector('small');
                         if (nameElement) {
-                            nameElement.textContent = leadingCandidate.candidate.name;
+                            nameElement.textContent = leadingAlcalde.candidate.name;
                         }
                         if (detailsElement) {
-                            detailsElement.textContent = `${leadingCandidate.votes.toLocaleString()} votos (${leadingCandidate.percentage}%)`;
+                            detailsElement.textContent = `${leadingAlcalde.votes.toLocaleString()} votos (${leadingAlcalde.percentage}%)`;
                         }
                     }
                 }
-                
-                // Update charts
+                if (Object.keys(data.concejalStats).length > 0) {
+                    const sortedConcejal = Object.values(data.concejalStats).sort((a, b) => b.votes - a.votes);
+                    const leadingConcejal = sortedConcejal[0];
+                    const concejalContainer = document.querySelector('.bg-gradient-purple');   
+                    if (concejalContainer) {
+                        const nameElement = concejalContainer.querySelector('h5');
+                        const detailsElement = concejalContainer.querySelector('small');
+                        if (nameElement) {
+                            nameElement.textContent = leadingConcejal.candidate.name;
+                        }
+                        if (detailsElement) {
+                            detailsElement.textContent = `${leadingConcejal.votes.toLocaleString()} votos (${leadingConcejal.percentage}%)`;
+                        }
+                    }
+                }
+                const participationElement = document.querySelector('.bg-gradient-pink .counter-value');
+                if (participationElement) {
+                    const participation = data.reportedTables > 0 
+                        ? Math.round((data.totalVotesAlcalde / (data.reportedTables * 300)) * 100) 
+                        : 0;
+                    participationElement.textContent = participation;
+                }
                 updateCharts(data);
             }
             
             function updateCounter(selector, value) {
                 const elements = document.querySelectorAll(selector);
                 elements.forEach(element => {
-                    if (element.classList.contains('counter-value')) {
-                        element.textContent = typeof value === 'number' ? value.toLocaleString() : value;
-                    } else {
-                        element.textContent = typeof value === 'number' ? value.toLocaleString() : value;
-                    }
+                    element.textContent = typeof value === 'number' ? value.toLocaleString() : value;
                 });
             }
             
             function updateCharts(data) {
-                if (!charts.trendChart || !charts.pieChart || !charts.radialChart || !charts.heatmapChart || !charts.gaugeChart || !charts.bubbleChart) return;
-                
-                const sortedStats = Object.values(data.candidateStats).sort((a, b) => b.votes - a.votes);
-                const candidateNames = sortedStats.map(stat => stat.candidate.name);
-                const candidateColors = sortedStats.map(stat => stat.candidate.color || ['#405189', '#0ab39c', '#f7b84b', '#299cdb', '#e66b6b'][Math.floor(Math.random() * 5)]);
-                const candidateVotes = sortedStats.map(stat => stat.votes);
-                const candidatePercentages = sortedStats.map(stat => stat.percentage);
-                
-                // Update trend chart
+                if (!charts.trendChart || !charts.pieChartAlcalde || !charts.pieChartConcejal || !charts.radialChart || !charts.gaugeChart) return;
+                const sortedAlcalde = Object.values(data.alcaldeStats).sort((a, b) => b.votes - a.votes);
+                const alcaldeNames = sortedAlcalde.map(stat => stat.candidate.name);
+                const alcaldeColors = sortedAlcalde.map(stat => stat.candidate.color || '#405189');
+                const alcaldeVotes = sortedAlcalde.map(stat => stat.votes);
+                const alcaldePercentages = sortedAlcalde.map(stat => stat.percentage);
+                const sortedConcejal = Object.values(data.concejalStats).sort((a, b) => b.votes - a.votes);
+                const concejalVotes = sortedConcejal.map(stat => stat.votes);
                 charts.trendChart.updateOptions({
                     series: [
-                        { name: 'Votos', type: 'column', data: candidateVotes },
-                        { name: 'Porcentaje', type: 'line', data: candidatePercentages }
+                        { name: 'Votos Alcalde', type: 'column', data: alcaldeVotes },
+                        { name: 'Porcentaje', type: 'line', data: alcaldePercentages }
                     ],
-                    labels: candidateNames,
-                    colors: ['#405189', '#f7b84b']
+                    labels: alcaldeNames
                 });
-                
-                // Update pie chart
-                charts.pieChart.updateOptions({
-                    series: candidateVotes,
-                    labels: candidateNames,
-                    colors: candidateColors
+                charts.pieChartAlcalde.updateOptions({
+                    series: alcaldeVotes,
+                    labels: alcaldeNames,
+                    colors: alcaldeColors
                 });
-                
-                // Update radial chart
+                charts.pieChartConcejal.updateOptions({
+                    series: concejalVotes,
+                    labels: sortedConcejal.map(stat => stat.candidate.name),
+                    colors: sortedConcejal.map(stat => stat.candidate.color || '#299cdb')
+                });
                 const localityProgress = Object.values(data.localityResults).map(l => {
                     const totalTables = l.total_tables || 0;
                     const reportedTables = l.reported_tables || 0;
                     return totalTables > 0 ? Math.round((reportedTables / totalTables) * 100) : 0;
                 });
-                
                 const localityNames = Object.values(data.localityResults).map(l => l.name).slice(0, 6);
-                
                 charts.radialChart.updateOptions({
                     series: localityProgress.slice(0, 6),
                     labels: localityNames
                 });
-                
-                // Update heatmap
-                const heatmapData = candidateNames.map((candidate, idx) => {
-                    return {
-                        name: candidate,
-                        data: Object.values(data.localityResults).map(locality => {
-                            const candidateData = locality.candidates.find(c => c.name === candidate);
-                            return candidateData ? candidateData.votes : 0;
-                        })
-                    };
-                });
-                
-                charts.heatmapChart.updateOptions({
-                    series: heatmapData,
-                    xaxis: {
-                        categories: Object.values(data.localityResults).map(l => l.name)
-                    }
-                });
-                
-                // Update gauge
                 charts.gaugeChart.updateOptions({
                     series: [data.progressPercentage]
-                });
-                
-                // Update bubble chart
-                const bubbleData = Object.values(data.localityResults).map((locality, index) => {
-                    return {
-                        x: locality.total_votes || 0,
-                        y: locality.total_tables || 0,
-                        z: locality.reported_tables || 0,
-                        name: locality.name
-                    };
-                });
-                
-                charts.bubbleChart.updateOptions({
-                    series: [{
-                        name: 'Localidades',
-                        data: bubbleData
-                    }]
                 });
             }
             

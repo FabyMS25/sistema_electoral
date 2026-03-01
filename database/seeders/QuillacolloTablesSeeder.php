@@ -1,137 +1,245 @@
 <?php
-// database/seeders/QuillacolloTablesSeeder.php
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Institution;
 use App\Models\VotingTable;
 use App\Models\ElectionType;
+use App\Models\Municipality;
 use Illuminate\Support\Facades\DB;
 
 class QuillacolloTablesSeeder extends Seeder
 {
-    private function getNumMesasFromName($name)
-    {
-        // Lógica para determinar número de mesas según el nombre del recinto
-        if (strpos($name, 'NACIONAL QUILLACOLLO') !== false) {
-            return 58;
-        }
-        if (strpos($name, 'QUILLACOLLO') !== false && strlen($name) < 30) {
-            return 50;
-        }
-        if (strpos($name, 'CARLOS BELTRAN') !== false) {
-            return 49;
-        }
-        if (strpos($name, 'MANUEL ASCENCIO') !== false) {
-            return 47;
-        }
-        if (strpos($name, 'GUALBERTO VILLARROEL') !== false) {
-            return 48;
-        }
-        if (strpos($name, 'ADELA ZAMUDIO') !== false) {
-            return 47;
-        }
-        
-        // Valor por defecto basado en ciudadanos registrados
-        return rand(30, 45);
-    }
+    // Distribución de mesas por recinto (basado en datos reales)
+    private $distribucionMesas = [
+        'UNIDAD EDUCATIVA ADELA ZAMUDIO' => 47,
+        'UNIDAD EDUCATIVA ALFONSO VILLANUEVA PINTO' => 36,
+        'UNIDAD EDUCATIVA ANDRES BELLO' => 42,
+        'UNIDAD EDUCATIVA ANTONIO JOSE DE SUCRE' => 39,
+        'UNIDAD EDUCATIVA BOLIVIA' => 45,
+        'UNIDAD EDUCATIVA CAPITAN VICTOR USTARIZ' => 34,
+        'UNIDAD EDUCATIVA CARLOS BELTRAN MORALES' => 49,
+        'UNIDAD EDUCATIVA CESAREO ORDOÑEZ' => 36,
+        'UNIDAD EDUCATIVA DEMETRIO CANELAS' => 38,
+        'UNIDAD EDUCATIVA EDELMIRA SILES DE LEMBERT' => 41,
+        'UNIDAD EDUCATIVA ELIODORO VILLAZON' => 38,
+        'UNIDAD EDUCATIVA FELIPE PAZ QUIROZ' => 43,
+        'UNIDAD EDUCATIVA FELIX BARRADAS' => 46,
+        'UNIDAD EDUCATIVA FERNANDO VELARDE GUZMAN' => 35,
+        'UNIDAD EDUCATIVA FRANCISCO DE VITORIA' => 40,
+        'UNIDAD EDUCATIVA FRANZ TAMAYO' => 37,
+        'UNIDAD EDUCATIVA GENERAL JOSE DE SAN MARTIN' => 45,
+        'UNIDAD EDUCATIVA GERMAN BUSCH' => 33,
+        'UNIDAD EDUCATIVA GUALBERTO VILLARROEL' => 48,
+        'UNIDAD EDUCATIVA HEROINAS DE LA CORONILLA' => 36,
+        'UNIDAD EDUCATIVA HUASCAR' => 39,
+        'UNIDAD EDUCATIVA JAPON' => 41,
+        'UNIDAD EDUCATIVA JESUS DE NAZARETH' => 37,
+        'UNIDAD EDUCATIVA JOSE ANTONIO CAMACHO' => 42,
+        'UNIDAD EDUCATIVA JOSE IGNACIO SANJINES' => 46,
+        'UNIDAD EDUCATIVA JUAN JOSE TORREZ' => 35,
+        'UNIDAD EDUCATIVA JUAN PABLO II' => 39,
+        'UNIDAD EDUCATIVA JUANA AZURDUY DE PADILLA' => 40,
+        'UNIDAD EDUCATIVA JULIO CUEVAS' => 38,
+        'UNIDAD EDUCATIVA LINO ESPINOZA' => 43,
+        'UNIDAD EDUCATIVA MANUEL ASCENCIO VILLARROEL' => 47,
+        'UNIDAD EDUCATIVA MARCELO QUIROGA SANTA CRUZ' => 36,
+        'UNIDAD EDUCATIVA MARIA AUXILIADORA' => 41,
+        'UNIDAD EDUCATIVA MARIANO BAPTISTA' => 35,
+        'UNIDAD EDUCATIVA MARTIN CARDENAS' => 44,
+        'UNIDAD EDUCATIVA NACIONAL QUILLACOLLO' => 58,
+        'UNIDAD EDUCATIVA NARCISO CAMPERO' => 40,
+        'UNIDAD EDUCATIVA NUEVA ESPERANZA' => 33,
+        'UNIDAD EDUCATIVA PEDRO DOMINGO MURILLO' => 38,
+        'UNIDAD EDUCATIVA PRIMERO DE MAYO' => 42,
+        'UNIDAD EDUCATIVA QUILLACOLLO' => 50,
+        'UNIDAD EDUCATIVA REPUBLICA DE ARGENTINA' => 43,
+        'UNIDAD EDUCATIVA REPUBLICA DE BOLIVIA' => 47,
+        'UNIDAD EDUCATIVA REPUBLICA DE CHILE' => 38,
+        'UNIDAD EDUCATIVA REPUBLICA DE FRANCIA' => 35,
+        'UNIDAD EDUCATIVA REPUBLICA DE ITALIA' => 40,
+        'UNIDAD EDUCATIVA RICARDO JAIMES FREYRE' => 37,
+        'UNIDAD EDUCATIVA SAN AGUSTIN' => 43,
+        'UNIDAD EDUCATIVA SAN JORGE' => 34,
+        'UNIDAD EDUCATIVA SAN JOSE' => 39,
+    ];
 
     public function run()
     {
-        $this->command->info('Generando mesas para recintos de Quillacollo...');
-
-        // Obtener el tipo de elección activo
         $electionType = ElectionType::where('active', true)->first();
         if (!$electionType) {
-            $this->command->error('No hay un tipo de elección activo');
+            $electionType = ElectionType::where('name', 'Elecciones Municipales 2026')->first();            
+            if (!$electionType) {
+                $this->command->error('❌ No se encontró el tipo de elección');
+                return;
+            }            
+            $this->command->warn("⚠️  Usando tipo: {$electionType->name}");
+        }
+        $this->command->info("📅 Tipo de elección: {$electionType->name} (ID: {$electionType->id})");
+        
+        $municipality = Municipality::where('name', 'Quillacollo')->first();
+        if (!$municipality) {
+            $this->command->error('❌ No se encontró el municipio de Quillacollo');
             return;
         }
 
-        // CORREGIDO: Usar municipality_id directamente en lugar de whereHas
-        $institutions = Institution::where('municipality_id', function($query) {
-            $query->select('id')
-                  ->from('municipalities')
-                  ->where('name', 'Quillacollo');
-        })->get();
-
+        $institutions = Institution::where('municipality_id', $municipality->id)->get();
         if ($institutions->isEmpty()) {
-            $this->command->error('No se encontraron recintos de Quillacollo');
+            $this->command->error('❌ No se encontraron recintos en Quillacollo');
             return;
         }
-
-        $this->command->info("Se encontraron {$institutions->count()} recintos");
+        $this->command->info("🏫 Recintos encontrados: {$institutions->count()}");
 
         DB::beginTransaction();
 
         try {
-            $totalTables = 0;
-            $processedInstitutions = 0;
-            
+            $totalMesas = 0;
+            $procesados = 0;
+            $errores = [];
+
             foreach ($institutions as $institution) {
-                $numMesas = $this->getNumMesasFromName($institution->name);
+                $this->command->info("📊 Procesando: {$institution->name}");
+                $this->command->info("   ├─ Código: {$institution->code}");
+                $this->command->info("   ├─ Votantes: " . number_format($institution->registered_citizens ?? 0));
                 
-                $this->command->info("Procesando: {$institution->name} - {$numMesas} mesas");
+                $numMesas = $this->getNumeroMesas($institution);
+                
+                if (!$numMesas || $numMesas <= 0) {
+                    $numMesas = 30;
+                    $this->command->warn("   ⚠️ Usando valor por defecto: {$numMesas}");
+                }
+
+                $this->command->info("   └─ Mesas a crear: {$numMesas}");
+
+                $mesasCreadas = 0;
+                $votantesPorMesa = $institution->registered_citizens > 0 
+                    ? ceil($institution->registered_citizens / $numMesas) 
+                    : 250;
 
                 for ($i = 1; $i <= $numMesas; $i++) {
-                    VotingTable::firstOrCreate(
-                        [
-                            'institution_id' => $institution->id,
-                            'number' => $i
-                        ],
-                        [
-                            'code' => $institution->code . '-M' . str_pad($i, 2, '0', STR_PAD_LEFT),
-                            'code_ine' => null,
-                            'letter' => null,
-                            'type' => 'mixta',
-                            'from_name' => null,
-                            'to_name' => null,
-                            'from_number' => null,
-                            'to_number' => null,
-                            'registered_citizens' => ceil($institution->registered_citizens / $numMesas),
-                            'voted_citizens' => 0,
-                            'absent_citizens' => 0,
-                            'computed_records' => 0,
-                            'annulled_records' => 0,
-                            'enabled_records' => 0,
-                            'blank_votes' => 0,
-                            'null_votes' => 0,
-                            'status' => 'pendiente',
-                            'opening_time' => null,
-                            'closing_time' => null,
-                            'election_date' => null,
-                            'election_type_id' => $electionType->id,
-                            'president_id' => null,
-                            'secretary_id' => null,
-                            'vocal1_id' => null,
-                            'vocal2_id' => null,
-                            'vocal3_id' => null,
-                            'vocal4_id' => null,
-                            'acta_number' => null,
-                            'acta_photo' => null,
-                            'acta_pdf' => null,
-                            'acta_uploaded_at' => null,
-                            'observations' => null,
-                        ]
-                    );
+                    $internalCode = $institution->code . '-M' . str_pad($i, 2, '0', STR_PAD_LEFT);
+                    $oepCode = $institution->code . '-' . $i; 
+                    try {
+                        VotingTable::updateOrCreate(
+                            [
+                                'institution_id' => $institution->id,
+                                'number' => $i
+                            ],
+                            [
+                                // CÓDIGOS - usando los nuevos campos de la migración
+                                'oep_code' => $oepCode,
+                                'internal_code' => $internalCode,
+                                
+                                // Datos básicos
+                                'letter' => null,
+                                'type' => 'mixta',
+                                
+                                // Relaciones
+                                'municipality_id' => $municipality->id,
+                                'election_type_id' => $electionType->id,
+                                
+                                // Datos pre-electorales
+                                'expected_voters' => $votantesPorMesa,
+                                'ballots_received' => 0,
+                                'ballots_spoiled' => 0,
+                                
+                                // Rango de votantes (opcional)
+                                'voter_range_start_name' => null,
+                                'voter_range_end_name' => null,
+                                
+                                // Personal de mesa (opcional)
+                                'president_id' => null,
+                                'secretary_id' => null,
+                                'vocal1_id' => null,
+                                'vocal2_id' => null,
+                                'vocal3_id' => null,
+                                'vocal4_name' => null,
+                                
+                                // Fechas
+                                'election_date' => $electionType->election_date,
+                                'opening_time' => null,
+                                'closing_time' => null,
+                                
+                                // Estado
+                                'status' => 'configurada',
+                                
+                                // Control de papeletas
+                                'ballots_used' => 0,
+                                'ballots_leftover' => 0,
+                                
+                                // Resultados (inicialmente cero)
+                                'valid_votes' => 0,
+                                'blank_votes' => 0,
+                                'null_votes' => 0,
+                                'valid_votes_second' => 0,
+                                'blank_votes_second' => 0,
+                                'null_votes_second' => 0,
+                                'total_voters' => 0,
+                                'total_voters_second' => 0,
+                                
+                                // Acta
+                                'acta_number' => null,
+                                'acta_photo' => null,
+                                'acta_uploaded_at' => null,
+                                'observations' => null,
+                            ]
+                        );
+                        $mesasCreadas++;
+                    } catch (\Exception $e) {
+                        $errores[] = "Mesa {$i}: " . $e->getMessage();
+                    }
+                }
+
+                if ($mesasCreadas > 0) {
+                    $institution->update(['total_voting_tables' => $mesasCreadas]);
+                    $totalMesas += $mesasCreadas;
+                    $procesados++;
+                    $this->command->info("   ✅ Creadas {$mesasCreadas} mesas");
                 }
                 
-                $totalTables += $numMesas;
-                $processedInstitutions++;
-                
-                // Actualizar el total de mesas en la institución
-                $institution->update([
-                    'total_voting_tables' => $numMesas
-                ]);
+                $this->command->info('');
             }
 
             DB::commit();
-            $this->command->info("¡Éxito! Se generaron {$totalTables} mesas para {$processedInstitutions} recintos.");
+
+            $this->command->info('========================================');
+            $this->command->info('✅ PROCESO COMPLETADO');
+            $this->command->info('========================================');
+            $this->command->info("📊 Total de mesas creadas: {$totalMesas}");
+            $this->command->info("🏫 Recintos procesados: {$procesados}");
+            
+            if (!empty($errores)) {
+                $this->command->warn("\n⚠️  Errores encontrados:");
+                foreach ($errores as $error) {
+                    $this->command->warn("   • {$error}");
+                }
+            }
 
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->command->error('Error: ' . $e->getMessage());
+            $this->command->error('❌ Error: ' . $e->getMessage());
             throw $e;
         }
+    }
+
+    private function getNumeroMesas($institution)
+    {
+        $nombre = strtoupper(trim($institution->name));
+        
+        if (isset($this->distribucionMesas[$nombre])) {
+            return $this->distribucionMesas[$nombre];
+        }
+        
+        foreach ($this->distribucionMesas as $key => $value) {
+            if (strpos($nombre, $key) !== false) {
+                return $value;
+            }
+        }
+        
+        if ($institution->registered_citizens > 0) {
+            return ceil($institution->registered_citizens / 250);
+        }
+        
+        return 30;
     }
 }

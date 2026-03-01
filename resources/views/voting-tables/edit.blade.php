@@ -28,7 +28,7 @@
             <a href="{{ route('voting-tables.index') }}">Mesas</a>
         @endslot
         @slot('li_2')
-            <a href="{{ route('voting-tables.show', $votingTable->id) }}">Mesa {{ $votingTable->code }}</a>
+            <a href="{{ route('voting-tables.show', $votingTable->id) }}">Mesa {{ $votingTable->oep_code ?? $votingTable->internal_code }}</a>
         @endslot
         @slot('title')
             Editar Mesa
@@ -41,7 +41,7 @@
                 <div class="card-header">
                     <h4 class="card-title mb-0">
                         <i class="ri-edit-line me-1"></i>
-                        Editando Mesa: {{ $votingTable->code }} - N° {{ $votingTable->number }}
+                        Editando Mesa: {{ $votingTable->oep_code ?? $votingTable->internal_code }} - N° {{ $votingTable->number }}
                     </h4>
                 </div>
                 <div class="card-body">
@@ -57,7 +57,8 @@
                         @include('voting-tables.partials.form-fields', [
                             'votingTable' => $votingTable,
                             'institutions' => $institutions,
-                            'electionTypes' => $electionTypes
+                            'electionTypes' => $electionTypes,
+                            'statusOptions' => $statusOptions  // 👈 IMPORTANTE: Agregar esta línea
                         ])
 
                         <div class="row mt-4">

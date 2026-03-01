@@ -9,38 +9,25 @@ return new class extends Migration
     {
         Schema::create('election_types', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // "Elecciones Generales 2025"
-            $table->string('short_name')->nullable(); // "EG 2025"
+            $table->string('name'); // Ej: "Elección Municipal 2026"
+            $table->string('short_name')->nullable(); // Ej: "Municipales 2026"
             
-            // Tipo de elección (SEGÚN LEY BOLIVIANA)
-            $table->enum('type', [
-                'presidente',           // Presidente y Vicepresidente
-                'senador',              // Senadores
-                'diputado',             // Diputados
-                'diputado_plurinominal', // Diputados plurinominales
-                'diputado_uninominal',  // Diputados uninominales
-                'diputado_especial',    // Diputados especiales (circunscripciones especiales)
-                'gobernador',           // Gobernadores
-                'asambleista',          // Asambleístas departamentales
-                'alcalde',              // Alcaldes municipales
-                'concejal',             // Concejales municipales
-                'referendum',           // Referéndum
-                'revocatorio'           // Revocatorio de mandato
-            ]);
-            
-            // Fechas
+            // Fechas de la elección (generales)
             $table->date('election_date');
-            $table->time('start_time')->default('08:00:00'); // Hora inicio votación
-            $table->time('end_time')->default('17:00:00'); // Hora fin votación
-            $table->date('registration_start')->nullable(); // Inicio inscripción candidatos
-            $table->date('registration_end')->nullable(); // Fin inscripción candidatos
+            $table->time('start_time')->default('08:00:00');
+            $table->time('end_time')->default('17:00:00');
             
-            // Datos de la elección
-            $table->integer('total_voters')->nullable(); // Total votantes habilitados
-            $table->integer('total_tables')->nullable(); // Total mesas habilitadas
-            $table->integer('total_recintos')->nullable(); // Total recintos
+            // Períodos
+            $table->date('registration_start')->nullable();
+            $table->date('registration_end')->nullable();
+            $table->date('campaign_start')->nullable();
+            $table->date('campaign_end')->nullable();
             
-            // Estado
+            // Totales (se actualizan automáticamente)
+            $table->integer('total_voters')->default(0);
+            $table->integer('total_tables')->default(0);
+            $table->integer('total_recintos')->default(0);
+            
             $table->enum('status', [
                 'preparacion',
                 'inscripcion',
@@ -53,7 +40,6 @@ return new class extends Migration
             $table->boolean('active')->default(true);
             $table->text('description')->nullable();
             
-            // Auditoría
             $table->foreignId('created_by')->nullable()->constrained('users');
             $table->foreignId('updated_by')->nullable()->constrained('users');
             
