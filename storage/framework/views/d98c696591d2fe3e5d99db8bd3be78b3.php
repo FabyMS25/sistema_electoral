@@ -6,25 +6,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteMultipleBtn = document.getElementById('delete-multiple-btn');
     const exportSelectedBtn = document.getElementById('export-selected-btn');
     const selectedCountBadge = document.getElementById('selected-count-badge');
-    const deleteButtons = document.querySelectorAll('.remove-item-btn');
-    deleteButtons.forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();            
-            const id = this.getAttribute('data-id');
-            const code = this.getAttribute('data-code');
-            const oep = this.getAttribute('data-oep');
-            const internal = this.getAttribute('data-internal');
-            const deleteUrl = this.getAttribute('data-delete-url');
-            
-            const displayCode = oep || internal || code;
-            document.getElementById('deleteTableInfo').innerHTML = `Mesa: <strong>${displayCode}</strong> (N° ${this.closest('tr').querySelector('.fw-semibold').textContent})`;
-            document.getElementById('deleteForm').action = deleteUrl;
-            
-            const deleteModal = new bootstrap.Modal(document.getElementById('deleteRecordModal'));
-            deleteModal.show();
-        });
-    });
-    
     if (checkAll) {
         checkAll.addEventListener('change', function() {
             checkboxes.forEach(checkbox => {
@@ -33,26 +14,22 @@ document.addEventListener('DOMContentLoaded', function() {
             updateActionButtons();
         });
     }
-    
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
             updateCheckAllState();
             updateActionButtons();
         });
     });
-    
     function updateCheckAllState() {
         if (checkboxes.length === 0) return;
-        
         const allChecked = Array.from(checkboxes).every(cb => cb.checked);
         const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
-        
         if (checkAll) {
             checkAll.checked = allChecked;
             checkAll.indeterminate = !allChecked && anyChecked;
         }
     }
-    
+
     function updateActionButtons() {
         const selectedCount = document.querySelectorAll('.child-checkbox:checked').length;
         if (deleteMultipleBtn) {
@@ -67,7 +44,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (selectedCount > 0) {
                 exportSelectedBtn.disabled = false;
                 exportSelectedBtn.innerHTML = `<i class="ri-file-excel-line me-2"></i>Exportar Seleccionados`;
-                
                 if (selectedCountBadge) {
                     selectedCountBadge.style.display = 'inline-block';
                     selectedCountBadge.textContent = selectedCount;
@@ -75,7 +51,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 exportSelectedBtn.disabled = true;
                 exportSelectedBtn.innerHTML = `<i class="ri-file-excel-line me-2"></i>Exportar Seleccionados`;
-                
                 if (selectedCountBadge) {
                     selectedCountBadge.style.display = 'none';
                 }
@@ -87,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function exportSelected() {
     const selectedIds = Array.from(document.querySelectorAll('.child-checkbox:checked'))
         .map(cb => cb.value);
-    
+
     if (selectedIds.length === 0) {
         Swal.fire({
             title: 'Sin selección',
@@ -100,14 +75,12 @@ function exportSelected() {
     document.getElementById('selected-ids-input').value = JSON.stringify(selectedIds);
     document.getElementById('export-selected-form').submit();
 }
-
 function deleteMultiple() {
     const selectedIds = Array.from(document.querySelectorAll('.child-checkbox:checked'))
-        .map(cb => cb.value);    
+        .map(cb => cb.value);
     if (selectedIds.length === 0) {
         return;
     }
-    
     Swal.fire({
         title: '¿Estás seguro?',
         text: `¿Deseas eliminar ${selectedIds.length} mesa(s) seleccionada(s)? Esta acción no se puede deshacer.`,
@@ -167,4 +140,5 @@ function deleteMultiple() {
         }
     });
 }
-</script><?php /**PATH D:\_Mine\corporate\resources\views/voting-tables/scripts/voting-table-js.blade.php ENDPATH**/ ?>
+</script>
+<?php /**PATH D:\_Mine\corporate\resources\views/voting-tables/scripts/voting-table-js.blade.php ENDPATH**/ ?>

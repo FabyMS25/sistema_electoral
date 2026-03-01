@@ -10,8 +10,4 @@
 <!-- custom Css-->
 <link href="<?php echo e(URL::asset('build/css/custom.min.css')); ?>" id="app-style" rel="stylesheet" type="text/css" />
 
-<style>
-.pagination-wrap .d-none.flex-sm-fill.d-sm-flex.align-items-sm-center.justify-content-sm-between > div:first-child {
-    display: none !important;
-}
-</style><?php /**PATH D:\_Mine\corporate\resources\views/layouts/head-css.blade.php ENDPATH**/ ?>
+<?php /**PATH D:\_Mine\corporate\resources\views/layouts/head-css.blade.php ENDPATH**/ ?>

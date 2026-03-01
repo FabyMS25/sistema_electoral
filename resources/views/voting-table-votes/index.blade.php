@@ -8,7 +8,6 @@
 @section('css')
     <link href="{{ URL::asset('build/libs/sweetalert2/sweetalert2.min.css') }}" rel="stylesheet" />
     <style>
-        
         .role-badge {
             position: absolute;
             top: 10px;
@@ -48,7 +47,7 @@
     @if(request()->has('institution_id') || request()->has('status') || request()->has('table_number'))
         <div class="alert alert-info">
             <i class="ri-information-line me-1"></i>
-            Mostrando resultados para los filtros aplicados. 
+            Mostrando resultados para los filtros aplicados.
             <a href="{{ route('voting-table-votes.index', ['election_type_id' => $electionTypeId]) }}" class="alert-link">
                 Limpiar filtros
             </a>

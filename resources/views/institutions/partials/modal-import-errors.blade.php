@@ -23,7 +23,7 @@
                     <br>
                     <span class="text-muted">Los siguientes registros no pudieron ser procesados correctamente.</span>
                 </div>
-                
+
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered">
                         <thead class="table-light">

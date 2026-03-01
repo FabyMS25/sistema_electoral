@@ -18,13 +18,31 @@
             transform: translateY(-5px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
-        .required-field label:after {
-            content: " *";
-            color: red;
+        .stats-toggle {
+            cursor: pointer;
+            user-select: none;
         }
-        .info-tooltip {
-            cursor: help;
-            border-bottom: 1px dotted #ccc;
+        .stats-toggle i {
+            transition: transform 0.3s ease;
+        }
+        .stats-toggle.collapsed i {
+            transform: rotate(-90deg);
+        }
+        #statsContainer {
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        #statsContainer.collapsed {
+            display: none;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .pagination-info {
+            font-size: 0.875rem;
+            color: #6c757d;
         }
     </style>
 @endsection
@@ -42,29 +60,39 @@
     <div class="row">
         <div class="col-lg-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="card-title mb-0">
                         <i class="ri-building-line me-1"></i>
-                        Administración de Recintos Electorales
+                        Listas de Recintos de Votación
                     </h4>
+                    <div class="stats-toggle" onclick="toggleStats()" id="statsToggle">
+                        <span class="badge bg-light text-dark p-1">
+                            <i class="ri-arrow-down-s-line me-1"></i>
+                            Estadísticas
+                        </span>
+                    </div>
                 </div>
-                
                 <div class="card-body">
                     @include('components.alerts')
-                    
-                    <!-- Stats Cards -->
-                    @include('institutions.partials.stats-cards', ['institutions' => $institutions])
-
-                    <div class="listjs-table" id="institutionList">
-                        <!-- Barra de acciones -->
-                        @include('institutions.partials.actions-bar')
-
-                        <!-- Tabla de recintos -->
+                    <div id="statsContainer" class="mb-2">
+                        @include('institutions.partials.stats-cards', ['institutions' => $institutions])
+                    </div>
+                    @include('institutions.partials.actions-bar')
+                    <div id="institutionList">
                         @include('institutions.partials.table', ['institutions' => $institutions])
-                        
-                        <!-- Paginación -->
-                        <div class="d-flex justify-content-end mt-3">
-                            {{ $institutions->appends(request()->query())->links() }}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <select class="form-select form-select-sm" style="width: auto;" onchange="window.location.href=this.value">
+                                <option value="{{ route('institutions.index', ['per_page' => 20] + request()->except('per_page', 'page')) }}" {{ request('per_page', 20) == 20 ? 'selected' : '' }}>20</option>
+                                <option value="{{ route('institutions.index', ['per_page' => 50] + request()->except('per_page', 'page')) }}" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
+                                <option value="{{ route('institutions.index', ['per_page' => 100] + request()->except('per_page', 'page')) }}" {{ request('per_page') == 100 ? 'selected' : '' }}>100</option>
+                                <option value="{{ route('institutions.index', ['per_page' => 200] + request()->except('per_page', 'page')) }}" {{ request('per_page') == 200 ? 'selected' : '' }}>200</option>
+                            </select>
+                            <div class="pagination-info">
+                                Mostrando {{ $institutions->firstItem() }} a {{ $institutions->lastItem() }} de {{ $institutions->total() }} resultados
+                            </div>
+                            <div class="pagination-wrap">
+                                {{ $institutions->onEachSide(1)->appends(request()->query())->links('pagination::bootstrap-5') }}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -75,17 +103,42 @@
     <!-- Modales -->
     @include('institutions.partials.modal-delete')
     @include('institutions.partials.modal-import')
-
     @if(session('import_errors'))
         @include('institutions.partials.modal-import-errors')
     @endif
 @endsection
 
 @section('script')
-    <script src="{{ URL::asset('build/libs/prismjs/prism.js') }}"></script>
-    <script src="{{ URL::asset('build/libs/list.js/list.min.js') }}"></script>
     <script src="{{ URL::asset('build/libs/sweetalert2/sweetalert2.min.js') }}"></script>
-    <script src="{{ URL::asset('build/libs/choices.js/public/assets/scripts/choices.min.js') }}"></script>
-    
     @include('institutions.scripts.institution-js')
+    <script>
+        function toggleStats() {
+            const statsContainer = document.getElementById('statsContainer');
+            const toggleBtn = document.getElementById('statsToggle');
+            const icon = toggleBtn.querySelector('i');
+            statsContainer.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+            if (statsContainer.classList.contains('collapsed')) {
+                icon.classList.remove('ri-arrow-down-s-line');
+                icon.classList.add('ri-arrow-right-s-line');
+            } else {
+                icon.classList.remove('ri-arrow-right-s-line');
+                icon.classList.add('ri-arrow-down-s-line');
+            }
+            localStorage.setItem('showStats', !statsContainer.classList.contains('collapsed'));
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            const showStats = localStorage.getItem('showStats');
+            const statsContainer = document.getElementById('statsContainer');
+            const toggleBtn = document.getElementById('statsToggle');
+
+            if (statsContainer && toggleBtn && showStats === 'false') {
+                const icon = toggleBtn.querySelector('i');
+                statsContainer.classList.add('collapsed');
+                toggleBtn.classList.add('collapsed');
+                icon.classList.remove('ri-arrow-down-s-line');
+                icon.classList.add('ri-arrow-right-s-line');
+            }
+        });
+    </script>
 @endsection

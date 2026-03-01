@@ -1,4 +1,3 @@
-
 <?php $__env->startSection('title'); ?>
     <?php echo app('translator')->get('translation.list-voting-tables'); ?>
 <?php $__env->stopSection(); ?>
@@ -13,12 +12,6 @@
         .stats-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-        .pagination {
-            display: flex;
-            padding-left: 0;
-            list-style: none;
-            gap: 5px;
         }
         .stats-toggle {
             cursor: pointer;
@@ -36,15 +29,6 @@
         }
         #statsContainer.collapsed {
             display: none;
-        }
-        .action-buttons {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-        }
-        .pagination-info {
-            font-size: 0.875rem;
-            color: #6c757d;
         }
     </style>
 <?php $__env->stopSection(); ?>
@@ -74,7 +58,7 @@
                         </span>
                     </div>
                 </div>
-                
+
                 <div class="card-body">
                     <?php echo $__env->make('components.alerts', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
                     <div id="statsContainer" class="mb-2">
@@ -84,18 +68,20 @@
                     <div id="votingTableList">
                         <?php echo $__env->make('voting-tables.partials.table', ['votingTables' => $votingTables], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
                         <div class="d-flex justify-content-between align-items-center">
-                            <select class="form-select form-select-sm" style="width: auto;" onchange="window.location.href=this.value">
-                                <option value="<?php echo e(route('voting-tables.index', ['per_page' => 20] + request()->except('per_page', 'page'))); ?>" <?php echo e(request('per_page', 20) == 20 ? 'selected' : ''); ?>>20</option>
-                                <option value="<?php echo e(route('voting-tables.index', ['per_page' => 50] + request()->except('per_page', 'page'))); ?>" <?php echo e(request('per_page') == 50 ? 'selected' : ''); ?>>50</option>
-                                <option value="<?php echo e(route('voting-tables.index', ['per_page' => 100] + request()->except('per_page', 'page'))); ?>" <?php echo e(request('per_page') == 100 ? 'selected' : ''); ?>>100</option>
-                                <option value="<?php echo e(route('voting-tables.index', ['per_page' => 200] + request()->except('per_page', 'page'))); ?>" <?php echo e(request('per_page') == 200 ? 'selected' : ''); ?>>200</option>
-                            </select>
                             <div class="pagination-info">
                                 Mostrando <?php echo e($votingTables->firstItem()); ?> a <?php echo e($votingTables->lastItem()); ?> de <?php echo e($votingTables->total()); ?> resultados
-                            </div>                      
-                            <div class="pagination-wrap">
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <select class="form-select form-select-sm" style="width: auto;" onchange="window.location.href=this.value">
+                                    <option value="<?php echo e(route('voting-tables.index', ['per_page' => 20] + request()->except('per_page', 'page'))); ?>" <?php echo e(request('per_page', 20) == 20 ? 'selected' : ''); ?>>20</option>
+                                    <option value="<?php echo e(route('voting-tables.index', ['per_page' => 50] + request()->except('per_page', 'page'))); ?>" <?php echo e(request('per_page') == 50 ? 'selected' : ''); ?>>50</option>
+                                    <option value="<?php echo e(route('voting-tables.index', ['per_page' => 100] + request()->except('per_page', 'page'))); ?>" <?php echo e(request('per_page') == 100 ? 'selected' : ''); ?>>100</option>
+                                    <option value="<?php echo e(route('voting-tables.index', ['per_page' => 200] + request()->except('per_page', 'page'))); ?>" <?php echo e(request('per_page') == 200 ? 'selected' : ''); ?>>200</option>
+                                </select>
+                                <div class="pagination-wrap">
                                     <?php echo e($votingTables->onEachSide(1)->appends(request()->query())->links('pagination::bootstrap-5')); ?>
 
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -114,28 +100,33 @@
 
 <?php $__env->startSection('script'); ?>
     <script src="<?php echo e(URL::asset('build/libs/sweetalert2/sweetalert2.min.js')); ?>"></script>
-    <?php echo $__env->make('voting-tables.scripts.voting-table-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>    
+    <?php echo $__env->make('voting-tables.scripts.voting-table-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
     <script>
         function toggleStats() {
             const statsContainer = document.getElementById('statsContainer');
             const toggleBtn = document.getElementById('statsToggle');
-            const icon = toggleBtn.querySelector('i');            
+            const icon = toggleBtn.querySelector('i');
+
             statsContainer.classList.toggle('collapsed');
-            toggleBtn.classList.toggle('collapsed');            
+            toggleBtn.classList.toggle('collapsed');
+
             if (statsContainer.classList.contains('collapsed')) {
                 icon.classList.remove('ri-arrow-down-s-line');
                 icon.classList.add('ri-arrow-right-s-line');
             } else {
                 icon.classList.remove('ri-arrow-right-s-line');
                 icon.classList.add('ri-arrow-down-s-line');
-            }   
+            }
+
             localStorage.setItem('showStats', !statsContainer.classList.contains('collapsed'));
-        }        
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const showStats = localStorage.getItem('showStats');
             const statsContainer = document.getElementById('statsContainer');
             const toggleBtn = document.getElementById('statsToggle');
-            
+
             if (statsContainer && toggleBtn && showStats === 'false') {
                 const icon = toggleBtn.querySelector('i');
                 statsContainer.classList.add('collapsed');
@@ -146,4 +137,5 @@
         });
     </script>
 <?php $__env->stopSection(); ?>
+
 <?php echo $__env->make('layouts.master', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\_Mine\corporate\resources\views/voting-tables/index.blade.php ENDPATH**/ ?>

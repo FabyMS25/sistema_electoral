@@ -110,3 +110,17 @@
 @import "pages/to-do";
 @import "pages/jobs";
 @import "pages/job-landing";
+
+/* Hide the English text from pagination */
+.pagination .flex.justify-between.flex-1 {
+    display: none !important;
+}
+
+.pagination .hidden {
+    display: none !important;
+}
+
+/* Ensure only our custom text shows */
+.pagination-info {
+    display: block;
+}

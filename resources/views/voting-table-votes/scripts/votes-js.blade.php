@@ -1,3 +1,4 @@
+{{-- scripts/votes-table-js --}}
 <script>
 // ===== VARIABLES GLOBALES =====
 let pendingTables = new Set();
@@ -20,17 +21,17 @@ function updateTableTotal(tableId) {
 
 function markPending(tableId) {
     if (!window.userPermissions?.register) return;
-    
+
     pendingTables.add(tableId);
     const tableCard = document.getElementById(`table-${tableId}`);
     if (tableCard) {
         tableCard.style.border = '2px solid #f7b84b';
     }
-    
+
     if (saveTimeouts[tableId]) {
         clearTimeout(saveTimeouts[tableId]);
     }
-    
+
     saveTimeouts[tableId] = setTimeout(() => {
         saveTable(tableId);
     }, 3000);
@@ -44,7 +45,7 @@ function saveTable(tableId, close = false) {
 
     const inputs = document.querySelectorAll(`.candidate-vote[data-table="${tableId}"]`);
     const votes = {};
-    
+
     inputs.forEach(input => {
         const candidateId = input.dataset.candidate;
         votes[candidateId] = parseInt(input.value) || 0;
@@ -75,7 +76,7 @@ function saveTable(tableId, close = false) {
         if (data.success) {
             pendingTables.delete(tableId);
             if (tableCard) tableCard.style.border = '';
-            
+
             Swal.fire({
                 icon: 'success',
                 title: 'Éxito',
@@ -114,13 +115,13 @@ document.querySelectorAll('.observe-table').forEach(btn => {
     btn.addEventListener('click', function() {
         currentObservationTable = this.dataset.tableId;
         document.getElementById('observationTableId').value = currentObservationTable;
-        
+
         // Limpiar campos del modal
         document.getElementById('observationType').value = '';
         document.getElementById('observationDescription').value = '';
         document.getElementById('observationSeverity').value = 'warning';
         document.getElementById('observationEvidence').value = '';
-        
+
         const modal = new bootstrap.Modal(document.getElementById('observationModal'));
         modal.show();
     });
@@ -170,7 +171,7 @@ document.getElementById('saveObservationBtn')?.addEventListener('click', functio
     formData.append('type', type);
     formData.append('description', description);
     formData.append('severity', severity);
-    
+
     const evidence = document.getElementById('observationEvidence').files[0];
     if (evidence) {
         formData.append('evidence', evidence);
@@ -189,7 +190,7 @@ document.getElementById('saveObservationBtn')?.addEventListener('click', functio
         if (data.success) {
             const modal = bootstrap.Modal.getInstance(document.getElementById('observationModal'));
             modal.hide();
-            
+
             Swal.fire({
                 icon: 'success',
                 title: 'Éxito',
@@ -199,7 +200,7 @@ document.getElementById('saveObservationBtn')?.addEventListener('click', functio
                 showConfirmButton: false,
                 timer: 3000
             });
-            
+
             setTimeout(() => location.reload(), 1500);
         } else {
             if (data.errors) {
@@ -230,13 +231,13 @@ document.querySelectorAll('.upload-acta').forEach(btn => {
     btn.addEventListener('click', function() {
         currentActaTable = this.dataset.tableId;
         document.getElementById('actaTableId').value = currentActaTable;
-        
+
         // Limpiar campos del modal
         document.getElementById('actaNumber').value = '';
         document.getElementById('actaPhoto').value = '';
         document.getElementById('actaPdf').value = '';
         document.getElementById('hasPhysicalActa').checked = true;
-        
+
         const modal = new bootstrap.Modal(document.getElementById('uploadActaModal'));
         modal.show();
     });
@@ -283,12 +284,12 @@ document.getElementById('uploadActaBtn')?.addEventListener('click', function() {
     formData.append('voting_table_id', currentActaTable);
     formData.append('acta_number', actaNumber);
     formData.append('photo', actaPhoto);
-    
+
     const pdfFile = document.getElementById('actaPdf').files[0];
     if (pdfFile) {
         formData.append('pdf', pdfFile);
     }
-    
+
     const hasPhysical = document.getElementById('hasPhysicalActa').checked;
     formData.append('has_physical', hasPhysical ? 'on' : 'off');
 
@@ -304,7 +305,7 @@ document.getElementById('uploadActaBtn')?.addEventListener('click', function() {
         if (data.success) {
             const modal = bootstrap.Modal.getInstance(document.getElementById('uploadActaModal'));
             modal.hide();
-            
+
             Swal.fire({
                 icon: 'success',
                 title: 'Éxito',
@@ -314,7 +315,7 @@ document.getElementById('uploadActaBtn')?.addEventListener('click', function() {
                 showConfirmButton: false,
                 timer: 3000
             });
-            
+
             setTimeout(() => location.reload(), 1500);
         } else {
             if (data.errors) {
@@ -344,7 +345,7 @@ document.querySelectorAll('.validate-table, .review-table').forEach(btn => {
     btn.addEventListener('click', function() {
         currentValidationTable = this.dataset.tableId;
         document.getElementById('validationTableId').value = currentValidationTable;
-        
+
         const modal = new bootstrap.Modal(document.getElementById('validationModal'));
         modal.show();
     });
@@ -372,7 +373,7 @@ document.getElementById('confirmValidationBtn')?.addEventListener('click', funct
         if (data.success) {
             const modal = bootstrap.Modal.getInstance(document.getElementById('validationModal'));
             modal.hide();
-            
+
             Swal.fire({
                 icon: 'success',
                 title: 'Validación completada',
@@ -417,7 +418,7 @@ document.querySelectorAll('.save-table').forEach(btn => {
 document.querySelectorAll('.close-table').forEach(btn => {
     btn.addEventListener('click', function() {
         const tableId = this.dataset.tableId;
-        
+
         Swal.fire({
             title: '¿Cerrar mesa?',
             text: 'Una vez cerrada, no se podrán modificar los votos.',
@@ -462,7 +463,7 @@ document.getElementById('saveAllBtn')?.addEventListener('click', function() {
 
 document.getElementById('closeAllBtn')?.addEventListener('click', function() {
     const tables = document.querySelectorAll('.table-card:not(.cerrado)');
-    
+
     if (tables.length === 0) {
         Swal.fire({
             icon: 'info',
@@ -518,7 +519,7 @@ window.showObservations = function(tableId) {
                 `;
             });
             html += '</ul>';
-            
+
             Swal.fire({
                 title: 'Observaciones',
                 html: html,

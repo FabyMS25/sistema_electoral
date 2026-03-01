@@ -43,24 +43,21 @@
             </button>
         </div>
     </div>
-    
+
     <div class="col-sm">
         <div class="filters-row">
             <form method="GET" action="<?php echo e(route('voting-tables.index')); ?>" id="filter-form">
                 <div class="row g-2 align-items-center">
-                    <!-- Search Input -->
                     <div class="col-md-3 filter-item">
                         <div class="input-group">
                             <span class="input-group-text bg-white">
                                 <i class="ri-search-line"></i>
                             </span>
-                            <input type="text" name="search" class="form-control" 
-                                placeholder="Buscar código OEP, interno, N° mesa, institución..." 
+                            <input type="text" name="search" class="form-control"
+                                placeholder="Buscar código, N° mesa, institución..."
                                 value="<?php echo e(request('search')); ?>">
                         </div>
                     </div>
-                    
-                    <!-- Institution Filter -->
                     <div class="col-md-3 filter-item">
                         <select name="institution_id" class="form-select">
                             <option value="">Institución</option>
@@ -72,8 +69,6 @@
                             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                         </select>
                     </div>
-                    
-                    <!-- Status Filter -->
                     <div class="col-md-2 filter-item">
                         <select name="status" class="form-select">
                             <option value="">Estado</option>
@@ -85,8 +80,6 @@
                             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                         </select>
                     </div>
-                    
-                    <!-- Election Type Filter -->
                     <div class="col-md-2 filter-item">
                         <select name="election_type_id" class="form-select">
                             <option value="">Tipo Elección</option>
@@ -98,23 +91,21 @@
                             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                         </select>
                     </div>
-                    
-                    <!-- Action Buttons -->
                     <div class="col-md-2">
                         <div class="action-buttons">
-                            <button type="submit" class="btn btn-primary btn-sm">
+                            <button type="submit" class="btn btn-primary btn">
                                 <i class="ri-filter-3-line"></i> Filtrar
                             </button>
-                            
+
                             <?php if(request()->hasAny(['search', 'institution_id', 'status', 'election_type_id'])): ?>
-                                <a href="<?php echo e(route('voting-tables.index')); ?>" class="btn btn-outline-secondary btn-sm">
+                                <a href="<?php echo e(route('voting-tables.index')); ?>" class="btn btn-outline-secondary btn">
                                     <i class="ri-close-line"></i>
                                 </a>
                             <?php endif; ?>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Hidden inputs for sorting -->
                 <input type="hidden" name="sort" value="<?php echo e(request('sort', 'institution_id')); ?>">
                 <input type="hidden" name="direction" value="<?php echo e(request('direction', 'asc')); ?>">
@@ -132,7 +123,7 @@
                             </a>
                         </span>
                     <?php endif; ?>
-                    
+
                     <?php if(request('institution_id') && $institutions->find(request('institution_id'))): ?>
                         <span class="badge bg-info">
                             <?php echo e($institutions->find(request('institution_id'))->name); ?>
@@ -142,7 +133,7 @@
                             </a>
                         </span>
                     <?php endif; ?>
-                    
+
                     <?php if(request('status') && isset($statusOptions[request('status')])): ?>
                         <span class="badge bg-success">
                             <?php echo e($statusOptions[request('status')]); ?>
@@ -152,7 +143,7 @@
                             </a>
                         </span>
                     <?php endif; ?>
-                    
+
                     <?php if(request('election_type_id') && $electionTypes->find(request('election_type_id'))): ?>
                         <span class="badge bg-warning text-dark">
                             <?php echo e($electionTypes->find(request('election_type_id'))->name); ?>
@@ -183,4 +174,5 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-</script><?php /**PATH D:\_Mine\corporate\resources\views/voting-tables/partials/actions-bar.blade.php ENDPATH**/ ?>
+</script>
+<?php /**PATH D:\_Mine\corporate\resources\views/voting-tables/partials/actions-bar.blade.php ENDPATH**/ ?>

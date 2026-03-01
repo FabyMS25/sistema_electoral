@@ -8,9 +8,9 @@
     $observedTables = $votingTables->where('status', 'observada')->count();
     $annulledTables = $votingTables->where('status', 'anulada')->count();
     $totalActas = $votingTables->filter(function($table) {
-        return $table->total_voters > 0 || 
-               $table->total_voters_second > 0 || 
-               $table->valid_votes > 0 || 
+        return $table->total_voters > 0 ||
+               $table->total_voters_second > 0 ||
+               $table->valid_votes > 0 ||
                $table->valid_votes_second > 0;
     })->count();
     $participationPercentage = $totalExpectedVoters > 0 ? round(($totalActualVoters/$totalExpectedVoters)*100, 1) : 0;
@@ -28,7 +28,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-info text-white">
             <div class="card-body">
@@ -38,7 +38,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-success text-white">
             <div class="card-body">
@@ -48,7 +48,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-warning text-white">
             <div class="card-body">
@@ -58,7 +58,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-success text-white">
             <div class="card-body">
@@ -68,7 +68,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-xl-2 col-md-4 mb-1">
         <div class="card stats-card bg-danger text-white">
             <div class="card-body">

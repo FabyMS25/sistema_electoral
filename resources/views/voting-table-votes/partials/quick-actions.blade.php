@@ -1,21 +1,21 @@
 {{-- resources/views/voting-table-votes/partials/quick-actions.blade.php --}}
 <div class="quick-actions mt-4">
-    <div class="card bg-light">
-        <div class="card-body">
+    <div class="card bg-light border-0 shadow-sm">
+        <div class="card-body py-3">
             <div class="row align-items-center">
                 <div class="col-md-6">
-                    <h6 class="mb-0">
+                    <h6 class="mb-1">
                         <i class="ri-flashlight-line me-1 text-warning"></i>
                         Acciones rápidas
                     </h6>
                     <small class="text-muted">
-                        {{ $votingTables->count() }} mesas visibles | 
+                        {{ $votingTables->count() }} mesas visibles |
                         <span id="pendingCount">0</span> con cambios pendientes
                     </small>
                 </div>
                 <div class="col-md-6 text-end">
                     <div class="btn-group" role="group">
-                        <button class="btn btn-success" id="quickSaveAllBtn" title="Guardar todas las mesas">
+                        <button class="btn btn-success" id="quickSaveAllBtn" title="Guardar todas las mesas (Ctrl+S)">
                             <i class="ri-save-line me-1"></i>
                             Guardar todo
                         </button>
@@ -36,10 +36,11 @@
                 <div class="col-12">
                     <small class="text-muted">
                         <i class="ri-keyboard-line me-1"></i>
-                        Atajos: 
-                        <span class="badge bg-light text-dark me-2">Ctrl + S</span> Guardar todo
-                        <span class="badge bg-light text-dark me-2 ms-2">Ctrl + Enter</span> Guardar mesa actual
-                        <span class="badge bg-light text-dark me-2 ms-2">Esc</span> Cancelar
+                        Atajos:
+                        <span class="badge bg-light text-dark me-2 border">Ctrl + S</span> Guardar todo
+                        <span class="badge bg-light text-dark me-2 border">Ctrl + Enter</span> Guardar mesa actual
+                        <span class="badge bg-light text-dark me-2 border">Esc</span> Cancelar
+                        <span class="badge bg-light text-dark me-2 border">F5</span> Actualizar
                     </small>
                 </div>
             </div>
@@ -69,6 +70,8 @@
 .quick-actions .card {
     box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
     border: none;
+    backdrop-filter: blur(5px);
+    background-color: rgba(248, 249, 250, 0.95) !important;
 }
 
 .quick-actions .btn-group .btn {
@@ -79,9 +82,15 @@
     .quick-actions .btn-group {
         display: flex;
         width: 100%;
+        margin-top: 0.5rem;
     }
     .quick-actions .btn-group .btn {
         flex: 1;
+        font-size: 0.8rem;
+        padding: 0.4rem 0.5rem;
+    }
+    .quick-actions .col-md-6.text-end {
+        text-align: left !important;
     }
 }
 </style>
@@ -106,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             document.getElementById('quickSaveAllBtn')?.click();
         }
-        
+
         // Ctrl + Enter: Guardar mesa actual (la que está en foco)
         if (e.ctrlKey && e.key === 'Enter') {
             e.preventDefault();
@@ -116,6 +125,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 const saveBtn = document.querySelector(`.save-table[data-table-id="${tableId}"]`);
                 if (saveBtn) saveBtn.click();
             }
+        }
+
+        // F5: Actualizar
+        if (e.key === 'F5') {
+            e.preventDefault();
+            document.getElementById('quickRefreshBtn')?.click();
+        }
+
+        // Esc: Salir de inputs
+        if (e.key === 'Escape') {
+            document.activeElement?.blur();
         }
     });
 

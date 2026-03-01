@@ -1,4 +1,4 @@
-{{-- resources/views/voting-tables/partials/actions-bar.blade.php --}}
+
 <div class="row g-4 mb-2">
     <div class="col-sm-auto">
         <div class="d-flex flex-wrap gap-2">
@@ -43,24 +43,21 @@
             </button>
         </div>
     </div>
-    
+
     <div class="col-sm">
         <div class="filters-row">
             <form method="GET" action="{{ route('voting-tables.index') }}" id="filter-form">
                 <div class="row g-2 align-items-center">
-                    <!-- Search Input -->
                     <div class="col-md-3 filter-item">
                         <div class="input-group">
                             <span class="input-group-text bg-white">
                                 <i class="ri-search-line"></i>
                             </span>
-                            <input type="text" name="search" class="form-control" 
-                                placeholder="Buscar código OEP, interno, N° mesa, institución..." 
+                            <input type="text" name="search" class="form-control"
+                                placeholder="Buscar código, N° mesa, institución..."
                                 value="{{ request('search') }}">
                         </div>
                     </div>
-                    
-                    <!-- Institution Filter -->
                     <div class="col-md-3 filter-item">
                         <select name="institution_id" class="form-select">
                             <option value="">Institución</option>
@@ -71,8 +68,6 @@
                             @endforeach
                         </select>
                     </div>
-                    
-                    <!-- Status Filter -->
                     <div class="col-md-2 filter-item">
                         <select name="status" class="form-select">
                             <option value="">Estado</option>
@@ -83,8 +78,6 @@
                             @endforeach
                         </select>
                     </div>
-                    
-                    <!-- Election Type Filter -->
                     <div class="col-md-2 filter-item">
                         <select name="election_type_id" class="form-select">
                             <option value="">Tipo Elección</option>
@@ -95,23 +88,21 @@
                             @endforeach
                         </select>
                     </div>
-                    
-                    <!-- Action Buttons -->
                     <div class="col-md-2">
                         <div class="action-buttons">
-                            <button type="submit" class="btn btn-primary btn-sm">
+                            <button type="submit" class="btn btn-primary btn">
                                 <i class="ri-filter-3-line"></i> Filtrar
                             </button>
-                            
+
                             @if(request()->hasAny(['search', 'institution_id', 'status', 'election_type_id']))
-                                <a href="{{ route('voting-tables.index') }}" class="btn btn-outline-secondary btn-sm">
+                                <a href="{{ route('voting-tables.index') }}" class="btn btn-outline-secondary btn">
                                     <i class="ri-close-line"></i>
                                 </a>
                             @endif
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Hidden inputs for sorting -->
                 <input type="hidden" name="sort" value="{{ request('sort', 'institution_id') }}">
                 <input type="hidden" name="direction" value="{{ request('direction', 'asc') }}">
@@ -129,7 +120,7 @@
                             </a>
                         </span>
                     @endif
-                    
+
                     @if(request('institution_id') && $institutions->find(request('institution_id')))
                         <span class="badge bg-info">
                             {{ $institutions->find(request('institution_id'))->name }}
@@ -138,7 +129,7 @@
                             </a>
                         </span>
                     @endif
-                    
+
                     @if(request('status') && isset($statusOptions[request('status')]))
                         <span class="badge bg-success">
                             {{ $statusOptions[request('status')] }}
@@ -147,7 +138,7 @@
                             </a>
                         </span>
                     @endif
-                    
+
                     @if(request('election_type_id') && $electionTypes->find(request('election_type_id')))
                         <span class="badge bg-warning text-dark">
                             {{ $electionTypes->find(request('election_type_id'))->name }}

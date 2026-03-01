@@ -1,6 +1,4 @@
 <?php
-// app/Models/Institution.php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -78,7 +76,7 @@ class Institution extends Model
     }
 
     // ===== RELACIONES =====
-    
+
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
@@ -125,7 +123,7 @@ class Institution extends Model
     }
 
     // ===== SCOPES =====
-    
+
     public function scopeActive($query)
     {
         return $query->where('status', 'activo');
@@ -142,7 +140,7 @@ class Institution extends Model
     }
 
     // ===== MÉTODOS =====
-    
+
     public function updateTotals()
     {
         $this->update([
@@ -162,7 +160,7 @@ class Institution extends Model
         if ($this->municipality) $parts[] = $this->municipality->name;
         if ($this->province) $parts[] = $this->province->name;
         if ($this->department) $parts[] = $this->department->name;
-        
+
         return implode(', ', $parts);
     }
 

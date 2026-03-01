@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Exports;
 
 use App\Models\Institution;
@@ -13,72 +12,112 @@ use Illuminate\Support\Facades\Log;
 
 class InstitutionsExport
 {
-    public function export()
+    public function export($filters = [])
     {
         try {
-            $institutions = Institution::with([
+            $query = Institution::with([
                 'locality.municipality.province.department',
                 'district',
                 'zone'
-            ])->orderBy('name')->get();
+            ]);
+            if (!empty($filters['selected_ids'])) {
+                $query->whereIn('id', $filters['selected_ids']);
+            }
+
+            if (!empty($filters['search'])) {
+                $search = $filters['search'];
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'ilike', "%{$search}%")
+                      ->orWhere('code', 'ilike', "%{$search}%")
+                      ->orWhere('short_name', 'ilike', "%{$search}%");
+                });
+            }
+            if (!empty($filters['department_id'])) {
+                $query->whereHas('locality.municipality.province', function($q) use ($filters) {
+                    $q->where('department_id', $filters['department_id']);
+                });
+            }
+            if (!empty($filters['status'])) {
+                $query->where('status', $filters['status']);
+            }
+            $institutions = $query->orderBy('name')->get();
             $spreadsheet = new Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();            
+            $sheet = $spreadsheet->getActiveSheet();
             $headers = [
                 'A1' => 'Código',
                 'B1' => 'Nombre',
-                'C1' => 'Dirección',
+                'C1' => 'Nombre Corto',
                 'D1' => 'Departamento',
                 'E1' => 'Provincia',
                 'F1' => 'Municipio',
                 'G1' => 'Localidad',
                 'H1' => 'Distrito',
                 'I1' => 'Zona',
-                'J1' => 'Ciudadanos Habilitados',
-                'K1' => 'Actas Computadas',
-                'L1' => 'Actas Anuladas',
-                'M1' => 'Actas Habilitadas',
-                'N1' => 'Activo',
-                'O1' => 'Fecha Creación',
-                'P1' => 'Última Actualización'
-            ];            
+                'J1' => 'Dirección',
+                'K1' => 'Referencia',
+                'L1' => 'Teléfono',
+                'M1' => 'Email',
+                'N1' => 'Responsable',
+                'O1' => 'Ciudadanos Habilitados',
+                'P1' => 'Total Mesas',
+                'Q1' => 'Actas Computadas',
+                'R1' => 'Actas Anuladas',
+                'S1' => 'Actas Habilitadas',
+                'T1' => 'Latitud',
+                'U1' => 'Longitud',
+                'V1' => 'Estado',
+                'W1' => 'Operativo',
+                'X1' => 'Observaciones'
+            ];
             foreach ($headers as $cell => $value) {
                 $sheet->setCellValue($cell, $value);
             }
-            $headerRange = 'A1:P1';
+            $headerRange = 'A1:X1';
             $sheet->getStyle($headerRange)->getFont()->setBold(true);
             $sheet->getStyle($headerRange)->getFill()
                   ->setFillType(Fill::FILL_SOLID)
                   ->getStartColor()->setRGB('E3F2FD');
             $sheet->getStyle($headerRange)->getAlignment()
                   ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
             $row = 2;
             foreach ($institutions as $institution) {
-                $sheet->setCellValue('A'.$row, $institution->code ?? '');
-                $sheet->setCellValue('B'.$row, $institution->name);
-                $sheet->setCellValue('C'.$row, $institution->address ?? '');
-                $sheet->setCellValue('D'.$row, $institution->locality->municipality->province->department->name ?? '');
-                $sheet->setCellValue('E'.$row, $institution->locality->municipality->province->name ?? '');
-                $sheet->setCellValue('F'.$row, $institution->locality->municipality->name ?? '');
-                $sheet->setCellValue('G'.$row, $institution->locality->name ?? '');
-                $sheet->setCellValue('H'.$row, $institution->district->name ?? '');
-                $sheet->setCellValue('I'.$row, $institution->zone->name ?? '');
-                $sheet->setCellValue('J'.$row, $institution->registered_citizens ?? 0);
-                $sheet->setCellValue('K'.$row, $institution->total_computed_records ?? 0);
-                $sheet->setCellValue('L'.$row, $institution->total_annulled_records ?? 0);
-                $sheet->setCellValue('M'.$row, $institution->total_enabled_records ?? 0);
-                $sheet->setCellValue('N'.$row, $institution->active ? 'Sí' : 'No');
-                $sheet->setCellValue('O'.$row, $institution->created_at ? $institution->created_at->format('d/m/Y H:i') : '');
-                $sheet->setCellValue('P'.$row, $institution->updated_at ? $institution->updated_at->format('d/m/Y H:i') : '');
+                $sheet->setCellValue('A' . $row, $institution->code ?? '');
+                $sheet->setCellValue('B' . $row, $institution->name ?? '');
+                $sheet->setCellValue('C' . $row, $institution->short_name ?? '');
+                $sheet->setCellValue('D' . $row, $institution->locality->municipality->province->department->name ?? '');
+                $sheet->setCellValue('E' . $row, $institution->locality->municipality->province->name ?? '');
+                $sheet->setCellValue('F' . $row, $institution->locality->municipality->name ?? '');
+                $sheet->setCellValue('G' . $row, $institution->locality->name ?? '');
+                $sheet->setCellValue('H' . $row, $institution->district->name ?? '');
+                $sheet->setCellValue('I' . $row, $institution->zone->name ?? '');
+                $sheet->setCellValue('J' . $row, $institution->address ?? '');
+                $sheet->setCellValue('K' . $row, $institution->reference ?? '');
+                $sheet->setCellValue('L' . $row, $institution->phone ?? '');
+                $sheet->setCellValue('M' . $row, $institution->email ?? '');
+                $sheet->setCellValue('N' . $row, $institution->responsible_name ?? '');
+                $sheet->setCellValue('O' . $row, $institution->registered_citizens ?? 0);
+                $sheet->setCellValue('P' . $row, $institution->voting_tables_count ?? 0);
+                $sheet->setCellValue('Q' . $row, $institution->total_computed_records ?? 0);
+                $sheet->setCellValue('R' . $row, $institution->total_annulled_records ?? 0);
+                $sheet->setCellValue('S' . $row, $institution->total_enabled_records ?? 0);
+                $sheet->setCellValue('T' . $row, $institution->latitude ?? '');
+                $sheet->setCellValue('U' . $row, $institution->longitude ?? '');
+                $sheet->setCellValue('V' . $row, $this->getStatusLabel($institution->status));
+                $sheet->setCellValue('W' . $row, $institution->is_operative ? 'Sí' : 'No');
+                $sheet->setCellValue('X' . $row, $institution->observations ?? '');
+
                 $row++;
             }
-            foreach (range('A', 'P') as $column) {
+            $columns = range('A', 'X');
+            foreach ($columns as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
-            $fileName = 'instituciones_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
-            $filePath = "exports/{$fileName}";            
-            Storage::makeDirectory('exports');            
+            $fileName = 'recintos_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+            $filePath = "exports/{$fileName}";
+            Storage::makeDirectory('exports');
             $writer = new Xlsx($spreadsheet);
-            $writer->save(storage_path("app/{$filePath}"));            
+            $writer->save(storage_path("app/{$filePath}"));
             return $filePath;
         } catch (\Exception $e) {
             Log::error('Export error: ' . $e->getMessage());
@@ -90,72 +129,95 @@ class InstitutionsExport
     {
         try {
             $spreadsheet = new Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();            
+            $sheet = $spreadsheet->getActiveSheet();
             $headers = [
                 'A1' => 'Código',
                 'B1' => 'Nombre',
-                'C1' => 'Dirección',
+                'C1' => 'Nombre Corto',
                 'D1' => 'Departamento',
                 'E1' => 'Provincia',
                 'F1' => 'Municipio',
                 'G1' => 'Localidad',
                 'H1' => 'Distrito',
                 'I1' => 'Zona',
-                'J1' => 'Ciudadanos_Habilitados',
-                'K1' => 'Actas_Computadas',
-                'L1' => 'Actas_Anuladas',
-                'M1' => 'Actas_Habilitadas',
-                'N1' => 'Activo'
-            ];            
+                'J1' => 'Dirección',
+                'K1' => 'Referencia',
+                'L1' => 'Teléfono',
+                'M1' => 'Email',
+                'N1' => 'Responsable',
+                'O1' => 'Ciudadanos Habilitados',
+                'P1' => 'Estado',
+                'Q1' => 'Operativo',
+                'R1' => 'Observaciones'
+            ];
             foreach ($headers as $cell => $value) {
                 $sheet->setCellValue($cell, $value);
             }
-            $headerRange = 'A1:N1';
+            $headerRange = 'A1:R1';
             $sheet->getStyle($headerRange)->getFont()->setBold(true);
             $sheet->getStyle($headerRange)->getFill()
                   ->setFillType(Fill::FILL_SOLID)
                   ->getStartColor()->setRGB('E3F2FD');
-
             $sampleData = [
-                ['INST001', 'Colegio Nacional Simón Bolívar', 'Av. 16 de Julio 1234', 'La Paz', 'Murillo', 'La Paz', 'Centro', 'Distrito 1', 'Zona Norte', '500', '10', '0', '10', 'Sí'],
-                ['INST002', 'Unidad Educativa Santa Rosa', 'Calle Comercio 567', 'Cochabamba', 'Cercado', 'Cochabamba', 'Villa Coronilla', '', '', '300', '8', '1', '7', 'Sí'],
-                ['', 'Instituto Tecnológico Superior', 'Plaza Principal s/n', 'Santa Cruz', 'Andrés Ibáñez', 'Santa Cruz de la Sierra', 'Plan 3000', 'Distrito 8', 'Zona Este', '750', '15', '0', '15', 'No']
+                ['INST001', 'UNIDAD EDUCATIVA SIMÓN BOLÍVAR', 'UE SIMÓN BOLÍVAR', 'Cochabamba', 'Quillacollo', 'Quillacollo', 'Quillacollo (Urbano)', '', '', 'Av. Blanco Galindo Km 12', 'Frente a la plaza', '4-1234567', 'ue.simon@ejemplo.com', 'Juan Pérez', '350', 'activo', 'Sí', 'Recinto principal'],
+                ['INST002', 'COLEGIO NACIONAL QUILLACOLLO', 'CNQ', 'Cochabamba', 'Quillacollo', 'Quillacollo', 'Centro', '', '', 'Calle Sucre', 'Al lado de la iglesia', '4-7654321', 'cnq@ejemplo.com', 'María Gómez', '280', 'activo', 'Sí', ''],
             ];
+
             $row = 2;
             foreach ($sampleData as $data) {
                 $col = 'A';
                 foreach ($data as $value) {
-                    $sheet->setCellValue($col.$row, $value);
+                    $sheet->setCellValue($col . $row, $value);
                     $col++;
                 }
                 $row++;
             }
-            foreach (range('A', 'N') as $column) {
+
+            $columns = range('A', 'R');
+            foreach ($columns as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
+
             $instructionRow = $row + 2;
-            $sheet->setCellValue('A'.$instructionRow, 'INSTRUCCIONES:');
-            $sheet->getStyle('A'.$instructionRow)->getFont()->setBold(true);            
+            $sheet->setCellValue('A' . $instructionRow, 'INSTRUCCIONES:');
+            $sheet->getStyle('A' . $instructionRow)->getFont()->setBold(true);
+
             $instructions = [
                 'El código se genera automáticamente si se deja vacío',
-                'Los campos Departamento, Provincia, Municipio y Localidad son obligatorios',
-                'Distrito y Zona son opcionales',
-                'Para el campo Activo use: Sí/No, Si/No, True/False, 1/0',
-                'Los campos numéricos pueden dejarse vacíos (se asumirá 0)',
+                'Los campos Nombre, Departamento, Provincia, Municipio y Localidad son obligatorios',
+                'Para el campo Estado use: activo, inactivo o en_mantenimiento',
+                'Para el campo Operativo use: Sí o No',
+                'Los departamentos, provincias, municipios y localidades deben existir en el sistema',
                 'Elimine estas filas de ejemplo antes de importar sus datos'
             ];
+
             foreach ($instructions as $i => $instruction) {
-                $sheet->setCellValue('A'.($instructionRow + $i + 1), '• ' . $instruction);
+                $sheet->setCellValue('A' . ($instructionRow + $i + 1), '• ' . $instruction);
             }
-            $fileName = 'plantilla_instituciones.xlsx';
-            $filePath = "templates/{$fileName}";            
-            Storage::makeDirectory('templates');            
+
+            $fileName = 'plantilla_recintos.xlsx';
+            $filePath = "templates/{$fileName}";
+
+            Storage::makeDirectory('templates');
+
             $writer = new Xlsx($spreadsheet);
-            $writer->save(storage_path("app/{$filePath}"));            
+            $writer->save(storage_path("app/{$filePath}"));
+
             return $filePath;
+
         } catch (\Exception $e) {
             Log::error('Template generation error: ' . $e->getMessage());
             throw new \Exception('Error al generar la plantilla: ' . $e->getMessage());
         }
+    }
+
+    private function getStatusLabel($status)
+    {
+        return match($status) {
+            'activo' => 'Activo',
+            'inactivo' => 'Inactivo',
+            'en_mantenimiento' => 'En Mantenimiento',
+            default => $status,
+        };
     }
 }
