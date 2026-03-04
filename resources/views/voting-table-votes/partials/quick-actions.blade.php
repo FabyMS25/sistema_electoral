@@ -19,10 +19,6 @@
                             <i class="ri-save-line me-1"></i>
                             Guardar todo
                         </button>
-                        <button class="btn btn-warning" id="quickCloseAllBtn" title="Cerrar todas las mesas">
-                            <i class="ri-lock-line me-1"></i>
-                            Cerrar todo
-                        </button>
                         <button class="btn btn-info" id="quickRefreshBtn" title="Actualizar vista">
                             <i class="ri-refresh-line me-1"></i>
                             Actualizar

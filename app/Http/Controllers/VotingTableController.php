@@ -29,54 +29,33 @@ class VotingTableController extends Controller
     private function validationMessages()
     {
         return [
-            // Número de mesa
             'number.required' => 'El número de mesa es obligatorio.',
             'number.integer' => 'El número de mesa debe ser un valor numérico.',
             'number.min' => 'El número de mesa debe ser mayor o igual a 1.',
-
-            // Códigos
             'oep_code.unique' => 'El código OEP ya está siendo utilizado por otra mesa.',
             'oep_code.max' => 'El código OEP no puede exceder los 20 caracteres.',
             'internal_code.unique' => 'El código interno ya está siendo utilizado por otra mesa.',
             'internal_code.max' => 'El código interno no puede exceder los 20 caracteres.',
-
-            // Institución
             'institution_id.required' => 'Debe seleccionar una institución/recinto.',
             'institution_id.exists' => 'La institución seleccionada no existe en el sistema.',
-
-            // Tipo de elección
             'election_type_id.required' => 'Debe seleccionar un tipo de elección.',
             'election_type_id.exists' => 'El tipo de elección seleccionado no existe.',
-
-            // Letra
             'letter.max' => 'La letra debe tener máximo 1 carácter.',
-
-            // Tipo de mesa
             'type.in' => 'El tipo de mesa debe ser: mixta, masculina o femenina.',
-
-            // Rango de votantes
             'voter_range_start_name.max' => 'El apellido inicial no puede exceder los 255 caracteres.',
             'voter_range_end_name.max' => 'El apellido final no puede exceder los 255 caracteres.',
-
-            // Datos electorales
             'expected_voters.integer' => 'Los votantes esperados deben ser un valor numérico.',
             'expected_voters.min' => 'Los votantes esperados deben ser mayor o igual a 0.',
             'ballots_received.integer' => 'Las papeletas recibidas deben ser un valor numérico.',
             'ballots_received.min' => 'Las papeletas recibidas deben ser mayor o igual a 0.',
             'ballots_spoiled.integer' => 'Las papeletas deterioradas deben ser un valor numérico.',
             'ballots_spoiled.min' => 'Las papeletas deterioradas deben ser mayor o igual a 0.',
-
-            // Estado
             'status.required' => 'El estado de la mesa es obligatorio.',
             'status.in' => 'El estado seleccionado no es válido.',
-
-            // Fechas y horas
             'election_date.date' => 'La fecha de elección no tiene un formato válido.',
             'opening_time.date_format' => 'La hora de apertura debe tener formato HH:MM.',
             'closing_time.date_format' => 'La hora de cierre debe tener formato HH:MM.',
             'closing_time.after' => 'La hora de cierre debe ser posterior a la hora de apertura.',
-
-            // Observaciones
             'observations.string' => 'Las observaciones deben ser texto.',
         ];
     }
@@ -84,7 +63,6 @@ class VotingTableController extends Controller
     private function validationRules($id = null, $request = null)
     {
         $statusValues = implode(',', array_keys(VotingTable::getStatuses()));
-
         $rules = [
             'oep_code' => 'nullable|string|max:20|unique:voting_tables,oep_code' . ($id ? ',' . $id : ''),
             'internal_code' => 'nullable|string|max:20|unique:voting_tables,internal_code' . ($id ? ',' . $id : ''),
@@ -117,9 +95,8 @@ class VotingTableController extends Controller
             'vocal1_id' => 'nullable|exists:users,id',
             'vocal2_id' => 'nullable|exists:users,id',
             'vocal3_id' => 'nullable|exists:users,id',
-            'vocal4_name' => 'nullable|string|max:255',
+            'vocal4_id' => 'nullable|exists:users,id',
         ];
-
         if ($request) {
             $rules['ballots_received'][] = function ($attribute, $value, $fail) use ($request) {
                 if ($value > 0 && $request->input('expected_voters', 0) > 0) {
@@ -128,14 +105,12 @@ class VotingTableController extends Controller
                     }
                 }
             };
-
             $rules['ballots_spoiled'][] = function ($attribute, $value, $fail) use ($request) {
                 if ($value > $request->input('ballots_received', 0)) {
                     $fail('Las papeletas deterioradas no pueden ser mayores a las papeletas recibidas.');
                 }
             };
         }
-
         return $rules;
     }
 
@@ -151,20 +126,15 @@ class VotingTableController extends Controller
                 'vocal2',
                 'vocal3',
             ]);
-
-            // Filtros
             if ($request->filled('institution_id')) {
                 $query->where('institution_id', $request->institution_id);
             }
-
             if ($request->filled('status')) {
                 $query->where('status', $request->status);
             }
-
             if ($request->filled('election_type_id')) {
                 $query->where('election_type_id', $request->election_type_id);
             }
-
             if ($request->filled('search')) {
                 $search = $request->search;
                 $query->where(function($q) use ($search) {
@@ -177,16 +147,12 @@ class VotingTableController extends Controller
                       });
                 });
             }
-
-            // Sorting
             $sortField = $request->get('sort', 'institution_id');
             $sortDirection = $request->get('direction', 'asc');
-
             $allowedSortFields = [
                 'institution_id', 'number', 'oep_code', 'internal_code', 'expected_voters',
                 'total_voters', 'status', 'institution_name'
             ];
-
             if (in_array($sortField, $allowedSortFields)) {
                 if ($sortField === 'institution_name') {
                     $query->leftJoin('institutions', 'voting_tables.institution_id', '=', 'institutions.id')
@@ -206,9 +172,7 @@ class VotingTableController extends Controller
             $electionTypes = ElectionType::where('active', true)
                                         ->orderBy('name')
                                         ->get();
-
             $statusOptions = VotingTable::getStatuses();
-
             return view('voting-tables.index', compact(
                 'votingTables',
                 'institutions',
@@ -217,7 +181,6 @@ class VotingTableController extends Controller
                 'sortField',
                 'sortDirection'
             ));
-
         } catch (\Exception $e) {
             Log::error('Error loading voting tables: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Error al cargar las mesas de votación.');
@@ -234,7 +197,6 @@ class VotingTableController extends Controller
                                          ->orderBy('name')
                                          ->get();
             $statusOptions = VotingTable::getStatuses();
-
             return view('voting-tables.create', compact('institutions', 'electionTypes', 'statusOptions'));
         } catch (\Exception $e) {
             Log::error('Error loading create form: ' . $e->getMessage());
@@ -242,63 +204,43 @@ class VotingTableController extends Controller
                             ->with('error', 'Error al cargar el formulario de creación.');
         }
     }
-
     public function store(Request $request)
     {
         try {
             Log::info('=== STORE: Datos completos del formulario ===', $request->all());
-
             $rules = $this->validationRules(null, $request);
             $validated = $request->validate($rules, $this->validationMessages());
-
             Log::info('=== STORE: Datos validados ===', $validated);
-
             $existingTable = VotingTable::where('institution_id', $validated['institution_id'])
                 ->where('number', $validated['number'])
                 ->first();
-
             if ($existingTable) {
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['number' => 'Ya existe una mesa con este número en la institución seleccionada.']);
             }
-
             $institution = Institution::find($validated['institution_id']);
-
-            // Generar códigos si están vacíos
             if (empty($validated['oep_code'])) {
                 $validated['oep_code'] = $institution->code . '-' . $validated['number'];
             }
-
             if (empty($validated['internal_code'])) {
                 $validated['internal_code'] = $institution->code . '-M' . str_pad($validated['number'], 2, '0', STR_PAD_LEFT);
             }
-
-            $validated['municipality_id'] = $institution->municipality_id;
-
-            // Valores por defecto
             $validated['expected_voters'] = $validated['expected_voters'] ?? 0;
             $validated['ballots_received'] = $validated['ballots_received'] ?? 0;
             $validated['ballots_spoiled'] = $validated['ballots_spoiled'] ?? 0;
-
-            // Manejo de campos opcionales
             $validated['opening_time'] = $request->filled('opening_time') ? $request->opening_time : null;
             $validated['closing_time'] = $request->filled('closing_time') ? $request->closing_time : null;
             $validated['election_date'] = $request->filled('election_date') ? $request->election_date : null;
             $validated['acta_number'] = $request->filled('acta_number') ? $request->acta_number : null;
             $validated['observations'] = $request->filled('observations') ? $request->observations : null;
-
             DB::beginTransaction();
-
             try {
                 $votingTable = VotingTable::create($validated);
                 DB::commit();
-
                 Log::info('=== STORE: Mesa creada exitosamente ===', ['id' => $votingTable->id]);
-
                 return redirect()->route('voting-tables.index')
                     ->with('success', '✅ La mesa de votación fue creada con éxito.');
-
             } catch (\Exception $e) {
                 DB::rollBack();
                 Log::error('=== STORE: Error al crear en DB ===', [
@@ -307,19 +249,16 @@ class VotingTableController extends Controller
                 ]);
                 throw $e;
             }
-
         } catch (ValidationException $e) {
             Log::error('=== STORE: Errores de validación ===', $e->errors());
             return redirect()->back()
                 ->withErrors($e->validator)
                 ->withInput();
-
         } catch (\Exception $e) {
             Log::error('=== STORE: Error general ===', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-
             return redirect()->back()
                 ->withInput()
                 ->with('error', '❌ Error al crear la mesa: ' . $e->getMessage());
@@ -387,7 +326,6 @@ class VotingTableController extends Controller
                                          ->orderBy('name')
                                          ->get();
             $statusOptions = VotingTable::getStatuses();
-
             return view('voting-tables.edit', compact('votingTable', 'institutions', 'electionTypes', 'statusOptions'));
         } catch (\Exception $e) {
             Log::error('Error loading edit form: ' . $e->getMessage(), ['id' => $id]);
@@ -413,7 +351,6 @@ class VotingTableController extends Controller
             }
             if ($votingTable->institution_id != $validated['institution_id']) {
                 $institution = Institution::find($validated['institution_id']);
-                $validated['municipality_id'] = $institution->municipality_id;
             }
             if (!empty($validated['opening_time']) && !empty($validated['closing_time'])) {
                 if ($validated['closing_time'] <= $validated['opening_time']) {
@@ -462,14 +399,11 @@ class VotingTableController extends Controller
                 return redirect()->back()
                     ->with('error', '❌ No se puede eliminar la mesa porque tiene votos registrados.');
             }
-
             DB::transaction(function () use ($votingTable) {
                 $votingTable->delete();
             });
-
             return redirect()->route('voting-tables.index')
                 ->with('success', '✅ La mesa de votación fue eliminada correctamente.');
-
         } catch (\Exception $e) {
             Log::error('Error deleting voting table: ' . $e->getMessage(), [
                 'id' => $id,
@@ -487,23 +421,18 @@ class VotingTableController extends Controller
                 'ids' => 'required|array',
                 'ids.*' => 'exists:voting_tables,id'
             ]);
-
             $ids = $request->input('ids');
             $count = count($ids);
-
             $tablesWithVotes = VotingTable::whereIn('id', $ids)
                 ->whereHas('votes')
                 ->count();
-
             if ($tablesWithVotes > 0) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No se pueden eliminar mesas que tienen votos registrados.'
                 ], 422);
             }
-
             $deleted = VotingTable::whereIn('id', $ids)->delete();
-
             if ($deleted) {
                 return response()->json([
                     'success' => true,
@@ -511,12 +440,10 @@ class VotingTableController extends Controller
                     'deleted_count' => $deleted
                 ]);
             }
-
             return response()->json([
                 'success' => false,
                 'message' => 'No se pudieron eliminar las mesas de votación.'
             ], 500);
-
         } catch (\Exception $e) {
             Log::error('Error deleting multiple voting tables: ' . $e->getMessage());
             return response()->json([
@@ -551,7 +478,7 @@ class VotingTableController extends Controller
                 'vocal1_id' => 'nullable|exists:users,id',
                 'vocal2_id' => 'nullable|exists:users,id',
                 'vocal3_id' => 'nullable|exists:users,id',
-                'vocal4_name' => 'nullable|string|max:255',
+                'vocal4_id' => 'nullable|exists:users,id',
             ]);
 
             $votingTable->update($validated);

@@ -10,4 +10,6 @@
 <!-- custom Css-->
 <link href="<?php echo e(URL::asset('build/css/custom.min.css')); ?>" id="app-style" rel="stylesheet" type="text/css" />
 
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
 <?php /**PATH D:\_Mine\corporate\resources\views/layouts/head-css.blade.php ENDPATH**/ ?>

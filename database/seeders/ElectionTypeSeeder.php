@@ -11,13 +11,6 @@ class ElectionTypeSeeder extends Seeder
 {
     public function run()
     {
-        $this->command->info('========================================');
-        $this->command->info('CREANDO TIPOS DE ELECCIÓN Y CATEGORÍAS');
-        $this->command->info('========================================');
-
-        // ===== 1. CREAR CATEGORÍAS ELECTORALES =====
-        $this->command->info('Creando categorías electorales...');
-        
         $categories = [
             [
                 'name' => 'Presidente',
@@ -60,7 +53,6 @@ class ElectionTypeSeeder extends Seeder
                 'active' => true,
             ],
         ];
-
         $categoriasCreadas = [];
         foreach ($categories as $catData) {
             $category = ElectionCategory::firstOrCreate(
@@ -70,10 +62,6 @@ class ElectionTypeSeeder extends Seeder
             $categoriasCreadas[$catData['code']] = $category->id;
             $this->command->info("  ✅ Categoría: {$catData['name']} ({$catData['code']})");
         }
-
-        // ===== 2. CREAR TIPOS DE ELECCIÓN =====
-        $this->command->info('');
-        $this->command->info('Creando tipos de elección...');
 
         $electionTypes = [
             [
@@ -92,33 +80,23 @@ class ElectionTypeSeeder extends Seeder
                 'end_time' => '17:00:00',
                 'status' => 'preparacion',
                 'active' => true,
-                'categories' => ['ALC', 'CON'], // Alcalde y Concejal (una sola papeleta con dos franjas)
+                'categories' => ['ALC', 'CON'], // Alcalde y Concejal
             ],
         ];
 
         foreach ($electionTypes as $typeData) {
             $categories = $typeData['categories'];
             unset($typeData['categories']);
-
-            // Crear o actualizar el tipo de elección
             $electionType = ElectionType::updateOrCreate(
                 ['name' => $typeData['name']],
                 $typeData
             );
-
-            $this->command->info("  📊 Tipo: {$electionType->name}");
-
-            // ===== 3. ASOCIAR CATEGORÍAS AL TIPO DE ELECCIÓN =====
-            $this->command->info("     Asignando categorías:");
-            
             foreach ($categories as $catCode) {
                 if (isset($categoriasCreadas[$catCode])) {
-                    // Verificar si ya existe la relación
                     $exists = ElectionTypeCategory::where([
                         'election_type_id' => $electionType->id,
                         'election_category_id' => $categoriasCreadas[$catCode],
                     ])->exists();
-
                     if (!$exists) {
                         ElectionTypeCategory::create([
                             'election_type_id' => $electionType->id,
@@ -134,22 +112,6 @@ class ElectionTypeSeeder extends Seeder
                 }
             }
         }
-
-        // ===== 4. MOSTRAR RESUMEN =====
-        $this->command->info('');
-        $this->command->info('========================================');
-        $this->command->info('✅ RESUMEN FINAL');
-        $this->command->info('========================================');
-        
-        $totalCategorias = ElectionCategory::count();
-        $totalTipos = ElectionType::count();
-        $totalRelaciones = ElectionTypeCategory::count();
-        
-        $this->command->info("📊 Categorías electorales: {$totalCategorias}");
-        $this->command->info("📅 Tipos de elección: {$totalTipos}");
-        $this->command->info("🔗 Relaciones creadas: {$totalRelaciones}");
-        
-        // Mostrar tipo activo
         $activo = ElectionType::where('active', true)->first();
         if ($activo) {
             $this->command->info('');

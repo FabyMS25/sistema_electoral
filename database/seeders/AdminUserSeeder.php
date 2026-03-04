@@ -1,5 +1,4 @@
 <?php
-// database/seeders/AdminUserSeeder.php
 
 namespace Database\Seeders;
 
@@ -8,56 +7,67 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Permission;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Crear o obtener el rol de administrador
-        $adminRole = Role::firstOrCreate(
-            ['name' => 'administrador'],
-            [
-                'display_name' => 'Administrador del Sistema',
-                'description' => 'Control total del sistema sin restricciones',
-                'default_scope' => 'global' // Ámbito global = puede hacer todo
-            ]
-        );
-
-        // 2. asignacion de TODOS los permisos
-        $allPermissions = Permission::all();
-        $adminRole->permissions()->sync($allPermissions->pluck('id'));
-
-        $admins = [
-            [
-                'name' => 'Administrador',
-                'email' => 'admin@gmail.com',
-                'password' => Hash::make('password123'),
-            ],
-            [
-                'name' => 'Fabiola Morales',
-                'email' => 'moralessfaby.dev@gmail.com',
-                'password' => Hash::make('password123'),
-            ]
-        ];
-
-        foreach ($admins as $adminData) {
-            $user = User::firstOrCreate(
-                ['email' => $adminData['email']],
+        DB::transaction(function () {
+            $adminRole = Role::firstOrCreate(
+                ['name' => 'administrador'],
                 [
-                    'name' => $adminData['name'],
-                    'password' => $adminData['password'],
+                    'display_name' => 'Administrador del Sistema',
+                    'description' => 'Control total del sistema sin restricciones',
+                    'default_scope' => 'global'
                 ]
             );
-            $user->roles()->syncWithoutDetaching([
-                $adminRole->id => [
-                    'scope' => 'global',
-                    'scope_id' => null,
-                    'scope_type' => null
-                ]
-            ]);
-            $this->command->info("✅ Usuario admin configurado: {$user->email} (ámbito GLOBAL)");
-        }
+            $allPermissions = Permission::all();
+            if ($allPermissions->isNotEmpty()) {
+                $adminRole->permissions()->sync($allPermissions->pluck('id'));
+            }
 
-        $this->command->info('🎉 Administradores creados exitosamente');
+            $admins = [
+                [
+                    'name' => 'Admin',
+                    'last_name' => 'User',
+                    'email' => 'admin@gmail.com',
+                    'password' => Hash::make('12345678'),
+                    'email_verified_at' => now(),
+                    'avatar' => 'avatar-6.jpg',
+                    'is_active' => true,
+                ],
+                [
+                    'name' => 'Faby',
+                    'last_name' => 'Morales',
+                    'email' => 'moralessfaby.dev@gmail.com',
+                    'password' => Hash::make('12345678'),
+                    'email_verified_at' => now(),
+                    'avatar' => 'avatar-6.jpg',
+                    'is_active' => true,
+                ]
+            ];
+
+            foreach ($admins as $adminData) {
+                $user = User::updateOrCreate(
+                    ['email' => $adminData['email']],
+                    array_merge($adminData, [
+                        'created_by' => null,
+                    ])
+                );
+                $user->roles()->syncWithoutDetaching([
+                    $adminRole->id => [
+                        'scope' => 'global',
+                        'institution_id' => null,
+                        'voting_table_id' => null,
+                        'election_type_id' => null,
+                        'scope_settings' => json_encode(['full_access' => true]),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                ]);
+            }
+
+        });
     }
 }

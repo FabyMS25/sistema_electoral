@@ -9,29 +9,33 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Traits\HasPermissionsAndRoles; // ← IMPORTAR EL TRAIT
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens,
+        HasFactory,
+        Notifiable,
+        HasPermissionsAndRoles; // ← AGREGAR EL TRAIT
 
     protected $fillable = [
-        'name', 
-        'last_name', 
-        'id_card', 
-        'email', 
-        'phone', 
+        'name',
+        'last_name',
+        'id_card',
+        'email',
+        'phone',
         'address',
-        'password', 
-        'avatar', 
-        'is_active', 
-        'last_login_at', 
+        'password',
+        'avatar',
+        'is_active',
+        'last_login_at',
         'last_login_ip',
-        'created_by', 
+        'created_by',
         'updated_by'
     ];
-    
+
     protected $hidden = [
-        'password', 
+        'password',
         'remember_token',
     ];
 
@@ -41,12 +45,16 @@ class User extends Authenticatable
         'last_login_at' => 'datetime'
     ];
 
-    // ===== RELACIONES =====
-    
+    // ===== RELACIONES EXISTENTES =====
+    public function assignments()
+    {
+        return $this->hasMany(UserAssignment::class);
+    }
+
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class)
-            ->withPivot('scope', 'scope_id', 'scope_type')
+            ->withPivot('scope', 'institution_id', 'voting_table_id', 'election_type_id', 'scope_settings')
             ->withTimestamps();
     }
 
@@ -56,7 +64,7 @@ class User extends Authenticatable
             ->withPivot('scope', 'scope_id', 'scope_type')
             ->withTimestamps();
     }
-    
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -77,8 +85,11 @@ class User extends Authenticatable
         return $this->hasMany(Observation::class, 'resolved_by');
     }
 
-    // ===== CACHE DE PERMISOS =====
-    
+    public function auditLogs()
+    {
+        return $this->hasMany(AuditLog::class, 'user_id');
+    }
+
     private $allPermissionsCache = null;
 
     public function getAllPermissionsAttribute()
@@ -87,134 +98,21 @@ class User extends Authenticatable
             $rolePermissions = $this->roles->flatMap(function($role) {
                 return $role->permissions;
             });
-            
+
             $directPermissions = $this->permissions;
-            
+
             $this->allPermissionsCache = $rolePermissions
                 ->merge($directPermissions)
                 ->unique('id');
         }
-        
+
         return $this->allPermissionsCache;
     }
 
-    // ===== MÉTODOS DE PERMISOS =====
-    
-    public function hasPermission(string $permissionName): bool
-    {
-        return $this->all_permissions->contains('name', $permissionName);
-    }
-    
-    public function hasPermissionTo($permissionName, $scope = null, $scopeId = null): bool
-    {
-        // 1. SUPER ADMIN - Si tiene rol admin con ámbito global, puede todo
-        $isGlobalAdmin = $this->roles()
-            ->where('name', 'administrador')
-            ->wherePivot('scope', 'global')
-            ->exists();
-        
-        if ($isGlobalAdmin) {
-            return true;
-        }
-        
-        // 2. Verificar permisos directos del usuario
-        $directPermission = $this->permissions()
-            ->where('name', $permissionName)
-            ->where(function($q) use ($scope, $scopeId) {
-                $q->where('scope', 'global')
-                  ->orWhere(function($q2) use ($scope, $scopeId) {
-                      $q2->where('scope', $scope)
-                         ->where('scope_id', $scopeId);
-                  });
-            })->exists();
-
-        if ($directPermission) return true;
-
-        // 3. Verificar a través de roles
-        foreach ($this->roles as $role) {
-            $hasPermission = $role->permissions()
-                ->where('name', $permissionName)
-                ->exists();
-
-            if ($hasPermission) {
-                // Verificar ámbito del rol
-                if ($role->pivot->scope === 'global') return true;
-                if ($role->pivot->scope === $scope && $role->pivot->scope_id == $scopeId) return true;
-            }
-        }
-
-        return false;
-    }
-    
-    // ===== OBTENER ASIGNACIONES POR ÁMBITO =====
-    
-    public function getAssignedRecintos()
-    {
-        $recintoIds = $this->roles()
-            ->where('scope', 'recinto')
-            ->where('scope_type', Institution::class)
-            ->pluck('scope_id')
-            ->unique();
-
-        return Institution::whereIn('id', $recintoIds)->get();
-    }
-
-    public function getAssignedMesas()
-    {
-        $mesaIds = $this->roles()
-            ->where('scope', 'mesa')
-            ->where('scope_type', VotingTable::class)
-            ->pluck('scope_id')
-            ->unique();
-
-        return VotingTable::whereIn('id', $mesaIds)->get();
-    }
-
-    public function getAssignedInstitutionId()
-    {
-        $assignment = $this->roles()
-            ->where('scope', 'recinto')
-            ->where('scope_type', Institution::class)
-            ->first();
-            
-        return $assignment ? $assignment->pivot->scope_id : null;
-    }
-
-    public function getAssignedVotingTableId()
-    {
-        $assignment = $this->roles()
-            ->where('scope', 'mesa')
-            ->where('scope_type', VotingTable::class)
-            ->first();
-            
-        return $assignment ? $assignment->pivot->scope_id : null;
-    }
-
-    // ===== MÉTODOS DE ROLES =====
-    
-    public function hasRole(string $roleName): bool
-    {
-        return $this->roles->contains('name', $roleName);
-    }
-
-    public function hasAnyRole(array $roleNames): bool
-    {
-        return $this->roles->whereIn('name', $roleNames)->isNotEmpty();
-    }
-
-    public function hasAllRoles(array $roleNames): bool
-    {
-        $userRoleNames = $this->roles->pluck('name')->toArray();
-        return empty(array_diff($roleNames, $userRoleNames));
-    }
-
-    public function getRoleNamesAttribute(): string
-    {
-        return $this->roles->pluck('display_name')->implode(', ');
-    }
+    // ===== MÉTODOS DE PERMISOS (AHORA EN EL TRAIT) =====
+    // Los métodos can(), hasPermissionTo(), hasRole(), etc. están en el trait
 
     // ===== SCOPES =====
-    
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
@@ -230,14 +128,26 @@ class User extends Authenticatable
     public function scopeByRecinto($query, $institutionId)
     {
         return $query->whereHas('roles', function($q) use ($institutionId) {
-            $q->where('scope', 'recinto')
-              ->where('scope_id', $institutionId)
-              ->where('scope_type', Institution::class);
+            $q->where('scope', 'institution')
+              ->where('institution_id', $institutionId);
+        })->orWhereHas('assignments', function($q) use ($institutionId) {
+            $q->where('institution_id', $institutionId)
+              ->where('status', 'activo');
+        });
+    }
+
+    public function scopeByMesa($query, $votingTableId)
+    {
+        return $query->whereHas('roles', function($q) use ($votingTableId) {
+            $q->where('scope', 'voting_table')
+              ->where('voting_table_id', $votingTableId);
+        })->orWhereHas('assignments', function($q) use ($votingTableId) {
+            $q->where('voting_table_id', $votingTableId)
+              ->where('status', 'activo');
         });
     }
 
     // ===== BOOT =====
-    
     protected static function booted()
     {
         static::saved(function ($user) {

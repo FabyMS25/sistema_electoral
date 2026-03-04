@@ -15,8 +15,6 @@ class Institution extends Model
         'code',
         'name',
         'short_name',
-        'department_id',
-        'province_id',
         'municipality_id',
         'locality_id',
         'district_id',

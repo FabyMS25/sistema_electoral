@@ -1,52 +1,56 @@
 {{-- resources/views/voting-table-votes/partials/modals/upload-acta-modal.blade.php --}}
 <div class="modal fade" id="uploadActaModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-info">
-                <h5 class="modal-title text-white">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
                     <i class="ri-upload-line me-1"></i>
-                    Subir Acta Digital
+                    Subir Acta de Mesa
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="actaTableId">
-                
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Número de Acta <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="actaNumber" 
-                           placeholder="Ej: ACT-001-2025" required>
-                    <small class="text-muted">Número según el registro del OEP</small>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Foto del Acta <span class="text-danger">*</span></label>
-                    <input type="file" class="form-control" id="actaPhoto" accept="image/*" required>
-                    <small class="text-muted">Tome una foto clara del acta original (máx. 5MB)</small>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label fw-bold">PDF (opcional)</label>
-                    <input type="file" class="form-control" id="actaPdf" accept=".pdf">
-                    <small class="text-muted">Versión escaneada en PDF (máx. 10MB)</small>
-                </div>
-                
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="hasPhysicalActa" checked value="1">
-                    <label class="form-check-label" for="hasPhysicalActa">
-                        <strong>Tengo el acta física</strong>
-                        <br>
-                        <small class="text-muted">Confirmo que poseo el acta física en mi poder</small>
-                    </label>
-                </div>
+                <form id="uploadActaForm" enctype="multipart/form-data">
+                    @csrf
+                    <input type="hidden" id="actaTableId" name="voting_table_id">
 
-                <div class="alert alert-info mt-2">
-                    <i class="ri-information-line me-1"></i>
-                    <small>El acta será almacenada de forma segura y estará disponible para verificación.</small>
-                </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Número de Acta <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="actaNumber" name="acta_number" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" id="hasPhysicalActa" name="has_physical" checked>
+                                <label class="form-check-label" for="hasPhysicalActa">
+                                    ¿Tiene acta física?
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Foto del Acta <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" id="actaPhoto" name="photo" accept="image/*" required>
+                        <small class="text-muted">Máx. 10MB. Formatos: JPG, PNG. Tome una foto clara y legible.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">PDF del Acta (opcional)</label>
+                        <input type="file" class="form-control" id="actaPdf" name="pdf" accept=".pdf">
+                        <small class="text-muted">Máx. 20MB</small>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="ri-information-line me-1"></i>
+                        <strong>Importante:</strong> La foto del acta debe ser legible y mostrar claramente todos los resultados.
+                        El sistema verificará automáticamente la consistencia con los votos registrados.
+                    </div>
+                </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-info" id="uploadActaBtn">
                     <i class="ri-upload-line me-1"></i>
                     Subir Acta

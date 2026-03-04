@@ -14,8 +14,7 @@ return new class extends Migration
             $table->integer('votes_per_person')->default(1);
             $table->boolean('has_blank_vote')->default(true);
             $table->boolean('has_null_vote')->default(true);
-            
-            $table->timestamps();            
+            $table->timestamps();
             $table->unique(['election_type_id', 'election_category_id'], 'unique_election_category');
         });
     }

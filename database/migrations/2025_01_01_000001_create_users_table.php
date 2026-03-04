@@ -1,5 +1,4 @@
 <?php
-// database/migrations/2014_10_12_000000_create_users_table.php
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -29,27 +28,13 @@ return new class extends Migration
             $table->foreignId('updated_by')->nullable()->constrained('users');
             $table->rememberToken();
             $table->timestamps();
+            $table->softDeletes();
+            $table->index('is_active');
+            $table->index('last_login_at');
+            $table->index(['name', 'last_name']);
+            $table->index('email');
+            $table->index('id_card');
         });
-        DB::table('users')->insert([
-            [
-                'name' => 'admin',
-                'email' => 'usuario1@gmail.com',
-                'password' => Hash::make('12345678'),
-                'email_verified_at' => '2022-01-02 17:04:58',
-                'avatar' => 'avatar-6.jpg',
-                'created_at' => now(),
-                'updated_at' => now()
-            ],
-            [
-                'name' => 'admin',
-                'email' => 'moralessfaby.dev@gmail.com',
-                'password' => Hash::make('12345678'),
-                'email_verified_at' => '2022-01-02 17:04:58',
-                'avatar' => 'avatar-6.jpg',
-                'created_at' => now(),
-                'updated_at' => now()
-            ]
-        ]);
     }
 
     public function down(): void

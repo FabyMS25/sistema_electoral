@@ -68,14 +68,14 @@
                 <div class="card-body">
                     <form action="{{ route('users.store') }}" method="POST" id="createUserForm">
                         @csrf
-                        
+
                         <div class="row">
                             <div class="col-md-6">
                                 <h5 class="mb-3">Datos Personales</h5>
-                                
+
                                 <div class="mb-3">
                                     <label for="name" class="form-label">Nombres <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('name') is-invalid @enderror" 
+                                    <input type="text" class="form-control @error('name') is-invalid @enderror"
                                            id="name" name="name" value="{{ old('name') }}" required>
                                     @error('name')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -84,7 +84,7 @@
 
                                 <div class="mb-3">
                                     <label for="last_name" class="form-label">Apellidos</label>
-                                    <input type="text" class="form-control @error('last_name') is-invalid @enderror" 
+                                    <input type="text" class="form-control @error('last_name') is-invalid @enderror"
                                            id="last_name" name="last_name" value="{{ old('last_name') }}">
                                     @error('last_name')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -93,7 +93,7 @@
 
                                 <div class="mb-3">
                                     <label for="id_card" class="form-label">Carnet de Identidad</label>
-                                    <input type="text" class="form-control @error('id_card') is-invalid @enderror" 
+                                    <input type="text" class="form-control @error('id_card') is-invalid @enderror"
                                            id="id_card" name="id_card" value="{{ old('id_card') }}">
                                     @error('id_card')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -102,7 +102,7 @@
 
                                 <div class="mb-3">
                                     <label for="phone" class="form-label">Teléfono</label>
-                                    <input type="text" class="form-control @error('phone') is-invalid @enderror" 
+                                    <input type="text" class="form-control @error('phone') is-invalid @enderror"
                                            id="phone" name="phone" value="{{ old('phone') }}">
                                     @error('phone')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -111,7 +111,7 @@
 
                                 <div class="mb-3">
                                     <label for="address" class="form-label">Dirección</label>
-                                    <textarea class="form-control @error('address') is-invalid @enderror" 
+                                    <textarea class="form-control @error('address') is-invalid @enderror"
                                               id="address" name="address" rows="2">{{ old('address') }}</textarea>
                                     @error('address')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -121,10 +121,10 @@
 
                             <div class="col-md-6">
                                 <h5 class="mb-3">Credenciales de Acceso</h5>
-                                
+
                                 <div class="mb-3">
                                     <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
-                                    <input type="email" class="form-control @error('email') is-invalid @enderror" 
+                                    <input type="email" class="form-control @error('email') is-invalid @enderror"
                                            id="email" name="email" value="{{ old('email') }}" required>
                                     @error('email')
                                         <div class="invalid-feedback">{{ $message }}</div>
@@ -133,7 +133,7 @@
 
                                 <div class="mb-3">
                                     <label for="password" class="form-label">Contraseña <span class="text-danger">*</span></label>
-                                    <input type="password" class="form-control @error('password') is-invalid @enderror" 
+                                    <input type="password" class="form-control @error('password') is-invalid @enderror"
                                            id="password" name="password" required>
                                     <small class="text-muted">Mínimo 8 caracteres</small>
                                     @error('password')
@@ -143,12 +143,12 @@
 
                                 <div class="mb-3">
                                     <label for="password_confirmation" class="form-label">Confirmar Contraseña <span class="text-danger">*</span></label>
-                                    <input type="password" class="form-control" 
+                                    <input type="password" class="form-control"
                                            id="password_confirmation" name="password_confirmation" required>
                                 </div>
 
                                 <div class="mb-3 form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" 
+                                    <input class="form-check-input" type="checkbox" role="switch"
                                            id="is_active" name="is_active" value="1" checked>
                                     <label class="form-check-label" for="is_active">
                                         <strong>Usuario activo</strong>
@@ -161,7 +161,7 @@
                         <div class="row mt-3">
                             <div class="col-12">
                                 <h5 class="mb-3">Roles y Permisos</h5>
-                                
+
                                 <div class="row">
                                     <div class="col-md-5">
                                         <div class="card">
@@ -170,10 +170,10 @@
                                             </div>
                                             <div class="card-body" style="max-height: 400px; overflow-y: auto;">
                                                 @foreach($roles as $role)
-                                                <div class="role-card" data-role-id="{{ $role->id }}" 
+                                                <div class="role-card" data-role-id="{{ $role->id }}"
                                                      data-permissions='@json($role->permissions->pluck('id'))'>
                                                     <div class="form-check">
-                                                        <input type="checkbox" class="form-check-input role-checkbox" 
+                                                        <input type="checkbox" class="form-check-input role-checkbox"
                                                                id="role_{{ $role->id }}" name="roles[]" value="{{ $role->id }}"
                                                                {{ in_array($role->id, old('roles', [])) ? 'checked' : '' }}>
                                                         <label class="form-check-label" for="role_{{ $role->id }}">
@@ -210,8 +210,8 @@
                                                 <div class="permission-group">
                                                     <div class="permission-group-header">
                                                         <div class="form-check">
-                                                            <input type="checkbox" class="form-check-input group-checkbox" 
-                                                                   id="group_{{ Str::slug($group) }}" 
+                                                            <input type="checkbox" class="form-check-input group-checkbox"
+                                                                   id="group_{{ Str::slug($group) }}"
                                                                    data-group="{{ $group }}">
                                                             <label class="form-check-label fw-bold" for="group_{{ Str::slug($group) }}">
                                                                 {{ $group }}
@@ -221,8 +221,8 @@
                                                     <div class="permission-group-body">
                                                         @foreach($groupPermissions as $permission)
                                                         <div class="form-check">
-                                                            <input type="checkbox" class="form-check-input permission-checkbox" 
-                                                                   id="perm_{{ $permission->id }}" name="permissions[]" 
+                                                            <input type="checkbox" class="form-check-input permission-checkbox"
+                                                                   id="perm_{{ $permission->id }}" name="permissions[]"
                                                                    value="{{ $permission->id }}"
                                                                    data-group="{{ $group }}"
                                                                    {{ in_array($permission->id, old('permissions', [])) ? 'checked' : '' }}>
@@ -262,19 +262,19 @@
 <script src="{{ URL::asset('build/libs/choices.js/public/assets/scripts/choices.min.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    
+
     // ===== AUTOASIGNACIÓN DE PERMISOS POR ROL =====
     const roleCheckboxes = document.querySelectorAll('.role-checkbox');
     const permissionCheckboxes = document.querySelectorAll('.permission-checkbox');
     const groupCheckboxes = document.querySelectorAll('.group-checkbox');
-    
+
     // Objeto para almacenar permisos por rol
     const rolePermissions = {};
-    
+
     @foreach($roles as $role)
         rolePermissions[{{ $role->id }}] = @json($role->permissions->pluck('id'));
     @endforeach
-    
+
     // Función para actualizar permisos basado en roles seleccionados
     function updatePermissionsFromRoles() {
         // Obtener todos los permisos de los roles seleccionados
@@ -284,10 +284,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectedRoles.push(parseInt(cb.value));
             }
         });
-        
+
         // Si no hay roles seleccionados, no hacer nada
         if (selectedRoles.length === 0) return;
-        
+
         // Recolectar todos los permisos de los roles seleccionados
         const permissionsToEnable = new Set();
         selectedRoles.forEach(roleId => {
@@ -297,7 +297,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
-        
+
         // Marcar los permisos (sin desmarcar los que ya estaban marcados manualmente)
         permissionCheckboxes.forEach(cb => {
             const permId = parseInt(cb.value);
@@ -306,20 +306,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             // NOTA: No desmarcamos permisos existentes para respetar selecciones manuales
         });
-        
+
         // Actualizar checkboxes de grupo
         updateGroupCheckboxes();
     }
-    
+
     // Event listener para cambios en roles
     roleCheckboxes.forEach(cb => {
         cb.addEventListener('change', function() {
             updatePermissionsFromRoles();
         });
     });
-    
+
     // ===== FUNCIONALIDAD DE GRUPOS =====
-    
+
     // Seleccionar/deseleccionar todos los permisos de un grupo
     groupCheckboxes.forEach(groupCb => {
         groupCb.addEventListener('change', function() {
@@ -330,16 +330,16 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
-    
+
     // Actualizar estado del checkbox de grupo basado en permisos individuales
     function updateGroupCheckboxes() {
         groupCheckboxes.forEach(groupCb => {
             const group = groupCb.dataset.group;
             const groupPermissions = document.querySelectorAll(`.permission-checkbox[data-group="${group}"]`);
             const checkedPermissions = document.querySelectorAll(`.permission-checkbox[data-group="${group}"]:checked`);
-            
+
             if (groupPermissions.length === 0) return;
-            
+
             if (checkedPermissions.length === groupPermissions.length) {
                 groupCb.checked = true;
                 groupCb.indeterminate = false;
@@ -352,32 +352,32 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
+
     // Actualizar grupos cuando cambia un permiso individual
     permissionCheckboxes.forEach(cb => {
         cb.addEventListener('change', function() {
             updateGroupCheckboxes();
         });
     });
-    
+
     // ===== BOTONES DE SELECCIÓN MASIVA =====
-    
+
     document.getElementById('select-all-permissions').addEventListener('click', function() {
         permissionCheckboxes.forEach(cb => cb.checked = true);
         updateGroupCheckboxes();
     });
-    
+
     document.getElementById('deselect-all-permissions').addEventListener('click', function() {
         permissionCheckboxes.forEach(cb => cb.checked = false);
         updateGroupCheckboxes();
     });
-    
+
     // ===== VALIDACIÓN DE CONTRASEÑA =====
     const form = document.getElementById('createUserForm');
     form.addEventListener('submit', function(e) {
         const password = document.getElementById('password').value;
         const confirm = document.getElementById('password_confirmation').value;
-        
+
         if (password !== confirm) {
             e.preventDefault();
             Swal.fire({
@@ -387,9 +387,32 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
-    
+
     // Inicializar grupos al cargar la página
     updateGroupCheckboxes();
+
+    // Agregar al final del script en create.blade.php
+// ===== VALIDACIÓN DE EMAIL ÚNICO =====
+    const emailInput = document.getElementById('email');
+    emailInput.addEventListener('blur', function() {
+        const email = this.value;
+        if (email) {
+            fetch(`/users/check-email?email=${email}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.exists) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Email ya registrado',
+                            text: 'Este correo electrónico ya está en uso',
+                            timer: 3000,
+                            showConfirmButton: false
+                        });
+                    }
+                });
+        }
+    });
 });
+
 </script>
 @endsection

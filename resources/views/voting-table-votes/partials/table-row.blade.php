@@ -1,326 +1,355 @@
 {{-- resources/views/voting-table-votes/partials/table-row.blade.php --}}
-<div class="card mb-3 table-card {{ $table->status }}" id="table-{{ $table->id }}" data-table-id="{{ $table->id }}">
-    <div class="card-header position-relative">
-        @if($table->validation_status === 'observed' || $table->status === 'observada')
-            <span class="badge bg-danger role-badge" title="Tiene observaciones">
-                <i class="ri-alert-line me-1"></i>Observada
-            </span>
-        @elseif($table->validation_status === 'validated')
-            <span class="badge bg-success role-badge">
-                <i class="ri-check-line me-1"></i>Validada
-            </span>
-        @elseif($table->validation_status === 'approved')
-            <span class="badge bg-primary role-badge">
-                <i class="ri-check-double-line me-1"></i>Aprobada
-            </span>
-        @elseif($table->status === 'cerrada')
-            <span class="badge bg-secondary role-badge">
-                <i class="ri-lock-line me-1"></i>Cerrada
-            </span>
-        @endif
+@php
+    // Filtrar candidatos regulares (no NULO ni BLANCO)
+    $alcaldesRegulares = $candidatesByCategory['alcalde']->filter(function($c) {
+        return !in_array($c->type, ['null_votes', 'blank_votes']);
+    })->values();
 
-        <div class="row align-items-center">
-            <div class="col-md-3">
-                <h5 class="mb-0">
-                    <i class="ri-table-line me-1"></i>
-                    Mesa {{ $table->number }}
-                    <small class="text-muted ms-2">{{ $table->internal_code ?? $table->oep_code }}</small>
-                </h5>
-                <small class="text-muted">{{ $table->institution->name ?? 'N/A' }}</small>
-            </div>
-            <div class="col-md-3">
-                @php
-                    $statusClasses = [
-                        'configurada' => 'secondary',
-                        'en_espera' => 'info',
-                        'votacion' => 'primary',
-                        'cerrada' => 'danger',
-                        'en_escrutinio' => 'warning',
-                        'escrutada' => 'success',
-                        'observada' => 'danger',
-                        'transmitida' => 'success',
-                        'anulada' => 'dark'
-                    ];
-                    $statusLabels = [
-                        'configurada' => 'Configurada',
-                        'en_espera' => 'En Espera',
-                        'votacion' => 'Votación',
-                        'cerrada' => 'Cerrada',
-                        'en_escrutinio' => 'En Escrutinio',
-                        'escrutada' => 'Escrutada',
-                        'observada' => 'Observada',
-                        'transmitida' => 'Transmitida',
-                        'anulada' => 'Anulada'
-                    ];
-                @endphp
-                <span class="badge bg-{{ $statusClasses[$table->status] ?? 'secondary' }} total-badge">
-                    {{ $statusLabels[$table->status] ?? $table->status }}
-                </span>
-                <span class="ms-2 text-muted">
-                    <i class="ri-group-line me-1"></i>
-                    {{ number_format($table->expected_voters ?? 0) }}
-                </span>
-            </div>
-            <div class="col-md-3">
-                <span class="text-muted">
-                    <i class="ri-bar-chart-line me-1"></i>
-                    Votos: <span class="total-votes" id="total-{{ $table->id }}">{{ $table->total_voters ?? 0 }}</span>
-                </span>
-                @if(isset($table->observations_count) && $table->observations_count > 0)
-                    <span class="badge bg-warning observation-badge ms-2"
-                          onclick="showObservations({{ $table->id }})">
-                        <i class="ri-chat-1-line me-1"></i>
-                        {{ $table->observations_count }}
-                    </span>
-                @endif
-                @if($table->acta_number)
-                    <span class="badge bg-info ms-2">
-                        <i class="ri-file-copy-line me-1"></i>
-                        Acta
-                    </span>
-                @endif
-            </div>
-            <div class="col-md-3 text-end">
-                <div class="action-buttons">
-                    @if(!in_array($table->status, ['cerrada', 'escrutada', 'transmitida', 'anulada']))
-                        @if($userCan['register'] && $table->validation_status !== 'validated')
-                            <button class="btn btn-sm btn-success save-table" data-table-id="{{ $table->id }}" title="Guardar votos">
-                                <i class="ri-save-line"></i>
-                            </button>
-                        @endif
+    $concejalesRegulares = $candidatesByCategory['concejal']->filter(function($c) {
+        return !in_array($c->type, ['null_votes', 'blank_votes']);
+    })->values();
 
-                        @if($userCan['review'] && $table->validation_status === 'pending')
-                            <button class="btn btn-sm btn-info review-table" data-table-id="{{ $table->id }}" title="Revisar">
-                                <i class="ri-eye-line"></i>
-                            </button>
-                        @endif
+    // Obtener NULO y BLANCO específicamente
+    $nuloAlcalde = $candidatesByCategory['alcalde']->firstWhere('type', 'null_votes');
+    $blancoAlcalde = $candidatesByCategory['alcalde']->firstWhere('type', 'blank_votes');
+    $nuloConcejal = $candidatesByCategory['concejal']->firstWhere('type', 'null_votes');
+    $blancoConcejal = $candidatesByCategory['concejal']->firstWhere('type', 'blank_votes');
 
-                        @if($userCan['observe'])
-                            <button class="btn btn-sm btn-warning observe-table" data-table-id="{{ $table->id }}" title="Observar">
-                                <i class="ri-chat-1-line"></i>
-                            </button>
-                        @endif
+    $maxRows = max($alcaldesRegulares->count(), $concejalesRegulares->count());
+    $totalAlcalde = 0;
+    $totalConcejal = 0;
+@endphp
 
-                        @if($userCan['correct'] && $table->validation_status === 'observed')
-                            <button class="btn btn-sm btn-warning correct-table" data-table-id="{{ $table->id }}" title="Corregir">
-                                <i class="ri-refund-line"></i>
-                            </button>
-                        @endif
+{{-- Filas de candidatos regulares --}}
+@for($i = 0; $i < $maxRows; $i++)
+    @php
+        $alcalde = $alcaldesRegulares[$i] ?? null;
+        $concejal = $concejalesRegulares[$i] ?? null;
 
-                        @if($userCan['validate'] && $table->validation_status === 'reviewed')
-                            <button class="btn btn-sm btn-success validate-table" data-table-id="{{ $table->id }}" title="Validar">
-                                <i class="ri-check-line"></i>
-                            </button>
-                        @endif
+        if ($alcalde) {
+            $voteAlcalde = $table->votes->firstWhere('candidate_id', $alcalde->id);
+            $quantityAlcalde = $voteAlcalde ? $voteAlcalde->quantity : 0;
+            $totalAlcalde += $quantityAlcalde;
+            $isAlcaldeObserved = $voteAlcalde && $voteAlcalde->vote_status === 'observed';
+        } else {
+            $quantityAlcalde = 0;
+            $isAlcaldeObserved = false;
+        }
 
-                        @if($userCan['upload_acta'])
-                            <button class="btn btn-sm btn-info upload-acta" data-table-id="{{ $table->id }}" title="Subir acta">
-                                <i class="ri-upload-line"></i>
-                            </button>
-                        @endif
+        if ($concejal) {
+            $voteConcejal = $table->votes->firstWhere('candidate_id', $concejal->id);
+            $quantityConcejal = $voteConcejal ? $voteConcejal->quantity : 0;
+            $totalConcejal += $quantityConcejal;
+            $isConcejalObserved = $voteConcejal && $voteConcejal->vote_status === 'observed';
+        } else {
+            $quantityConcejal = 0;
+            $isConcejalObserved = false;
+        }
+    @endphp
+    <tr class="{{ $isAlcaldeObserved || $isConcejalObserved ? 'table-warning' : '' }}">
+        <td class="text-center fw-bold">{{ $i + 1 }}</td>
 
-                        @if($userCan['close'])
-                            <button class="btn btn-sm btn-secondary close-table" data-table-id="{{ $table->id }}" title="Cerrar mesa">
-                                <i class="ri-lock-line"></i>
-                            </button>
-                        @endif
+        {{-- Partido --}}
+        <td>
+            @if($alcalde || $concejal)
+                @php $party = $alcalde->party ?? $concejal->party; @endphp
+                <div class="d-flex align-items-center">
+                    @php
+                        $logo = $alcalde->party_logo ?? $concejal->party_logo ?? null;
+                        $color = $alcalde->color ?? $concejal->color ?? '#0ab39c';
+                    @endphp
+                    @if($logo)
+                        <img src="{{ asset('storage/' . $logo) }}"
+                             width="20" height="20"
+                             class="me-1 rounded"
+                             style="object-fit: contain;">
                     @else
-                        <span class="text-muted small">Cerrada</span>
+                        <span class="candidate-color" style="background-color: {{ $color }}; width: 16px; height: 16px; border-radius: 4px; display: inline-block; margin-right: 4px;"></span>
+                    @endif
+                    <span class="small">{{ $party }}</span>
+                </div>
+            @endif
+        </td>
+
+        {{-- Alcalde Candidato --}}
+        <td class="table-primary">
+            @if($alcalde)
+                <div class="d-flex align-items-center">
+                    @if($alcalde->photo)
+                        <img src="{{ asset('storage/' . $alcalde->photo) }}"
+                             class="rounded-circle me-1"
+                             width="20" height="20"
+                             style="object-fit: cover;">
+                    @endif
+                    <span class="small">{{ Str::limit($alcalde->name, 25) }}</span>
+                    @if($isAlcaldeObserved)
+                        <i class="ri-alert-line text-danger ms-1" title="Observado"></i>
                     @endif
                 </div>
-            </div>
-        </div>
-    </div>
+            @else
+                <span class="text-muted fst-italic small">---</span>
+            @endif
+        </td>
 
-    <div class="card-body">
-        <!-- Barra de estado de validación -->
-        <div class="row mb-2">
-            <div class="col-12">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <small class="text-muted">Estado:</small>
+        {{-- Alcalde Votos --}}
+        <td class="table-primary text-center">
+            @if($alcalde)
+                <input type="number"
+                       class="form-control form-control-sm vote-input text-center"
+                       data-table="{{ $table->id }}"
+                       data-candidate="{{ $alcalde->id }}"
+                       data-category="alcalde"
+                       value="{{ $quantityAlcalde }}"
+                       min="0"
+                       max="{{ $table->expected_voters ?? 9999 }}"
+                       step="1"
+                       {{ $isDisabled ? 'disabled' : '' }}
+                       style="width: 70px; margin: 0 auto; {{ $isAlcaldeObserved ? 'border-color: #f06548;' : '' }}">
+            @endif
+        </td>
 
-                    @php
-                        $validationColors = [
-                            'pending' => 'warning',
-                            'reviewed' => 'info',
-                            'observed' => 'danger',
-                            'corrected' => 'primary',
-                            'validated' => 'success',
-                            'approved' => 'success',
-                            'rejected' => 'dark'
-                        ];
-                        $validationLabels = [
-                            'pending' => 'Pendiente',
-                            'reviewed' => 'Revisado',
-                            'observed' => 'Observado',
-                            'corrected' => 'Corregido',
-                            'validated' => 'Validado',
-                            'approved' => 'Aprobado',
-                            'rejected' => 'Rechazado'
-                        ];
-                    @endphp
+        {{-- Alcalde Checkbox Observación --}}
+        <td class="table-primary text-center">
+            @if($alcalde && $userCan['observe'] && !$isDisabled)
+                <input type="checkbox"
+                       class="form-check-input observe-checkbox"
+                       data-table="{{ $table->id }}"
+                       data-candidate="{{ $alcalde->id }}"
+                       data-category="alcalde"
+                       data-candidate-name="{{ $alcalde->name }}"
+                       {{ $isAlcaldeObserved ? 'checked' : '' }}
+                       {{ $isAlcaldeObserved ? 'disabled' : '' }}
+                       title="Marcar como observado">
+            @elseif($isAlcaldeObserved)
+                <i class="ri-checkbox-circle-fill text-warning" title="Observado"></i>
+            @endif
+        </td>
 
-                    <span class="badge bg-{{ $validationColors[$table->validation_status] ?? 'secondary' }}">
-                        {{ $validationLabels[$table->validation_status] ?? $table->validation_status }}
-                    </span>
-
-                    @if($table->verified_by)
-                        <small class="text-muted">
-                            <i class="ri-user-line"></i> Revisado: {{ $table->verified_at ? \Carbon\Carbon::parse($table->verified_at)->format('d/m H:i') : '' }}
-                        </small>
+        {{-- Concejal Candidato --}}
+        <td class="table-success">
+            @if($concejal)
+                <div class="d-flex align-items-center">
+                    @if($concejal->photo)
+                        <img src="{{ asset('storage/' . $concejal->photo) }}"
+                             class="rounded-circle me-1"
+                             width="20" height="20"
+                             style="object-fit: cover;">
                     @endif
-
-                    @if($table->validated_by)
-                        <small class="text-muted">
-                            <i class="ri-check-double-line"></i> Validado: {{ $table->validated_at ? \Carbon\Carbon::parse($table->validated_at)->format('d/m H:i') : '' }}
-                        </small>
-                    @endif
-
-                    @if($table->ballots_received > 0)
-                        <small class="text-muted">
-                            <i class="ri-file-copy-line"></i> Papeletas: {{ $table->ballots_used }}/{{ $table->ballots_received }}
-                        </small>
+                    <span class="small">{{ Str::limit($concejal->name, 25) }}</span>
+                    @if($isConcejalObserved)
+                        <i class="ri-alert-line text-danger ms-1" title="Observado"></i>
                     @endif
                 </div>
-            </div>
-        </div>
+            @else
+                <span class="text-muted fst-italic small">---</span>
+            @endif
+        </td>
 
-        <!-- Tabla de votos - ALCALDES -->
-        <h6 class="text-primary mb-2">
-            <i class="ri-user-star-line me-1"></i>
-            Alcaldes
-        </h6>
-        <div class="table-responsive mb-3">
-            <table class="table table-sm table-bordered">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 40%">Candidato</th>
-                        <th style="width: 40%">Partido</th>
-                        <th style="width: 20%">Votos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @php
-                        $alcaldeCandidates = $candidatesByCategory['alcalde'] ?? collect();
-                        $totalAlcalde = 0;
-                    @endphp
-                    @forelse($alcaldeCandidates as $candidate)
-                        @php
-                            $vote = $table->votes->firstWhere('candidate_id', $candidate->id);
-                            $quantity = $vote ? $vote->quantity : 0;
-                            $totalAlcalde += $quantity;
-                            $isDisabled = in_array($table->status, ['cerrada', 'escrutada', 'transmitida', 'anulada']) ||
-                                         ($table->validation_status === 'validated' && !$userCan['correct']) ||
-                                         ($table->validation_status === 'approved');
-                        @endphp
-                        <tr>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <span class="candidate-color" style="background-color: {{ $candidate->color ?? '#0ab39c' }}; width: 20px; height: 20px; border-radius: 4px; display: inline-block; margin-right: 8px;"></span>
-                                    <span class="ms-2">{{ $candidate->name }}</span>
-                                </div>
-                            </td>
-                            <td>{{ $candidate->party }}</td>
-                            <td>
-                                <input type="number"
-                                       class="form-control form-control-sm vote-input candidate-vote"
-                                       data-table="{{ $table->id }}"
-                                       data-candidate="{{ $candidate->id }}"
-                                       data-category="alcalde"
-                                       value="{{ $quantity }}"
-                                       min="0"
-                                       max="{{ $table->expected_voters ?? 9999 }}"
-                                       {{ $isDisabled ? 'disabled' : '' }}>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="3" class="text-center text-muted">
-                                No hay candidatos a Alcalde disponibles
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        {{-- Concejal Votos --}}
+        <td class="table-success text-center">
+            @if($concejal)
+                <input type="number"
+                       class="form-control form-control-sm vote-input text-center"
+                       data-table="{{ $table->id }}"
+                       data-candidate="{{ $concejal->id }}"
+                       data-category="concejal"
+                       value="{{ $quantityConcejal }}"
+                       min="0"
+                       max="{{ $table->expected_voters ?? 9999 }}"
+                       step="1"
+                       {{ $isDisabled ? 'disabled' : '' }}
+                       style="width: 70px; margin: 0 auto; {{ $isConcejalObserved ? 'border-color: #f06548;' : '' }}">
+            @endif
+        </td>
 
-        <!-- Tabla de votos - CONCEJALES -->
-        <h6 class="text-success mb-2">
-            <i class="ri-group-line me-1"></i>
-            Concejales
-        </h6>
-        <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 40%">Candidato</th>
-                        <th style="width: 40%">Partido</th>
-                        <th style="width: 20%">Votos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @php
-                        $concejalCandidates = $candidatesByCategory['concejal'] ?? collect();
-                        $totalConcejal = 0;
-                    @endphp
-                    @forelse($concejalCandidates as $candidate)
-                        @php
-                            $vote = $table->votes->firstWhere('candidate_id', $candidate->id);
-                            $quantity = $vote ? $vote->quantity : 0;
-                            $totalConcejal += $quantity;
-                            $isDisabled = in_array($table->status, ['cerrada', 'escrutada', 'transmitida', 'anulada']) ||
-                                         ($table->validation_status === 'validated' && !$userCan['correct']) ||
-                                         ($table->validation_status === 'approved');
-                        @endphp
-                        <tr>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <span class="candidate-color" style="background-color: {{ $candidate->color ?? '#0ab39c' }}; width: 20px; height: 20px; border-radius: 4px; display: inline-block; margin-right: 8px;"></span>
-                                    <span class="ms-2">{{ $candidate->name }}</span>
-                                </div>
-                            </td>
-                            <td>{{ $candidate->party }}</td>
-                            <td>
-                                <input type="number"
-                                       class="form-control form-control-sm vote-input candidate-vote"
-                                       data-table="{{ $table->id }}"
-                                       data-candidate="{{ $candidate->id }}"
-                                       data-category="concejal"
-                                       value="{{ $quantity }}"
-                                       min="0"
-                                       max="{{ $table->expected_voters ?? 9999 }}"
-                                       {{ $isDisabled ? 'disabled' : '' }}>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="3" class="text-center text-muted">
-                                No hay candidatos a Concejal disponibles
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-                <tfoot class="table-info">
-                    <tr>
-                        <th colspan="2" class="text-end">Total Alcalde:</th>
-                        <th>
-                            <span class="fw-bold" id="total-alcalde-{{ $table->id }}">{{ $totalAlcalde }}</span>
-                        </th>
-                    </tr>
-                    <tr>
-                        <th colspan="2" class="text-end">Total Concejal:</th>
-                        <th>
-                            <span class="fw-bold" id="total-concejal-{{ $table->id }}">{{ $totalConcejal }}</span>
-                        </th>
-                    </tr>
-                    <tr class="table-secondary">
-                        <th colspan="2" class="text-end">Total General:</th>
-                        <th>
-                            <span class="fw-bold" id="total-{{ $table->id }}">{{ $totalAlcalde + $totalConcejal }}</span>
-                        </th>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    </div>
-</div>
+        {{-- Concejal Checkbox Observación --}}
+        <td class="table-success text-center">
+            @if($concejal && $userCan['observe'] && !$isDisabled)
+                <input type="checkbox"
+                       class="form-check-input observe-checkbox"
+                       data-table="{{ $table->id }}"
+                       data-candidate="{{ $concejal->id }}"
+                       data-category="concejal"
+                       data-candidate-name="{{ $concejal->name }}"
+                       {{ $isConcejalObserved ? 'checked' : '' }}
+                       {{ $isConcejalObserved ? 'disabled' : '' }}
+                       title="Marcar como observado">
+            @elseif($isConcejalObserved)
+                <i class="ri-checkbox-circle-fill text-warning" title="Observado"></i>
+            @endif
+        </td>
+    </tr>
+@endfor
+
+{{-- Fila para NULO --}}
+@if($nuloAlcalde || $nuloConcejal)
+<tr class="table-secondary">
+    <td class="text-center">{{ $maxRows + 1 }}</td>
+    <td>-</td>
+
+    {{-- NULO Alcalde --}}
+    <td class="table-primary fw-bold">NULO</td>
+    <td class="table-primary text-center">
+        @if($nuloAlcalde)
+            @php
+                $vote = $table->votes->firstWhere('candidate_id', $nuloAlcalde->id);
+                $quantity = $vote ? $vote->quantity : 0;
+                $totalAlcalde += $quantity;
+                $isObserved = $vote && $vote->vote_status === 'observed';
+            @endphp
+            <input type="number"
+                   class="form-control form-control-sm vote-input text-center"
+                   data-table="{{ $table->id }}"
+                   data-candidate="{{ $nuloAlcalde->id }}"
+                   data-category="alcalde"
+                   value="{{ $quantity }}"
+                   min="0"
+                   {{ $isDisabled ? 'disabled' : '' }}
+                   style="width: 70px; margin: 0 auto; {{ $isObserved ? 'border-color: #f06548;' : '' }}">
+        @endif
+    </td>
+    <td class="table-primary text-center">
+        @if($nuloAlcalde && $userCan['observe'] && !$isDisabled)
+            <input type="checkbox"
+                   class="form-check-input observe-checkbox"
+                   data-table="{{ $table->id }}"
+                   data-candidate="{{ $nuloAlcalde->id }}"
+                   data-category="alcalde"
+                   data-candidate-name="NULO"
+                   {{ $isObserved ? 'checked' : '' }}
+                   {{ $isObserved ? 'disabled' : '' }}>
+        @elseif($isObserved)
+            <i class="ri-checkbox-circle-fill text-warning"></i>
+        @endif
+    </td>
+
+    {{-- NULO Concejal --}}
+    <td class="table-success fw-bold">NULO</td>
+    <td class="table-success text-center">
+        @if($nuloConcejal)
+            @php
+                $vote = $table->votes->firstWhere('candidate_id', $nuloConcejal->id);
+                $quantity = $vote ? $vote->quantity : 0;
+                $totalConcejal += $quantity;
+                $isObserved = $vote && $vote->vote_status === 'observed';
+            @endphp
+            <input type="number"
+                   class="form-control form-control-sm vote-input text-center"
+                   data-table="{{ $table->id }}"
+                   data-candidate="{{ $nuloConcejal->id }}"
+                   data-category="concejal"
+                   value="{{ $quantity }}"
+                   min="0"
+                   {{ $isDisabled ? 'disabled' : '' }}
+                   style="width: 70px; margin: 0 auto; {{ $isObserved ? 'border-color: #f06548;' : '' }}">
+        @endif
+    </td>
+    <td class="table-success text-center">
+        @if($nuloConcejal && $userCan['observe'] && !$isDisabled)
+            <input type="checkbox"
+                   class="form-check-input observe-checkbox"
+                   data-table="{{ $table->id }}"
+                   data-candidate="{{ $nuloConcejal->id }}"
+                   data-category="concejal"
+                   data-candidate-name="NULO"
+                   {{ $isObserved ? 'checked' : '' }}
+                   {{ $isObserved ? 'disabled' : '' }}>
+        @elseif($isObserved)
+            <i class="ri-checkbox-circle-fill text-warning"></i>
+        @endif
+    </td>
+</tr>
+@endif
+
+{{-- Fila para BLANCO --}}
+@if($blancoAlcalde || $blancoConcejal)
+<tr class="table-secondary">
+    <td class="text-center">{{ $maxRows + 2 }}</td>
+    <td>-</td>
+
+    {{-- BLANCO Alcalde --}}
+    <td class="table-primary fw-bold">BLANCO</td>
+    <td class="table-primary text-center">
+        @if($blancoAlcalde)
+            @php
+                $vote = $table->votes->firstWhere('candidate_id', $blancoAlcalde->id);
+                $quantity = $vote ? $vote->quantity : 0;
+                $totalAlcalde += $quantity;
+                $isObserved = $vote && $vote->vote_status === 'observed';
+            @endphp
+            <input type="number"
+                   class="form-control form-control-sm vote-input text-center"
+                   data-table="{{ $table->id }}"
+                   data-candidate="{{ $blancoAlcalde->id }}"
+                   data-category="alcalde"
+                   value="{{ $quantity }}"
+                   min="0"
+                   {{ $isDisabled ? 'disabled' : '' }}
+                   style="width: 70px; margin: 0 auto; {{ $isObserved ? 'border-color: #f06548;' : '' }}">
+        @endif
+    </td>
+    <td class="table-primary text-center">
+        @if($blancoAlcalde && $userCan['observe'] && !$isDisabled)
+            <input type="checkbox"
+                   class="form-check-input observe-checkbox"
+                   data-table="{{ $table->id }}"
+                   data-candidate="{{ $blancoAlcalde->id }}"
+                   data-category="alcalde"
+                   data-candidate-name="BLANCO"
+                   {{ $isObserved ? 'checked' : '' }}
+                   {{ $isObserved ? 'disabled' : '' }}>
+        @elseif($isObserved)
+            <i class="ri-checkbox-circle-fill text-warning"></i>
+        @endif
+    </td>
+
+    {{-- BLANCO Concejal --}}
+    <td class="table-success fw-bold">BLANCO</td>
+    <td class="table-success text-center">
+        @if($blancoConcejal)
+            @php
+                $vote = $table->votes->firstWhere('candidate_id', $blancoConcejal->id);
+                $quantity = $vote ? $vote->quantity : 0;
+                $totalConcejal += $quantity;
+                $isObserved = $vote && $vote->vote_status === 'observed';
+            @endphp
+            <input type="number"
+                   class="form-control form-control-sm vote-input text-center"
+                   data-table="{{ $table->id }}"
+                   data-candidate="{{ $blancoConcejal->id }}"
+                   data-category="concejal"
+                   value="{{ $quantity }}"
+                   min="0"
+                   {{ $isDisabled ? 'disabled' : '' }}
+                   style="width: 70px; margin: 0 auto; {{ $isObserved ? 'border-color: #f06548;' : '' }}">
+        @endif
+    </td>
+    <td class="table-success text-center">
+        @if($blancoConcejal && $userCan['observe'] && !$isDisabled)
+            <input type="checkbox"
+                   class="form-check-input observe-checkbox"
+                   data-table="{{ $table->id }}"
+                   data-candidate="{{ $blancoConcejal->id }}"
+                   data-category="concejal"
+                   data-candidate-name="BLANCO"
+                   {{ $isObserved ? 'checked' : '' }}
+                   {{ $isObserved ? 'disabled' : '' }}>
+        @elseif($isObserved)
+            <i class="ri-checkbox-circle-fill text-warning"></i>
+        @endif
+    </td>
+</tr>
+@endif
+
+{{-- Fila de totales --}}
+<tr class="table-info fw-bold">
+    <td colspan="2" class="text-end">TOTALES:</td>
+    <td class="table-primary text-center" colspan="2">
+        <span id="total-alcalde-{{ $table->id }}">{{ $totalAlcalde }}</span>
+    </td>
+    <td class="table-primary"></td>
+    <td class="table-success text-center" colspan="2">
+        <span id="total-concejal-{{ $table->id }}">{{ $totalConcejal }}</span>
+    </td>
+    <td class="table-success"></td>
+</tr>

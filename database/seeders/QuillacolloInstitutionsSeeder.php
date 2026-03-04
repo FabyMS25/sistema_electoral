@@ -117,8 +117,6 @@ class QuillacolloInstitutionsSeeder extends Seeder
                     'code' => $recinto['code'],
                     'name' => $recinto['name'],
                     'short_name' => null,
-                    'department_id' => $department->id,
-                    'province_id' => $province->id,
                     'municipality_id' => $municipality->id,
                     'locality_id' => $locality->id,
                     'district_id' => null,
@@ -144,7 +142,7 @@ class QuillacolloInstitutionsSeeder extends Seeder
                 ]);
 
                 $count++;
-                
+
                 if ($count % 10 == 0) {
                     $this->command->info("Procesados {$count} recintos...");
                 }

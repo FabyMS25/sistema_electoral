@@ -8,6 +8,10 @@ class Role extends Model
 {
     protected $fillable = ['name', 'display_name', 'description', 'default_scope'];
 
+    protected $casts = [
+        'default_scope' => 'string',
+    ];
+
     public function permissions(): BelongsToMany
     {
         return $this->belongsToMany(Permission::class);
@@ -16,7 +20,28 @@ class Role extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-            ->withPivot('scope', 'scope_id', 'scope_type')
+            ->withPivot('scope', 'institution_id', 'voting_table_id', 'election_type_id', 'scope_settings')
             ->withTimestamps();
+    }
+
+    // AÑADIR estos métodos útiles
+    public function getUsersByScope($scope, $scopeId = null)
+    {
+        $query = $this->users()->wherePivot('scope', $scope);
+
+        if ($scopeId) {
+            if ($scope === 'institution') {
+                $query->wherePivot('institution_id', $scopeId);
+            } elseif ($scope === 'voting_table') {
+                $query->wherePivot('voting_table_id', $scopeId);
+            }
+        }
+
+        return $query->get();
+    }
+
+    public function scopeByDefaultScope($query, $scope)
+    {
+        return $query->where('default_scope', $scope);
     }
 }

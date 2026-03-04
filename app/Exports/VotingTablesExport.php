@@ -104,7 +104,6 @@ class VotingTablesExport
 
             $row = 2;
             foreach ($votingTables as $table) {
-                // Calcular papeletas usadas y sobrantes
                 $ballotsUsed = $table->total_voters;
                 $ballotsLeftover = $table->ballots_received - $ballotsUsed - $table->ballots_spoiled;
 
@@ -139,7 +138,7 @@ class VotingTablesExport
                 $sheet->setCellValue('AC' . $row, $table->vocal1 ? $table->vocal1->name . ' ' . ($table->vocal1->last_name ?? '') : '');
                 $sheet->setCellValue('AD' . $row, $table->vocal2 ? $table->vocal2->name . ' ' . ($table->vocal2->last_name ?? '') : '');
                 $sheet->setCellValue('AE' . $row, $table->vocal3 ? $table->vocal3->name . ' ' . ($table->vocal3->last_name ?? '') : '');
-                $sheet->setCellValue('AF' . $row, $table->vocal4_name ?? '');
+                $sheet->setCellValue('AF' . $row, $table->vocal4 ? $table->vocal4->name . ' ' . ($table->vocal4->last_name ?? '') : '');
                 $sheet->setCellValue('AG' . $row, $table->opening_time ? \Carbon\Carbon::parse($table->opening_time)->format('H:i') : '');
                 $sheet->setCellValue('AH' . $row, $table->closing_time ? \Carbon\Carbon::parse($table->closing_time)->format('H:i') : '');
                 $sheet->setCellValue('AI' . $row, $table->election_date ? \Carbon\Carbon::parse($table->election_date)->format('d/m/Y') : '');
@@ -154,7 +153,7 @@ class VotingTablesExport
             // Auto-size columns
             $columns = range('A', 'M'); // A-M son 13 columnas
             $columns = array_merge($columns, ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ', 'AK', 'AL', 'AM']);
-            
+
             foreach ($columns as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
@@ -246,7 +245,7 @@ class VotingTablesExport
 
             $columns = range('A', 'H'); // A-H
             $columns = array_merge($columns, ['I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH']);
-            
+
             foreach ($columns as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }

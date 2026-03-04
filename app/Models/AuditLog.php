@@ -5,9 +5,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
-class ActivityLog extends Model
+class AuditLog extends Model
 {
-    protected $table = 'activity_logs';
+    protected $table = 'audit_logs';
 
     protected $fillable = [
         'user_id',
@@ -21,7 +21,6 @@ class ActivityLog extends Model
         'notes',
         'performed_at'
     ];
-
     protected $casts = [
         'old_data' => 'array',
         'new_data' => 'array',
@@ -30,48 +29,36 @@ class ActivityLog extends Model
         'updated_at' => 'datetime'
     ];
 
-    // ===== RELACIONES =====
-    
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
-
     public function model(): MorphTo
     {
         return $this->morphTo();
     }
-
-    // ===== SCOPES =====
-    
     public function scopeByUser($query, $userId)
     {
         return $query->where('user_id', $userId);
     }
-
     public function scopeByModel($query, $modelType, $modelId)
     {
         return $query->where('model_type', $modelType)
                      ->where('model_id', $modelId);
     }
-
     public function scopeByAction($query, $action)
     {
         return $query->where('action', $action);
     }
-
     public function scopeToday($query)
     {
         return $query->whereDate('created_at', today());
     }
-
     public function scopeLastDays($query, $days)
     {
         return $query->where('created_at', '>=', now()->subDays($days));
     }
 
-    // ===== MÉTODOS DE UTILIDAD =====
-    
     public static function log($action, $model, $oldData = null, $newData = null, $notes = null)
     {
         return self::create([
@@ -92,7 +79,6 @@ class ActivityLog extends Model
     {
         $userName = $this->user ? $this->user->name : 'Sistema';
         $modelName = class_basename($this->model_type);
-        
         return match($this->action) {
             'created' => "{$userName} creó {$modelName} #{$this->model_id}",
             'updated' => "{$userName} actualizó {$modelName} #{$this->model_id}",
@@ -115,7 +101,6 @@ class ActivityLog extends Model
         if (!$this->old_data || !$this->new_data) {
             return null;
         }
-
         $changes = [];
         foreach ($this->new_data as $key => $value) {
             $oldValue = $this->old_data[$key] ?? null;
@@ -123,7 +108,6 @@ class ActivityLog extends Model
                 $changes[] = "$key: '$oldValue' → '$value'";
             }
         }
-
         return implode(', ', $changes);
     }
 }

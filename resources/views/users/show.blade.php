@@ -1,3 +1,4 @@
+{{-- resources/views/users/show.blade.php --}}
 @extends('layouts.master')
 
 @section('title')
@@ -6,6 +7,60 @@
 
 @section('css')
     <link href="{{ URL::asset('build/libs/sweetalert2/sweetalert2.min.css') }}" rel="stylesheet" type="text/css" />
+    <style>
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.25rem;
+        }
+        .info-value {
+            background-color: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            margin-bottom: 1rem;
+        }
+        .badge-assignment {
+            font-size: 0.8rem;
+            padding: 0.4rem 0.6rem;
+        }
+        .timeline {
+            position: relative;
+            padding-left: 1.5rem;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e9e9ef;
+        }
+        .timeline-item {
+            position: relative;
+            padding-bottom: 1.5rem;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.5rem;
+            top: 0.25rem;
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            background: #0ab39c;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 2px #e9e9ef;
+        }
+        .delegate-type-badge {
+            background-color: #e7f1ff;
+            color: #0a5dc2;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+    </style>
 @endsection
 
 @section('content')
@@ -22,270 +77,357 @@
     @endcomponent
 
     <div class="row">
-        <div class="col-xl-4">
+        <div class="col-lg-12">
             <div class="card">
-                <div class="card-body text-center">
-                    <div class="mb-3">
-                        @if($user->avatar)
-                            <img src="{{ $user->avatar ? URL::asset('build/images/users/'.$user->avatar) : URL::asset('build/images/users/avatar-1.jpg') }}" alt="user-img" class="img-thumbnail rounded-circle" />
-                            {{-- <img src="{{ $user->avatar }}" alt="" class="avatar-xl rounded-circle"> --}}
-                        @else
-                            <div class="avatar-xl mx-auto">
-                                <span class="avatar-title rounded-circle bg-soft-primary display-6" 
-                                      style="width: 100px; height: 100px; font-size: 40px;">
-                                    {{ strtoupper(substr($user->name, 0, 1)) }}{{ strtoupper(substr($user->last_name, 0, 1)) }}
-                                </span>
+                <div class="card-header">
+                    <h4 class="card-title mb-0 d-flex justify-content-between align-items-center">
+                        <span>Información del Usuario</span>
+                        <div class="btn-group" role="group">
+                            <a href="{{ route('users.edit', $user) }}" class="btn btn-warning btn-sm">
+                                <i class="ri-pencil-line align-middle me-1"></i> Editar
+                            </a>
+                            @if($user->is_active)
+                                <button type="button" class="btn btn-danger btn-sm"
+                                        onclick="confirmDeactivate('{{ $user->id }}', '{{ $user->name }}')">
+                                    <i class="ri-user-unfollow-line align-middle me-1"></i> Desactivar
+                                </button>
+                            @else
+                                <a href="{{ route('users.activate', $user) }}" class="btn btn-success btn-sm">
+                                    <i class="ri-user-follow-line align-middle me-1"></i> Activar
+                                </a>
+                            @endif
+                        </div>
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-xl-4">
+                            <div class="text-center mb-4">
+                                <div class="mb-3">
+                                    <img src="{{ $user->avatar ? URL::asset('build/images/users/'.$user->avatar) : URL::asset('build/images/users/avatar-1.jpg') }}"
+                                         alt="avatar" class="avatar-xl rounded-circle img-thumbnail">
+                                </div>
+                                <h5 class="mb-1">{{ $user->name }} {{ $user->last_name }}</h5>
+                                <p class="text-muted mb-2">ID: #{{ $user->id }}</p>
+                                <div class="mb-2">
+                                    @if($user->is_active)
+                                        <span class="badge bg-success-subtle text-success fs-6">Activo</span>
+                                    @else
+                                        <span class="badge bg-danger-subtle text-danger fs-6">Inactivo</span>
+                                    @endif
+                                </div>
+                                <div class="mt-4">
+                                    <p class="text-muted mb-1">
+                                        <i class="ri-time-line align-middle me-1"></i>
+                                        Registrado: {{ $user->created_at->format('d/m/Y H:i') }}
+                                    </p>
+                                    @if($user->last_login_at)
+                                        <p class="text-muted mb-1">
+                                            <i class="ri-login-circle-line align-middle me-1"></i>
+                                            Último acceso: {{ $user->last_login_at->diffForHumans() }}
+                                        </p>
+                                    @endif
+                                </div>
                             </div>
-                        @endif
-                    </div>
-                    
-                    <h4 class="mb-1">{{ $user->name }} {{ $user->last_name }}</h4>
-                    
-                    <div class="mb-3">
-                        @if($user->is_active)
-                            <span class="badge bg-success px-3 py-2">Activo</span>
-                        @else
-                            <span class="badge bg-danger px-3 py-2">Inactivo</span>
-                        @endif
-                    </div>
+                        </div>
 
-                    <div class="d-flex justify-content-center gap-2 mb-4">
-                        @can('edit_users')
-                        <a href="{{ route('users.edit', $user) }}" class="btn btn-soft-warning">
-                            <i class="ri-edit-line"></i> Editar
+                        <div class="col-xl-8">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="info-label">Nombre Completo</div>
+                                    <div class="info-value">{{ $user->name }} {{ $user->last_name }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="info-label">Carnet de Identidad</div>
+                                    <div class="info-value">{{ $user->id_card ?? 'No registrado' }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="info-label">Correo Electrónico</div>
+                                    <div class="info-value">{{ $user->email }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="info-label">Teléfono</div>
+                                    <div class="info-value">{{ $user->phone ?? 'No registrado' }}</div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="info-label">Dirección</div>
+                                    <div class="info-value">{{ $user->address ?? 'No registrada' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botones de Acciones Rápidas -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Acciones Rápidas</h4>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        @can('assign_roles')
+                        <a href="{{ route('users.assign-roles.form', $user) }}" class="btn btn-soft-primary">
+                            <i class="ri-shield-user-line align-middle me-1"></i> Asignar Roles
                         </a>
                         @endcan
-                        <a href="{{ route('users.index') }}" class="btn btn-soft-secondary">
-                            <i class="ri-arrow-left-line"></i> Volver
-                        </a>
-                    </div>
 
-                    <div class="text-start">
-                        <h5 class="font-size-15 mb-3">Información Personal</h5>
-                        
+                        @can('assign_delegates')
+                        <a href="{{ route('users.assign-institution.form', $user) }}" class="btn btn-soft-success">
+                            <i class="ri-building-line align-middle me-1"></i> Asignar Recinto
+                        </a>
+                        <a href="{{ route('users.assign-table.form', $user) }}" class="btn btn-soft-info">
+                            <i class="ri-table-line align-middle me-1"></i> Asignar Mesa
+                        </a>
+                        @endcan
+
+                        @can('assign_permissions')
+                        <a href="{{ route('users.permissions.form', $user) }}" class="btn btn-soft-warning">
+                            <i class="ri-key-line align-middle me-1"></i> Permisos Directos
+                        </a>
+                        @endcan
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Roles Asignados -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Roles Asignados</h4>
+                </div>
+                <div class="card-body">
+                    @if($user->roles->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-borderless mb-0">
+                            <table class="table table-sm table-nowrap">
+                                <thead>
+                                    <tr>
+                                        <th>Rol</th>
+                                        <th>Ámbito</th>
+                                        <th>Detalle</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
+                                    @foreach($user->roles as $role)
                                     <tr>
-                                        <th scope="row" style="width: 40%;">CI:</th>
-                                        <td>{{ $user->id_card ?? 'N/A' }}</td>
+                                        <td>
+                                            <span class="fw-bold">{{ $role->display_name }}</span>
+                                            <br>
+                                            <small class="text-muted">{{ $role->description }}</small>
+                                        </td>
+                                        <td>
+                                            @switch($role->pivot->scope)
+                                                @case('global')
+                                                    <span class="badge bg-primary">Global</span>
+                                                    @break
+                                                @case('institution')
+                                                    <span class="badge bg-success">Institución</span>
+                                                    @break
+                                                @case('voting_table')
+                                                    <span class="badge bg-info">Mesa</span>
+                                                    @break
+                                                @default
+                                                    <span class="badge bg-secondary">{{ $role->pivot->scope }}</span>
+                                            @endswitch
+                                        </td>
+                                        <td>
+                                            @if($role->pivot->institution_id)
+                                                <small>Inst: {{ optional($role->pivot->institution)->name ?? 'N/A' }}</small>
+                                            @endif
+                                            @if($role->pivot->voting_table_id)
+                                                <small>Mesa: {{ optional($role->pivot->votingTable)->number ?? 'N/A' }}</small>
+                                            @endif
+                                            @if($role->pivot->election_type_id)
+                                                <br>
+                                                <small>Elección: {{ optional($role->pivot->electionType)->name ?? 'N/A' }}</small>
+                                            @endif
+                                        </td>
                                     </tr>
-                                    <tr>
-                                        <th scope="row">Email:</th>
-                                        <td>{{ $user->email }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">Teléfono:</th>
-                                        <td>{{ $user->phone ?? 'N/A' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">Dirección:</th>
-                                        <td>{{ $user->address ?? 'N/A' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">Creado por:</th>
-                                        <td>{{ $user->createdBy->name ?? 'Sistema' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">Fecha creación:</th>
-                                        <td>{{ $user->created_at->format('d/m/Y H:i') }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">Último acceso:</th>
-                                        <td>{{ $user->last_login_at ? $user->last_login_at->format('d/m/Y H:i') : 'Nunca' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">IP último acceso:</th>
-                                        <td>{{ $user->last_login_ip ?? 'N/A' }}</td>
-                                    </tr>
+                                    @endforeach
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header bg-soft-primary">
-                    <h5 class="card-title mb-0">Roles y Permisos</h5>
-                </div>
-                <div class="card-body">
-                    <h6 class="font-size-14">Roles:</h6>
-                    <div class="mb-3">
-                        @forelse($user->roles as $role)
-                            <span class="badge bg-info font-size-12 mb-1">{{ $role->display_name }}</span>
-                        @empty
-                            <p class="text-muted small">Sin roles asignados</p>
-                        @endforelse
-                    </div>
-
-                    <h6 class="font-size-14">Permisos Directos:</h6>
-                    <div>
-                        @forelse($user->permissions as $permission)
-                            <span class="badge bg-secondary font-size-12 mb-1">{{ $permission->display_name }}</span>
-                        @empty
-                            <p class="text-muted small">Sin permisos directos</p>
-                        @endforelse
-                    </div>
+                    @else
+                        <div class="text-center py-4">
+                            <lord-icon src="https://cdn.lordicon.com/msoeawqm.json" trigger="loop"
+                                colors="primary:#121331,secondary:#08a88a" style="width:50px;height:50px">
+                            </lord-icon>
+                            <p class="text-muted mb-0">No tiene roles asignados</p>
+                            @can('assign_roles')
+                            <a href="{{ route('users.assign-roles.form', $user) }}" class="btn btn-sm btn-primary mt-2">
+                                Asignar Roles
+                            </a>
+                            @endcan
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-8">
-            {{-- Delegado de Recinto --}}
-            @can('assign_recinto_delegates')
+        <!-- Asignaciones de Delegaciones -->
+        <div class="col-md-6">
             <div class="card">
-                <div class="card-header bg-soft-success d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Delegado de Recinto</h5>
-                    <a href="{{ route('users.assign-recinto.form', $user) }}" class="btn btn-sm btn-success">
-                        <i class="ri-add-line"></i> Asignar Recinto
-                    </a>
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Delegaciones Activas</h4>
                 </div>
                 <div class="card-body">
-                    @if($activeAssignments['recinto'])
-                        <div class="alert alert-success mb-0">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>{{ $activeAssignments['recinto']->institution->name }}</strong>
-                                    <br>
-                                    <small>Asignado: {{ $activeAssignments['recinto']->assigned_at->format('d/m/Y') }}</small>
-                                    @if($activeAssignments['recinto']->assigned_until)
-                                        <br>
-                                        <small>Hasta: {{ $activeAssignments['recinto']->assigned_until->format('d/m/Y') }}</small>
-                                    @endif
-                                </div>
-                                <button type="button" class="btn btn-sm btn-danger" 
-                                        onclick="removeAssignment('recinto', {{ $activeAssignments['recinto']->id }})">
-                                    <i class="ri-delete-bin-line"></i> Remover
-                                </button>
-                            </div>
-                        </div>
-                    @else
-                        <p class="text-muted mb-0">No tiene recinto asignado</p>
-                    @endif
-                </div>
-            </div>
-            @endcan
+                    @php
+                        $activeAssignments = $user->assignments()->where('status', 'activo')->get();
+                    @endphp
 
-            {{-- Delegado de Mesa --}}
-            @can('assign_table_delegates')
-            <div class="card">
-                <div class="card-header bg-soft-warning d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Delegado de Mesa</h5>
-                    <a href="{{ route('users.assign-table.form', $user) }}" class="btn btn-sm btn-warning">
-                        <i class="ri-add-line"></i> Asignar Mesa
-                    </a>
-                </div>
-                <div class="card-body">
-                    @if($activeAssignments['mesas']->count() > 0)
-                        <div class="list-group">
-                            @foreach($activeAssignments['mesas'] as $delegation)
-                            <div class="list-group-item">
-                                <div class="d-flex justify-content-between align-items-center">
+                    @if($activeAssignments->count() > 0)
+                        <div class="timeline">
+                            @foreach($activeAssignments as $assignment)
+                            <div class="timeline-item">
+                                <div class="d-flex justify-content-between align-items-start">
                                     <div>
-                                        <strong>Mesa {{ $delegation->votingTable->number }}</strong>
-                                        <br>
-                                        <small>{{ $delegation->votingTable->institution->name }}</small>
-                                        <br>
-                                        <span class="badge bg-info">Rol: {{ ucfirst($delegation->role) }}</span>
-                                    </div>
-                                    <button type="button" class="btn btn-sm btn-danger" 
-                                            onclick="removeAssignment('mesa', {{ $delegation->id }})">
-                                        <i class="ri-delete-bin-line"></i> Remover
-                                    </button>
-                                </div>
-                            </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <p class="text-muted mb-0">No tiene mesas asignadas</p>
-                    @endif
-                </div>
-            </div>
-            @endcan
-
-            {{-- Asignaciones como Revisor --}}
-            @can('assign_recinto_delegates')
-            <div class="card">
-                <div class="card-header bg-soft-info">
-                    <h5 class="card-title mb-0">Asignaciones como Revisor</h5>
-                </div>
-                <div class="card-body">
-                    @if($activeAssignments['revisor']->count() > 0)
-                        <div class="list-group">
-                            @foreach($activeAssignments['revisor'] as $assignment)
-                            <div class="list-group-item">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        @if($assignment->assignable_type == 'App\\Models\\Institution')
-                                            <strong>Recinto: {{ $assignment->assignable->name }}</strong>
-                                        @else
-                                            <strong>Mesa {{ $assignment->assignable->number }}</strong>
-                                            <br>
-                                            <small>{{ $assignment->assignable->institution->name }}</small>
+                                        <h6 class="mb-1">
+                                            @if($assignment->institution_id)
+                                                <i class="ri-building-line text-success me-1"></i>
+                                                Recinto: {{ $assignment->institution->name ?? 'N/A' }}
+                                            @elseif($assignment->voting_table_id)
+                                                <i class="ri-table-line text-info me-1"></i>
+                                                Mesa: {{ $assignment->votingTable->number ?? 'N/A' }}
+                                                ({{ $assignment->votingTable->institution->name ?? 'N/A' }})
+                                            @endif
+                                        </h6>
+                                        <p class="mb-1">
+                                            <span class="delegate-type-badge">
+                                                {{ $assignment->delegate_type_label }}
+                                            </span>
+                                        </p>
+                                        <p class="text-muted small mb-1">
+                                            <i class="ri-calendar-line align-middle"></i>
+                                            Desde: {{ $assignment->assignment_date ? $assignment->assignment_date->format('d/m/Y') : 'N/A' }}
+                                            @if($assignment->expiration_date)
+                                                | Hasta: {{ $assignment->expiration_date->format('d/m/Y') }}
+                                            @endif
+                                        </p>
+                                        @if($assignment->credential_number)
+                                        <p class="text-muted small mb-0">
+                                            <i class="ri-id-card-line align-middle"></i>
+                                            Credencial: {{ $assignment->credential_number }}
+                                        </p>
                                         @endif
                                     </div>
-                                    <button type="button" class="btn btn-sm btn-danger" 
-                                            onclick="removeAssignment('revisor', {{ $assignment->id }})">
-                                        <i class="ri-delete-bin-line"></i> Remover
+                                    @can('assign_delegates')
+                                    <button type="button" class="btn btn-sm btn-soft-danger"
+                                            onclick="removeAssignment('{{ $assignment->id }}', '{{ $assignment->delegate_type_label }}')">
+                                        <i class="ri-close-line"></i>
                                     </button>
+                                    @endcan
                                 </div>
                             </div>
                             @endforeach
                         </div>
                     @else
-                        <p class="text-muted mb-0">No tiene asignaciones como revisor</p>
-                    @endif
-                </div>
-            </div>
-            @endcan
-
-            {{-- Asignaciones como Modificador --}}
-            @can('assign_recinto_delegates')
-            <div class="card">
-                <div class="card-header bg-soft-purple">
-                    <h5 class="card-title mb-0">Asignaciones como Modificador</h5>
-                </div>
-                <div class="card-body">
-                    @if($activeAssignments['modificador']->count() > 0)
-                        <div class="list-group">
-                            @foreach($activeAssignments['modificador'] as $assignment)
-                            <div class="list-group-item">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        @if($assignment->assignable_type == 'App\\Models\\Institution')
-                                            <strong>Recinto: {{ $assignment->assignable->name }}</strong>
-                                        @else
-                                            <strong>Mesa {{ $assignment->assignable->number }}</strong>
-                                            <br>
-                                            <small>{{ $assignment->assignable->institution->name }}</small>
-                                        @endif
-                                    </div>
-                                    <button type="button" class="btn btn-sm btn-danger" 
-                                            onclick="removeAssignment('modificador', {{ $assignment->id }})">
-                                        <i class="ri-delete-bin-line"></i> Remover
-                                    </button>
-                                </div>
-                            </div>
-                            @endforeach
+                        <div class="text-center py-4">
+                            <lord-icon src="https://cdn.lordicon.com/msoeawqm.json" trigger="loop"
+                                colors="primary:#121331,secondary:#08a88a" style="width:50px;height:50px">
+                            </lord-icon>
+                            <p class="text-muted mb-0">No tiene delegaciones activas</p>
+                            @can('assign_delegates')
+                            <a href="{{ route('users.assign-institution.form', $user) }}" class="btn btn-sm btn-success mt-2">
+                                Asignar Recinto
+                            </a>
+                            @endcan
                         </div>
-                    @else
-                        <p class="text-muted mb-0">No tiene asignaciones como modificador</p>
                     @endif
                 </div>
             </div>
-            @endcan
         </div>
     </div>
+
+    <!-- Historial de Actividad -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Historial de Actividad</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Acción</th>
+                                    <th>Descripción</th>
+                                    <th>Realizado por</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse(\App\Models\AuditLog::where('user_id', $user->id)->orWhere(function($q) use ($user) {
+                                    $q->where('model_type', 'App\\Models\\User')->where('model_id', $user->id);
+                                })->latest()->take(10)->get() as $log)
+                                <tr>
+                                    <td>{{ $log->created_at->format('d/m/Y H:i') }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ $log->action_color ?? 'secondary' }}">
+                                            {{ $log->action }}
+                                        </span>
+                                    </td>
+                                    <td>{{ $log->description }}</td>
+                                    <td>{{ optional($log->user)->name ?? 'Sistema' }}</td>
+                                </tr>
+                                @empty
+                                <tr>
+                                    <td colspan="4" class="text-center">No hay actividad registrada</td>
+                                </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form id="remove-assignment-form" method="POST" style="display: none;">
+        @csrf
+        @method('DELETE')
+    </form>
 @endsection
 
 @section('script')
 <script src="{{ URL::asset('build/libs/sweetalert2/sweetalert2.min.js') }}"></script>
 <script>
-    function removeAssignment(type, assignmentId) {
+    function confirmDeactivate(userId, userName) {
+        Swal.fire({
+            title: '¿Desactivar usuario?',
+            html: `¿Estás seguro de desactivar a <strong>${userName}</strong>?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sí, desactivar',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `{{ url('users') }}/${userId}`;
+                form.innerHTML = `
+                    @csrf
+                    @method('DELETE')
+                `;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    }
+
+    function removeAssignment(assignmentId, type) {
         Swal.fire({
             title: '¿Remover asignación?',
-            text: 'Esta acción no se puede deshacer',
+            html: `¿Estás seguro de remover la asignación de <strong>${type}</strong>?`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
@@ -294,14 +436,8 @@
             cancelButtonText: 'Cancelar'
         }).then((result) => {
             if (result.isConfirmed) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = `{{ url('users') }}/${type}/assignment/${assignmentId}/remove`;
-                form.innerHTML = `
-                    @csrf
-                    @method('DELETE')
-                `;
-                document.body.appendChild(form);
+                const form = document.getElementById('remove-assignment-form');
+                form.action = `{{ url('users') }}/${assignmentId}/assignment/${assignmentId}/remove`;
                 form.submit();
             }
         });

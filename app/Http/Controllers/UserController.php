@@ -1,5 +1,5 @@
 <?php
-// app/Http/Controllers/UserController.php
+// app/Http/Controllers/UserController.php - VERSIÓN SIMPLIFICADA
 
 namespace App\Http\Controllers;
 
@@ -8,13 +8,12 @@ use App\Models\Role;
 use App\Models\Permission;
 use App\Models\Institution;
 use App\Models\VotingTable;
-use App\Models\TableDelegate;
-use App\Models\RecintoDelegate;
-use App\Models\Reviewer;
-use App\Models\Modifier;
+use App\Models\UserAssignment;
+use App\Models\ElectionType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -25,20 +24,40 @@ class UserController extends Controller
         $this->middleware('permission:create_users')->only(['create', 'store']);
         $this->middleware('permission:edit_users')->only(['edit', 'update']);
         $this->middleware('permission:delete_users')->only(['destroy']);
-        $this->middleware('permission:assign_roles')->only(['assignRoles', 'updateRoles']);
-        $this->middleware('permission:assign_permissions')->only(['assignPermissions', 'updatePermissions']);
-        $this->middleware('permission:assign_recinto_delegates')->only(['assignRecintoForm', 'assignRecinto']);
-        $this->middleware('permission:assign_table_delegates')->only(['assignTableForm', 'assignTable']);
+        $this->middleware('permission:activate_users')->only(['activate']);
+        $this->middleware('permission:assign_roles')->only(['assignRolesForm', 'assignRoles']);
+        $this->middleware('permission:assign_permissions')->only(['permissionsForm', 'updatePermissions']);
+        $this->middleware('permission:assign_delegates')->only([
+            'assignInstitutionForm', 'assignInstitution',
+            'assignTableForm', 'assignTable',
+            'removeAssignment'
+        ]);
     }
 
     /**
-     * Listado de usuarios con filtros
+     * Verificar email único
+     */
+    public function checkEmail(Request $request)
+    {
+        $exists = User::where('email', $request->email)
+            ->when($request->user_id, function($q, $userId) {
+                $q->where('id', '!=', $userId);
+            })
+            ->exists();
+
+        return response()->json(['exists' => $exists]);
+    }
+
+    /**
+     * Listado de usuarios
      */
     public function index(Request $request)
     {
-        $query = User::with(['roles', 'createdBy']);
+        $query = User::with(['roles', 'createdBy', 'assignments' => function($q) {
+            $q->where('status', 'activo')->with('institution', 'votingTable');
+        }]);
 
-        // Filtros
+        // Filtros de búsqueda
         if ($request->filled('search')) {
             $query->where(function($q) use ($request) {
                 $q->where('name', 'ilike', "%{$request->search}%")
@@ -58,8 +77,17 @@ class UserController extends Controller
             $query->where('is_active', $request->status === 'active');
         }
 
+        if ($request->filled('delegate_type')) {
+            $query->whereHas('assignments', function($q) use ($request) {
+                $q->where('delegate_type', $request->delegate_type)
+                  ->where('status', 'activo');
+            });
+        }
+
         // Ordenamiento
-        $query->orderBy($request->get('sort', 'created_at'), $request->get('order', 'desc'));
+        $sort = $request->get('sort', 'created_at');
+        $order = $request->get('order', 'desc');
+        $query->orderBy($sort, $order);
 
         $users = $query->paginate(15)->withQueryString();
 
@@ -69,11 +97,13 @@ class UserController extends Controller
             'active' => User::where('is_active', true)->count(),
             'inactive' => User::where('is_active', false)->count(),
             'online_today' => User::whereDate('last_login_at', today())->count(),
+            'delegates' => UserAssignment::where('status', 'activo')->count(),
         ];
 
         $roles = Role::all();
+        $delegateTypes = UserAssignment::getDelegateTypes();
 
-        return view('users.index', compact('users', 'stats', 'roles'));
+        return view('users.index', compact('users', 'stats', 'roles', 'delegateTypes'));
     }
 
     /**
@@ -81,10 +111,13 @@ class UserController extends Controller
      */
     public function create()
     {
+        $this->authorize('create_users');
+
         $roles = Role::with('permissions')->get();
         $permissions = Permission::all()->groupBy('group');
-        
-        return view('users.create', compact('roles', 'permissions'));
+        $electionTypes = ElectionType::where('active', true)->get();
+
+        return view('users.create', compact('roles', 'permissions', 'electionTypes'));
     }
 
     /**
@@ -92,6 +125,8 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create_users');
+
         $request->validate([
             'name' => 'required|string|max:255',
             'last_name' => 'nullable|string|max:255',
@@ -106,27 +141,37 @@ class UserController extends Controller
             'permissions.*' => 'exists:permissions,id',
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'last_name' => $request->last_name,
-            'id_card' => $request->id_card,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'address' => $request->address,
-            'password' => Hash::make($request->password),
-            'is_active' => true,
-            'created_by' => Auth::id(),
-        ]);
+        DB::transaction(function() use ($request) {
+            $user = User::create([
+                'name' => $request->name,
+                'last_name' => $request->last_name,
+                'id_card' => $request->id_card,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'address' => $request->address,
+                'password' => Hash::make($request->password),
+                'is_active' => true,
+                'created_by' => Auth::id(),
+            ]);
 
-        // Asignar roles
-        if ($request->has('roles')) {
-            $user->roles()->attach($request->roles);
-        }
+            // Asignar roles
+            if ($request->has('roles')) {
+                $roleData = [];
+                foreach ($request->roles as $roleId) {
+                    $roleData[$roleId] = [
+                        'scope' => 'global',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+                $user->roles()->attach($roleData);
+            }
 
-        // Asignar permisos directos
-        if ($request->has('permissions')) {
-            $user->permissions()->attach($request->permissions);
-        }
+            // Asignar permisos directos
+            if ($request->has('permissions')) {
+                $user->permissions()->attach($request->permissions);
+            }
+        });
 
         return redirect()->route('users.index')
             ->with('success', 'Usuario creado exitosamente.');
@@ -137,29 +182,24 @@ class UserController extends Controller
      */
     public function show(User $user)
     {
-        $user->load(['roles', 'permissions', 'createdBy', 'updatedBy']);
-        
-        // Cargar asignaciones activas
-        $activeAssignments = [
-            'recinto' => $user->recintoDelegations()
-                ->with('institution')
-                ->where('is_active', true)
-                ->first(),
-            'mesas' => $user->tableDelegations()
-                ->with('votingTable')
-                ->where('is_active', true)
-                ->get(),
-            'revisor' => $user->reviewerAssignments()
-                ->with('assignable')
-                ->where('is_active', true)
-                ->get(),
-            'modificador' => $user->modifierAssignments()
-                ->with('assignable')
-                ->where('is_active', true)
-                ->get(),
-        ];
+        $this->authorize('view_users');
 
-        return view('users.show', compact('user', 'activeAssignments'));
+        $user->load([
+            'roles' => function($q) {
+                $q->withPivot(['scope', 'institution_id', 'voting_table_id', 'election_type_id']);
+            },
+            'permissions',
+            'createdBy',
+            'updatedBy',
+            'assignments' => function($q) {
+                $q->with(['institution', 'votingTable', 'electionType', 'assignedBy'])
+                  ->orderBy('created_at', 'desc');
+            }
+        ]);
+
+        $activeElection = ElectionType::where('active', true)->first();
+
+        return view('users.show', compact('user', 'activeElection'));
     }
 
     /**
@@ -167,12 +207,27 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
+        $this->authorize('edit_users');
+
         $roles = Role::with('permissions')->get();
         $permissions = Permission::all()->groupBy('group');
-        $userRoles = $user->roles->pluck('id')->toArray();
+        $electionTypes = ElectionType::where('active', true)->get();
+
+        $userRoles = $user->roles->mapWithKeys(function($role) {
+            return [$role->id => [
+                'scope' => $role->pivot->scope,
+                'institution_id' => $role->pivot->institution_id,
+                'voting_table_id' => $role->pivot->voting_table_id,
+                'election_type_id' => $role->pivot->election_type_id,
+            ]];
+        })->toArray();
+
         $userPermissions = $user->permissions->pluck('id')->toArray();
 
-        return view('users.edit', compact('user', 'roles', 'permissions', 'userRoles', 'userPermissions'));
+        return view('users.edit', compact(
+            'user', 'roles', 'permissions', 'electionTypes',
+            'userRoles', 'userPermissions'
+        ));
     }
 
     /**
@@ -180,6 +235,8 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
+        $this->authorize('edit_users');
+
         $request->validate([
             'name' => 'required|string|max:255',
             'last_name' => 'nullable|string|max:255',
@@ -189,10 +246,6 @@ class UserController extends Controller
             'address' => 'nullable|string|max:500',
             'password' => 'nullable|string|min:8|confirmed',
             'is_active' => 'boolean',
-            'roles' => 'array',
-            'roles.*' => 'exists:roles,id',
-            'permissions' => 'array',
-            'permissions.*' => 'exists:permissions,id',
         ]);
 
         $data = [
@@ -212,26 +265,21 @@ class UserController extends Controller
 
         $user->update($data);
 
-        // Sincronizar roles
-        $user->roles()->sync($request->roles ?? []);
-
-        // Sincronizar permisos directos
-        $user->permissions()->sync($request->permissions ?? []);
-
         return redirect()->route('users.show', $user)
             ->with('success', 'Usuario actualizado exitosamente.');
     }
 
     /**
-     * Eliminar usuario (soft delete o desactivar)
+     * Desactivar usuario
      */
     public function destroy(User $user)
     {
+        $this->authorize('delete_users');
+
         if ($user->id === Auth::id()) {
-            return back()->with('error', 'No puedes eliminarte a ti mismo.');
+            return back()->with('error', 'No puedes desactivarte a ti mismo.');
         }
 
-        // En lugar de eliminar, desactivamos
         $user->update([
             'is_active' => false,
             'updated_by' => Auth::id()
@@ -246,6 +294,8 @@ class UserController extends Controller
      */
     public function activate(User $user)
     {
+        $this->authorize('activate_users');
+
         $user->update([
             'is_active' => true,
             'updated_by' => Auth::id()
@@ -256,46 +306,166 @@ class UserController extends Controller
     }
 
     /**
-     * Formulario de asignación de recinto
+     * Formulario de asignación de roles
      */
-    public function assignRecintoForm(User $user)
+    public function assignRolesForm(User $user)
     {
-        $this->authorize('assign_recinto_delegates');
+        $this->authorize('assign_roles');
 
-        $recintos = Institution::where('active', true)->orderBy('name')->get();
-        $currentAssignment = $user->recintoDelegations()
-            ->where('is_active', true)
-            ->first();
+        $roles = Role::with('permissions')->get();
+        $electionTypes = ElectionType::where('active', true)->get();
+        $institutions = Institution::where('status', 'activo')->orderBy('name')->get();
+        $votingTables = VotingTable::with('institution')
+            ->where('status', 'configurada')
+            ->orderBy('institution_id')
+            ->orderBy('number')
+            ->get();
 
-        return view('users.assign-recinto', compact('user', 'recintos', 'currentAssignment'));
+        $currentRoles = $user->roles()->withPivot(['scope', 'institution_id', 'voting_table_id', 'election_type_id'])->get();
+
+        return view('users.assign-roles', compact('user', 'roles', 'electionTypes', 'institutions', 'votingTables', 'currentRoles'));
     }
 
     /**
-     * Guardar asignación de recinto
+     * Guardar asignación de roles
      */
-    public function assignRecinto(Request $request, User $user)
+    public function assignRoles(Request $request, User $user)
     {
-        $this->authorize('assign_recinto_delegates');
+        $this->authorize('assign_roles');
+
+        $request->validate([
+            'roles' => 'array',
+            'roles.*.role_id' => 'required|exists:roles,id',
+            'roles.*.scope' => 'required|in:global,institution,voting_table',
+            'roles.*.institution_id' => 'required_if:roles.*.scope,institution|nullable|exists:institutions,id',
+            'roles.*.voting_table_id' => 'required_if:roles.*.scope,voting_table|nullable|exists:voting_tables,id',
+            'roles.*.election_type_id' => 'nullable|exists:election_types,id',
+        ]);
+
+        DB::transaction(function() use ($request, $user) {
+            $user->roles()->detach();
+
+            if ($request->has('roles')) {
+                $roleData = [];
+                foreach ($request->roles as $role) {
+                    $roleData[$role['role_id']] = [
+                        'scope' => $role['scope'],
+                        'institution_id' => $role['institution_id'] ?? null,
+                        'voting_table_id' => $role['voting_table_id'] ?? null,
+                        'election_type_id' => $role['election_type_id'] ?? null,
+                        'scope_settings' => json_encode(['assigned_at' => now()->toDateTimeString()]),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+                $user->roles()->attach($roleData);
+            }
+        });
+
+        return redirect()->route('users.show', $user)
+            ->with('success', 'Roles asignados exitosamente.');
+    }
+
+    /**
+     * Formulario de permisos directos
+     */
+    public function permissionsForm(User $user)
+    {
+        $this->authorize('assign_permissions');
+
+        $permissions = Permission::all()->groupBy('group');
+        $currentPermissions = $user->permissions()->withPivot(['scope', 'scope_id', 'scope_type'])->get();
+
+        return view('users.permissions', compact('user', 'permissions', 'currentPermissions'));
+    }
+
+    /**
+     * Actualizar permisos directos
+     */
+    public function updatePermissions(Request $request, User $user)
+    {
+        $this->authorize('assign_permissions');
+
+        $request->validate([
+            'permissions' => 'array',
+            'permissions.*' => 'exists:permissions,id',
+        ]);
+
+        $user->permissions()->sync($request->permissions ?? []);
+
+        return redirect()->route('users.show', $user)
+            ->with('success', 'Permisos actualizados exitosamente.');
+    }
+
+    /**
+     * Formulario de asignación de institución (recinto)
+     */
+    public function assignInstitutionForm(User $user)
+    {
+        $this->authorize('assign_delegates');
+
+        $electionTypes = ElectionType::where('active', true)->get();
+
+        $institutions = Institution::where('status', 'activo')
+            ->orderBy('name')
+            ->get()
+            ->groupBy(function($item) {
+                return $item->municipality->name ?? 'Sin municipio';
+            });
+
+        $currentAssignments = $user->assignments()
+            ->where('status', 'activo')
+            ->whereNotNull('institution_id')
+            ->whereNull('voting_table_id')
+            ->with(['institution', 'electionType'])
+            ->get();
+
+        return view('users.assign-institution', compact('user', 'electionTypes', 'institutions', 'currentAssignments'));
+    }
+
+    /**
+     * Guardar asignación de institución
+     */
+    public function assignInstitution(Request $request, User $user)
+    {
+        $this->authorize('assign_delegates');
 
         $request->validate([
             'institution_id' => 'required|exists:institutions,id',
-            'assigned_until' => 'nullable|date|after:today',
+            'election_type_id' => 'required|exists:election_types,id',
+            'delegate_type' => 'required|in:delegado_general,tecnico,observador',
+            'assignment_date' => 'nullable|date',
+            'expiration_date' => 'nullable|date|after:assignment_date',
+            'credential_number' => 'nullable|string|max:50',
+            'observations' => 'nullable|string|max:500',
         ]);
 
-        // Desactivar asignaciones anteriores
-        $user->recintoDelegations()->update(['is_active' => false]);
+        // Verificar si ya tiene una asignación activa
+        $existing = UserAssignment::where('user_id', $user->id)
+            ->where('institution_id', $request->institution_id)
+            ->where('election_type_id', $request->election_type_id)
+            ->where('status', 'activo')
+            ->first();
 
-        // Crear nueva asignación
-        $user->recintoDelegations()->create([
+        if ($existing) {
+            return back()->with('error', 'El usuario ya tiene una asignación activa para esta institución.');
+        }
+
+        UserAssignment::create([
+            'user_id' => $user->id,
             'institution_id' => $request->institution_id,
-            'assigned_at' => now(),
-            'assigned_until' => $request->assigned_until,
+            'election_type_id' => $request->election_type_id,
+            'delegate_type' => $request->delegate_type,
+            'assignment_date' => $request->assignment_date ?? now(),
+            'expiration_date' => $request->expiration_date,
+            'credential_number' => $request->credential_number,
+            'status' => 'activo',
             'assigned_by' => Auth::id(),
-            'is_active' => true,
+            'observations' => $request->observations,
         ]);
 
         return redirect()->route('users.show', $user)
-            ->with('success', 'Recinto asignado exitosamente.');
+            ->with('success', 'Asignación de recinto guardada exitosamente.');
     }
 
     /**
@@ -303,24 +473,37 @@ class UserController extends Controller
      */
     public function assignTableForm(User $user)
     {
-        $this->authorize('assign_table_delegates');
+        $this->authorize('assign_delegates');
 
-        // Obtener mesas disponibles (del recinto del usuario si tiene)
-        $recinto = $user->assigned_recinto;
-        
-        $query = VotingTable::with('institution')->where('status', 'activo');
-        
-        if ($recinto) {
-            $query->where('institution_id', $recinto->id);
-        }
+        $electionTypes = ElectionType::where('active', true)->get();
 
-        $mesas = $query->orderBy('institution_id')->orderBy('number')->get();
-        $currentAssignments = $user->tableDelegations()
-            ->where('is_active', true)
-            ->with('votingTable')
+        // Obtener mesas disponibles (sin delegado activo)
+        $assignedTableIds = UserAssignment::where('status', 'activo')
+            ->whereNotNull('voting_table_id')
+            ->pluck('voting_table_id')
+            ->toArray();
+
+        $votingTables = VotingTable::with('institution')
+            ->where('status', 'configurada')
+            ->whereNotIn('id', $assignedTableIds)
+            ->orWhereHas('assignments', function($q) use ($user) {
+                $q->where('user_id', $user->id)
+                  ->where('status', 'activo');
+            })
+            ->orderBy('institution_id')
+            ->orderBy('number')
+            ->get()
+            ->groupBy(function($item) {
+                return $item->institution->name ?? 'Sin institución';
+            });
+
+        $currentAssignments = $user->assignments()
+            ->where('status', 'activo')
+            ->whereNotNull('voting_table_id')
+            ->with(['votingTable.institution', 'electionType'])
             ->get();
 
-        return view('users.assign-table', compact('user', 'mesas', 'currentAssignments'));
+        return view('users.assign-table', compact('user', 'electionTypes', 'votingTables', 'currentAssignments'));
     }
 
     /**
@@ -328,68 +511,74 @@ class UserController extends Controller
      */
     public function assignTable(Request $request, User $user)
     {
-        // if (!auth()->user()->hasPermission('assign_table_delegates')) {
-        //     abort(403, 'No tienes permiso para asignar mesas');
-        // }
-        $this->authorize('assign_table_delegates');
+        $this->authorize('assign_delegates');
 
         $request->validate([
             'voting_table_id' => 'required|exists:voting_tables,id',
-            'role' => 'required|in:presidente,secretario,vocal',
-            'assigned_until' => 'nullable|date|after:today',
+            'election_type_id' => 'required|exists:election_types,id',
+            'delegate_type' => 'required|in:delegado_mesa,presidente,secretario,vocal',
+            'assignment_date' => 'nullable|date',
+            'expiration_date' => 'nullable|date|after:assignment_date',
+            'credential_number' => 'nullable|string|max:50',
+            'observations' => 'nullable|string|max:500',
         ]);
 
-        // Verificar que la mesa no tenga ya un delegado activo
-        $existingDelegate = TableDelegate::where('voting_table_id', $request->voting_table_id)
-            ->where('is_active', true)
+        // Verificar si la mesa ya tiene un delegado activo
+        $existing = UserAssignment::where('voting_table_id', $request->voting_table_id)
+            ->where('status', 'activo')
             ->first();
 
-        if ($existingDelegate && $existingDelegate->user_id != $user->id) {
-            return back()->with('error', 'Esta mesa ya tiene un delegado activo.');
+        if ($existing && $existing->user_id != $user->id) {
+            return back()->with('error', 'Esta mesa ya tiene un delegado asignado.');
         }
 
-        // Crear asignación
-        $user->tableDelegations()->create([
-            'voting_table_id' => $request->voting_table_id,
-            'role' => $request->role,
-            'assigned_at' => now(),
-            'assigned_until' => $request->assigned_until,
-            'assigned_by' => Auth::id(),
-            'is_active' => true,
-        ]);
+        if ($existing && $existing->user_id == $user->id) {
+            $existing->update([
+                'delegate_type' => $request->delegate_type,
+                'expiration_date' => $request->expiration_date,
+                'credential_number' => $request->credential_number,
+                'observations' => $request->observations,
+                'assigned_by' => Auth::id(),
+            ]);
+
+            $message = 'Asignación actualizada exitosamente.';
+        } else {
+            UserAssignment::create([
+                'user_id' => $user->id,
+                'voting_table_id' => $request->voting_table_id,
+                'election_type_id' => $request->election_type_id,
+                'delegate_type' => $request->delegate_type,
+                'assignment_date' => $request->assignment_date ?? now(),
+                'expiration_date' => $request->expiration_date,
+                'credential_number' => $request->credential_number,
+                'status' => 'activo',
+                'assigned_by' => Auth::id(),
+                'observations' => $request->observations,
+            ]);
+
+            $message = 'Asignación de mesa guardada exitosamente.';
+        }
 
         return redirect()->route('users.show', $user)
-            ->with('success', 'Mesa asignada exitosamente.');
+            ->with('success', $message);
     }
 
     /**
      * Remover asignación
      */
-    public function removeAssignment(User $user, $type, $assignmentId)
+    public function removeAssignment(User $user, UserAssignment $assignment)
     {
-        $this->authorize('assign_recinto_delegates');
+        $this->authorize('assign_delegates');
 
-        $model = null;
-        switch ($type) {
-            case 'recinto':
-                $model = $user->recintoDelegations()->findOrFail($assignmentId);
-                break;
-            case 'mesa':
-                $model = $user->tableDelegations()->findOrFail($assignmentId);
-                break;
-            case 'revisor':
-                $model = $user->reviewerAssignments()->findOrFail($assignmentId);
-                break;
-            case 'modificador':
-                $model = $user->modifierAssignments()->findOrFail($assignmentId);
-                break;
-            default:
-                return back()->with('error', 'Tipo de asignación inválido.');
+        if ($assignment->user_id !== $user->id) {
+            return back()->with('error', 'La asignación no pertenece a este usuario.');
         }
 
-        $model->update(['is_active' => false]);
+        $assignment->update([
+            'status' => 'finalizado',
+            'expiration_date' => now(),
+        ]);
 
-        return redirect()->route('users.show', $user)
-            ->with('success', 'Asignación removida exitosamente.');
+        return back()->with('success', 'Asignación removida exitosamente.');
     }
 }

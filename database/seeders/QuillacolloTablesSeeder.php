@@ -68,15 +68,15 @@ class QuillacolloTablesSeeder extends Seeder
     {
         $electionType = ElectionType::where('active', true)->first();
         if (!$electionType) {
-            $electionType = ElectionType::where('name', 'Elecciones Municipales 2026')->first();            
+            $electionType = ElectionType::where('name', 'Elecciones Municipales 2026')->first();
             if (!$electionType) {
                 $this->command->error('❌ No se encontró el tipo de elección');
                 return;
-            }            
+            }
             $this->command->warn("⚠️  Usando tipo: {$electionType->name}");
         }
         $this->command->info("📅 Tipo de elección: {$electionType->name} (ID: {$electionType->id})");
-        
+
         $municipality = Municipality::where('name', 'Quillacollo')->first();
         if (!$municipality) {
             $this->command->error('❌ No se encontró el municipio de Quillacollo');
@@ -101,9 +101,9 @@ class QuillacolloTablesSeeder extends Seeder
                 $this->command->info("📊 Procesando: {$institution->name}");
                 $this->command->info("   ├─ Código: {$institution->code}");
                 $this->command->info("   ├─ Votantes: " . number_format($institution->registered_citizens ?? 0));
-                
+
                 $numMesas = $this->getNumeroMesas($institution);
-                
+
                 if (!$numMesas || $numMesas <= 0) {
                     $numMesas = 30;
                     $this->command->warn("   ⚠️ Usando valor por defecto: {$numMesas}");
@@ -112,13 +112,13 @@ class QuillacolloTablesSeeder extends Seeder
                 $this->command->info("   └─ Mesas a crear: {$numMesas}");
 
                 $mesasCreadas = 0;
-                $votantesPorMesa = $institution->registered_citizens > 0 
-                    ? ceil($institution->registered_citizens / $numMesas) 
+                $votantesPorMesa = $institution->registered_citizens > 0
+                    ? ceil($institution->registered_citizens / $numMesas)
                     : 250;
 
                 for ($i = 1; $i <= $numMesas; $i++) {
                     $internalCode = $institution->code . '-M' . str_pad($i, 2, '0', STR_PAD_LEFT);
-                    $oepCode = $institution->code . '-' . $i; 
+                    $oepCode = $institution->code . '-' . $i;
                     try {
                         VotingTable::updateOrCreate(
                             [
@@ -129,44 +129,43 @@ class QuillacolloTablesSeeder extends Seeder
                                 // CÓDIGOS - usando los nuevos campos de la migración
                                 'oep_code' => $oepCode,
                                 'internal_code' => $internalCode,
-                                
+
                                 // Datos básicos
                                 'letter' => null,
                                 'type' => 'mixta',
-                                
+
                                 // Relaciones
-                                'municipality_id' => $municipality->id,
                                 'election_type_id' => $electionType->id,
-                                
+
                                 // Datos pre-electorales
                                 'expected_voters' => $votantesPorMesa,
                                 'ballots_received' => 0,
                                 'ballots_spoiled' => 0,
-                                
+
                                 // Rango de votantes (opcional)
                                 'voter_range_start_name' => null,
                                 'voter_range_end_name' => null,
-                                
+
                                 // Personal de mesa (opcional)
                                 'president_id' => null,
                                 'secretary_id' => null,
                                 'vocal1_id' => null,
                                 'vocal2_id' => null,
                                 'vocal3_id' => null,
-                                'vocal4_name' => null,
-                                
+                                'vocal4_id' => null,
+
                                 // Fechas
                                 'election_date' => $electionType->election_date,
                                 'opening_time' => null,
                                 'closing_time' => null,
-                                
+
                                 // Estado
                                 'status' => 'configurada',
-                                
+
                                 // Control de papeletas
                                 'ballots_used' => 0,
                                 'ballots_leftover' => 0,
-                                
+
                                 // Resultados (inicialmente cero)
                                 'valid_votes' => 0,
                                 'blank_votes' => 0,
@@ -176,7 +175,7 @@ class QuillacolloTablesSeeder extends Seeder
                                 'null_votes_second' => 0,
                                 'total_voters' => 0,
                                 'total_voters_second' => 0,
-                                
+
                                 // Acta
                                 'acta_number' => null,
                                 'acta_photo' => null,
@@ -196,7 +195,7 @@ class QuillacolloTablesSeeder extends Seeder
                     $procesados++;
                     $this->command->info("   ✅ Creadas {$mesasCreadas} mesas");
                 }
-                
+
                 $this->command->info('');
             }
 
@@ -207,7 +206,7 @@ class QuillacolloTablesSeeder extends Seeder
             $this->command->info('========================================');
             $this->command->info("📊 Total de mesas creadas: {$totalMesas}");
             $this->command->info("🏫 Recintos procesados: {$procesados}");
-            
+
             if (!empty($errores)) {
                 $this->command->warn("\n⚠️  Errores encontrados:");
                 foreach ($errores as $error) {
@@ -225,21 +224,21 @@ class QuillacolloTablesSeeder extends Seeder
     private function getNumeroMesas($institution)
     {
         $nombre = strtoupper(trim($institution->name));
-        
+
         if (isset($this->distribucionMesas[$nombre])) {
             return $this->distribucionMesas[$nombre];
         }
-        
+
         foreach ($this->distribucionMesas as $key => $value) {
             if (strpos($nombre, $key) !== false) {
                 return $value;
             }
         }
-        
+
         if ($institution->registered_citizens > 0) {
             return ceil($institution->registered_citizens / 250);
         }
-        
+
         return 30;
     }
 }

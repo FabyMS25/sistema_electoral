@@ -19,14 +19,17 @@ return new class extends Migration
             $table->json('new_data')->nullable();
             $table->string('ip_address')->nullable();
             $table->text('user_agent')->nullable();
+            $table->text('notes')->nullable();
+            $table->timestamp('performed_at')->useCurrent();
             $table->timestamps();
-            
+
             $table->index(['model_type', 'model_id']);
+            $table->index('action');
             $table->index('user_id');
+            $table->index('performed_at');
             $table->index('created_at');
         });
 
-        // migrations/create_validation_history_table.php
         Schema::create('validation_history', function (Blueprint $table) {
             $table->id();
             $table->foreignId('vote_id')->constrained()->onDelete('cascade');
@@ -36,9 +39,11 @@ return new class extends Migration
             $table->json('previous_values')->nullable();
             $table->json('new_values')->nullable();
             $table->timestamps();
-            
+
             $table->index('vote_id');
             $table->index('user_id');
+            $table->index('action');
+            $table->index('created_at');
         });
     }
 

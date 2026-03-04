@@ -20,10 +20,10 @@ class VotingTablesImport
     {
         try {
             Log::info('Starting import process', ['file' => $uploadedFile->getClientOriginalName()]);
-            
+
             $filePath = $uploadedFile->store('imports');
             $fullPath = storage_path("app/{$filePath}");
-            
+
             $spreadsheet = IOFactory::load($fullPath);
             $sheet = $spreadsheet->getActiveSheet();
             $rows = $sheet->toArray();
@@ -49,7 +49,7 @@ class VotingTablesImport
                 DB::rollBack();
                 Log::warning('Import completed with errors. Success: ' . $this->successCount . ', Errors: ' . count($this->errors));
             }
-            
+
             Storage::delete($filePath);
 
             return [
@@ -145,7 +145,7 @@ class VotingTablesImport
             $name = trim($row[$colInstitutionName]);
             $institution = Institution::where('name', $name)->first();
             if ($institution) return $institution;
-            
+
             $institution = Institution::where('name', 'LIKE', '%' . $name . '%')->first();
             if ($institution) {
                 $this->warnings[] = "Fila {$rowNumber}: Se usó coincidencia parcial para el recinto: {$institution->name}";
@@ -165,7 +165,7 @@ class VotingTablesImport
             $electionType = ElectionType::where('name', 'LIKE', '%' . $typeName . '%')
                 ->where('active', true)
                 ->first();
-            
+
             if ($electionType) return $electionType;
         }
 
@@ -235,7 +235,7 @@ class VotingTablesImport
         }
 
         $number = intval($row[$colNumber]);
-        
+
         // Generar códigos si están vacíos
         $oepCode = !empty($row[$colOepCode]) ? trim($row[$colOepCode]) : $institution->code . '-' . $number;
         $internalCode = !empty($row[$colInternalCode]) ? trim($row[$colInternalCode]) : $institution->code . '-M' . str_pad($number, 2, '0', STR_PAD_LEFT);
@@ -255,6 +255,7 @@ class VotingTablesImport
         $vocal1 = $this->findUser($row[$colVocal1] ?? null);
         $vocal2 = $this->findUser($row[$colVocal2] ?? null);
         $vocal3 = $this->findUser($row[$colVocal3] ?? null);
+        $vocal4 = $this->findUser($row[$colVocal4] ?? null);
 
         // Calcular totales
         $totalVoters = ($row[$colValidVotes] ?? 0) + ($row[$colBlankVotes] ?? 0) + ($row[$colNullVotes] ?? 0);
@@ -269,60 +270,59 @@ class VotingTablesImport
             // CÓDIGOS - Nuevos campos
             'oep_code' => $oepCode,
             'internal_code' => $internalCode,
-            
+
             // Datos básicos
             'number' => $number,
             'letter' => !empty($row[$colLetter]) ? trim($row[$colLetter]) : null,
             'type' => $type,
-            
+
             // Relaciones
             'institution_id' => $institution->id,
             'election_type_id' => $electionType->id,
-            'municipality_id' => $institution->municipality_id,
-            
+
             // Datos pre-electorales
             'expected_voters' => !empty($row[$colExpectedVoters]) ? intval($row[$colExpectedVoters]) : 0,
             'ballots_received' => !empty($row[$colBallotsReceived]) ? intval($row[$colBallotsReceived]) : 0,
             'ballots_spoiled' => !empty($row[$colBallotsSpoiled]) ? intval($row[$colBallotsSpoiled]) : 0,
-            
+
             // Rango de votantes
             'voter_range_start_name' => !empty($row[$colFromName]) ? trim($row[$colFromName]) : null,
             'voter_range_end_name' => !empty($row[$colToName]) ? trim($row[$colToName]) : null,
-            
+
             // Personal de mesa
             'president_id' => $president?->id,
             'secretary_id' => $secretary?->id,
             'vocal1_id' => $vocal1?->id,
             'vocal2_id' => $vocal2?->id,
             'vocal3_id' => $vocal3?->id,
-            'vocal4_name' => null, // No hay campo en el Excel para vocal4
-            
+            'vocal4_id' => $vocal4?->id,
+
             // Fechas y horas
             'election_date' => $electionDate,
             'opening_time' => $openTime,
             'closing_time' => $closeTime,
-            
+
             // Estado
             'status' => $status,
-            
+
             // Control de papeletas (se calculan automáticamente)
             'ballots_used' => 0,
             'ballots_leftover' => 0,
-            
+
             // Resultados Alcalde
             'valid_votes' => !empty($row[$colValidVotes]) ? intval($row[$colValidVotes]) : 0,
             'blank_votes' => !empty($row[$colBlankVotes]) ? intval($row[$colBlankVotes]) : 0,
             'null_votes' => !empty($row[$colNullVotes]) ? intval($row[$colNullVotes]) : 0,
-            
+
             // Resultados Concejal
             'valid_votes_second' => !empty($row[$colValidVotesSecond]) ? intval($row[$colValidVotesSecond]) : 0,
             'blank_votes_second' => !empty($row[$colBlankVotesSecond]) ? intval($row[$colBlankVotesSecond]) : 0,
             'null_votes_second' => !empty($row[$colNullVotesSecond]) ? intval($row[$colNullVotesSecond]) : 0,
-            
+
             // Totales
             'total_voters' => $totalVoters,
             'total_voters_second' => $totalVotersSecond,
-            
+
             // Acta
             'acta_number' => !empty($row[$colActaNumber]) ? trim($row[$colActaNumber]) : null,
             'acta_photo' => null,
@@ -339,12 +339,12 @@ class VotingTablesImport
             if ($existingOepCode) {
                 throw new \Exception("El código OEP {$oepCode} ya existe en otra mesa");
             }
-            
+
             $existingInternalCode = VotingTable::where('internal_code', $internalCode)->first();
             if ($existingInternalCode) {
                 throw new \Exception("El código interno {$internalCode} ya existe en otra mesa");
             }
-            
+
             VotingTable::create($tableData);
         }
 
@@ -356,7 +356,7 @@ class VotingTablesImport
         if (empty($value)) return null;
 
         $value = trim($value);
-        
+
         $user = User::where('email', $value)->first();
         if ($user) return $user;
 

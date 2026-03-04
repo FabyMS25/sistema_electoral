@@ -1,335 +1,370 @@
 
-<div class="card mb-3 table-card <?php echo e($table->status); ?>" id="table-<?php echo e($table->id); ?>" data-table-id="<?php echo e($table->id); ?>">
-    <div class="card-header position-relative">
-        <?php if($table->validation_status === 'observed' || $table->status === 'observada'): ?>
-            <span class="badge bg-danger role-badge" title="Tiene observaciones">
-                <i class="ri-alert-line me-1"></i>Observada
-            </span>
-        <?php elseif($table->validation_status === 'validated'): ?>
-            <span class="badge bg-success role-badge">
-                <i class="ri-check-line me-1"></i>Validada
-            </span>
-        <?php elseif($table->validation_status === 'approved'): ?>
-            <span class="badge bg-primary role-badge">
-                <i class="ri-check-double-line me-1"></i>Aprobada
-            </span>
-        <?php elseif($table->status === 'cerrada'): ?>
-            <span class="badge bg-secondary role-badge">
-                <i class="ri-lock-line me-1"></i>Cerrada
-            </span>
-        <?php endif; ?>
+<?php
+    // Filtrar candidatos regulares (no NULO ni BLANCO)
+    $alcaldesRegulares = $candidatesByCategory['alcalde']->filter(function($c) {
+        return !in_array($c->type, ['null_votes', 'blank_votes']);
+    })->values();
 
-        <div class="row align-items-center">
-            <div class="col-md-3">
-                <h5 class="mb-0">
-                    <i class="ri-table-line me-1"></i>
-                    Mesa <?php echo e($table->number); ?>
+    $concejalesRegulares = $candidatesByCategory['concejal']->filter(function($c) {
+        return !in_array($c->type, ['null_votes', 'blank_votes']);
+    })->values();
 
-                    <small class="text-muted ms-2"><?php echo e($table->internal_code ?? $table->oep_code); ?></small>
-                </h5>
-                <small class="text-muted"><?php echo e($table->institution->name ?? 'N/A'); ?></small>
-            </div>
-            <div class="col-md-3">
-                <?php
-                    $statusClasses = [
-                        'configurada' => 'secondary',
-                        'en_espera' => 'info',
-                        'votacion' => 'primary',
-                        'cerrada' => 'danger',
-                        'en_escrutinio' => 'warning',
-                        'escrutada' => 'success',
-                        'observada' => 'danger',
-                        'transmitida' => 'success',
-                        'anulada' => 'dark'
-                    ];
-                    $statusLabels = [
-                        'configurada' => 'Configurada',
-                        'en_espera' => 'En Espera',
-                        'votacion' => 'Votación',
-                        'cerrada' => 'Cerrada',
-                        'en_escrutinio' => 'En Escrutinio',
-                        'escrutada' => 'Escrutada',
-                        'observada' => 'Observada',
-                        'transmitida' => 'Transmitida',
-                        'anulada' => 'Anulada'
-                    ];
-                ?>
-                <span class="badge bg-<?php echo e($statusClasses[$table->status] ?? 'secondary'); ?> total-badge">
-                    <?php echo e($statusLabels[$table->status] ?? $table->status); ?>
+    // Obtener NULO y BLANCO específicamente
+    $nuloAlcalde = $candidatesByCategory['alcalde']->firstWhere('type', 'null_votes');
+    $blancoAlcalde = $candidatesByCategory['alcalde']->firstWhere('type', 'blank_votes');
+    $nuloConcejal = $candidatesByCategory['concejal']->firstWhere('type', 'null_votes');
+    $blancoConcejal = $candidatesByCategory['concejal']->firstWhere('type', 'blank_votes');
 
-                </span>
-                <span class="ms-2 text-muted">
-                    <i class="ri-group-line me-1"></i>
-                    <?php echo e(number_format($table->expected_voters ?? 0)); ?>
+    $maxRows = max($alcaldesRegulares->count(), $concejalesRegulares->count());
+    $totalAlcalde = 0;
+    $totalConcejal = 0;
+?>
 
-                </span>
-            </div>
-            <div class="col-md-3">
-                <span class="text-muted">
-                    <i class="ri-bar-chart-line me-1"></i>
-                    Votos: <span class="total-votes" id="total-<?php echo e($table->id); ?>"><?php echo e($table->total_voters ?? 0); ?></span>
-                </span>
-                <?php if(isset($table->observations_count) && $table->observations_count > 0): ?>
-                    <span class="badge bg-warning observation-badge ms-2"
-                          onclick="showObservations(<?php echo e($table->id); ?>)">
-                        <i class="ri-chat-1-line me-1"></i>
-                        <?php echo e($table->observations_count); ?>
 
-                    </span>
-                <?php endif; ?>
-                <?php if($table->acta_number): ?>
-                    <span class="badge bg-info ms-2">
-                        <i class="ri-file-copy-line me-1"></i>
-                        Acta
-                    </span>
-                <?php endif; ?>
-            </div>
-            <div class="col-md-3 text-end">
-                <div class="action-buttons">
-                    <?php if(!in_array($table->status, ['cerrada', 'escrutada', 'transmitida', 'anulada'])): ?>
-                        <?php if($userCan['register'] && $table->validation_status !== 'validated'): ?>
-                            <button class="btn btn-sm btn-success save-table" data-table-id="<?php echo e($table->id); ?>" title="Guardar votos">
-                                <i class="ri-save-line"></i>
-                            </button>
-                        <?php endif; ?>
+<?php for($i = 0; $i < $maxRows; $i++): ?>
+    <?php
+        $alcalde = $alcaldesRegulares[$i] ?? null;
+        $concejal = $concejalesRegulares[$i] ?? null;
 
-                        <?php if($userCan['review'] && $table->validation_status === 'pending'): ?>
-                            <button class="btn btn-sm btn-info review-table" data-table-id="<?php echo e($table->id); ?>" title="Revisar">
-                                <i class="ri-eye-line"></i>
-                            </button>
-                        <?php endif; ?>
+        if ($alcalde) {
+            $voteAlcalde = $table->votes->firstWhere('candidate_id', $alcalde->id);
+            $quantityAlcalde = $voteAlcalde ? $voteAlcalde->quantity : 0;
+            $totalAlcalde += $quantityAlcalde;
+            $isAlcaldeObserved = $voteAlcalde && $voteAlcalde->vote_status === 'observed';
+        } else {
+            $quantityAlcalde = 0;
+            $isAlcaldeObserved = false;
+        }
 
-                        <?php if($userCan['observe']): ?>
-                            <button class="btn btn-sm btn-warning observe-table" data-table-id="<?php echo e($table->id); ?>" title="Observar">
-                                <i class="ri-chat-1-line"></i>
-                            </button>
-                        <?php endif; ?>
+        if ($concejal) {
+            $voteConcejal = $table->votes->firstWhere('candidate_id', $concejal->id);
+            $quantityConcejal = $voteConcejal ? $voteConcejal->quantity : 0;
+            $totalConcejal += $quantityConcejal;
+            $isConcejalObserved = $voteConcejal && $voteConcejal->vote_status === 'observed';
+        } else {
+            $quantityConcejal = 0;
+            $isConcejalObserved = false;
+        }
+    ?>
+    <tr class="<?php echo e($isAlcaldeObserved || $isConcejalObserved ? 'table-warning' : ''); ?>">
+        <td class="text-center fw-bold"><?php echo e($i + 1); ?></td>
 
-                        <?php if($userCan['correct'] && $table->validation_status === 'observed'): ?>
-                            <button class="btn btn-sm btn-warning correct-table" data-table-id="<?php echo e($table->id); ?>" title="Corregir">
-                                <i class="ri-refund-line"></i>
-                            </button>
-                        <?php endif; ?>
-
-                        <?php if($userCan['validate'] && $table->validation_status === 'reviewed'): ?>
-                            <button class="btn btn-sm btn-success validate-table" data-table-id="<?php echo e($table->id); ?>" title="Validar">
-                                <i class="ri-check-line"></i>
-                            </button>
-                        <?php endif; ?>
-
-                        <?php if($userCan['upload_acta']): ?>
-                            <button class="btn btn-sm btn-info upload-acta" data-table-id="<?php echo e($table->id); ?>" title="Subir acta">
-                                <i class="ri-upload-line"></i>
-                            </button>
-                        <?php endif; ?>
-
-                        <?php if($userCan['close']): ?>
-                            <button class="btn btn-sm btn-secondary close-table" data-table-id="<?php echo e($table->id); ?>" title="Cerrar mesa">
-                                <i class="ri-lock-line"></i>
-                            </button>
-                        <?php endif; ?>
+        
+        <td>
+            <?php if($alcalde || $concejal): ?>
+                <?php $party = $alcalde->party ?? $concejal->party; ?>
+                <div class="d-flex align-items-center">
+                    <?php
+                        $logo = $alcalde->party_logo ?? $concejal->party_logo ?? null;
+                        $color = $alcalde->color ?? $concejal->color ?? '#0ab39c';
+                    ?>
+                    <?php if($logo): ?>
+                        <img src="<?php echo e(asset('storage/' . $logo)); ?>"
+                             width="20" height="20"
+                             class="me-1 rounded"
+                             style="object-fit: contain;">
                     <?php else: ?>
-                        <span class="text-muted small">Cerrada</span>
+                        <span class="candidate-color" style="background-color: <?php echo e($color); ?>; width: 16px; height: 16px; border-radius: 4px; display: inline-block; margin-right: 4px;"></span>
+                    <?php endif; ?>
+                    <span class="small"><?php echo e($party); ?></span>
+                </div>
+            <?php endif; ?>
+        </td>
+
+        
+        <td class="table-primary">
+            <?php if($alcalde): ?>
+                <div class="d-flex align-items-center">
+                    <?php if($alcalde->photo): ?>
+                        <img src="<?php echo e(asset('storage/' . $alcalde->photo)); ?>"
+                             class="rounded-circle me-1"
+                             width="20" height="20"
+                             style="object-fit: cover;">
+                    <?php endif; ?>
+                    <span class="small"><?php echo e(Str::limit($alcalde->name, 25)); ?></span>
+                    <?php if($isAlcaldeObserved): ?>
+                        <i class="ri-alert-line text-danger ms-1" title="Observado"></i>
                     <?php endif; ?>
                 </div>
-            </div>
-        </div>
-    </div>
+            <?php else: ?>
+                <span class="text-muted fst-italic small">---</span>
+            <?php endif; ?>
+        </td>
 
-    <div class="card-body">
-        <!-- Barra de estado de validación -->
-        <div class="row mb-2">
-            <div class="col-12">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <small class="text-muted">Estado:</small>
+        
+        <td class="table-primary text-center">
+            <?php if($alcalde): ?>
+                <input type="number"
+                       class="form-control form-control-sm vote-input text-center"
+                       data-table="<?php echo e($table->id); ?>"
+                       data-candidate="<?php echo e($alcalde->id); ?>"
+                       data-category="alcalde"
+                       value="<?php echo e($quantityAlcalde); ?>"
+                       min="0"
+                       max="<?php echo e($table->expected_voters ?? 9999); ?>"
+                       step="1"
+                       <?php echo e($isDisabled ? 'disabled' : ''); ?>
 
-                    <?php
-                        $validationColors = [
-                            'pending' => 'warning',
-                            'reviewed' => 'info',
-                            'observed' => 'danger',
-                            'corrected' => 'primary',
-                            'validated' => 'success',
-                            'approved' => 'success',
-                            'rejected' => 'dark'
-                        ];
-                        $validationLabels = [
-                            'pending' => 'Pendiente',
-                            'reviewed' => 'Revisado',
-                            'observed' => 'Observado',
-                            'corrected' => 'Corregido',
-                            'validated' => 'Validado',
-                            'approved' => 'Aprobado',
-                            'rejected' => 'Rechazado'
-                        ];
-                    ?>
+                       style="width: 70px; margin: 0 auto; <?php echo e($isAlcaldeObserved ? 'border-color: #f06548;' : ''); ?>">
+            <?php endif; ?>
+        </td>
 
-                    <span class="badge bg-<?php echo e($validationColors[$table->validation_status] ?? 'secondary'); ?>">
-                        <?php echo e($validationLabels[$table->validation_status] ?? $table->validation_status); ?>
+        
+        <td class="table-primary text-center">
+            <?php if($alcalde && $userCan['observe'] && !$isDisabled): ?>
+                <input type="checkbox"
+                       class="form-check-input observe-checkbox"
+                       data-table="<?php echo e($table->id); ?>"
+                       data-candidate="<?php echo e($alcalde->id); ?>"
+                       data-category="alcalde"
+                       data-candidate-name="<?php echo e($alcalde->name); ?>"
+                       <?php echo e($isAlcaldeObserved ? 'checked' : ''); ?>
 
-                    </span>
+                       <?php echo e($isAlcaldeObserved ? 'disabled' : ''); ?>
 
-                    <?php if($table->verified_by): ?>
-                        <small class="text-muted">
-                            <i class="ri-user-line"></i> Revisado: <?php echo e($table->verified_at ? \Carbon\Carbon::parse($table->verified_at)->format('d/m H:i') : ''); ?>
+                       title="Marcar como observado">
+            <?php elseif($isAlcaldeObserved): ?>
+                <i class="ri-checkbox-circle-fill text-warning" title="Observado"></i>
+            <?php endif; ?>
+        </td>
 
-                        </small>
+        
+        <td class="table-success">
+            <?php if($concejal): ?>
+                <div class="d-flex align-items-center">
+                    <?php if($concejal->photo): ?>
+                        <img src="<?php echo e(asset('storage/' . $concejal->photo)); ?>"
+                             class="rounded-circle me-1"
+                             width="20" height="20"
+                             style="object-fit: cover;">
                     <?php endif; ?>
-
-                    <?php if($table->validated_by): ?>
-                        <small class="text-muted">
-                            <i class="ri-check-double-line"></i> Validado: <?php echo e($table->validated_at ? \Carbon\Carbon::parse($table->validated_at)->format('d/m H:i') : ''); ?>
-
-                        </small>
-                    <?php endif; ?>
-
-                    <?php if($table->ballots_received > 0): ?>
-                        <small class="text-muted">
-                            <i class="ri-file-copy-line"></i> Papeletas: <?php echo e($table->ballots_used); ?>/<?php echo e($table->ballots_received); ?>
-
-                        </small>
+                    <span class="small"><?php echo e(Str::limit($concejal->name, 25)); ?></span>
+                    <?php if($isConcejalObserved): ?>
+                        <i class="ri-alert-line text-danger ms-1" title="Observado"></i>
                     <?php endif; ?>
                 </div>
-            </div>
-        </div>
+            <?php else: ?>
+                <span class="text-muted fst-italic small">---</span>
+            <?php endif; ?>
+        </td>
 
-        <!-- Tabla de votos - ALCALDES -->
-        <h6 class="text-primary mb-2">
-            <i class="ri-user-star-line me-1"></i>
-            Alcaldes
-        </h6>
-        <div class="table-responsive mb-3">
-            <table class="table table-sm table-bordered">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 40%">Candidato</th>
-                        <th style="width: 40%">Partido</th>
-                        <th style="width: 20%">Votos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                        $alcaldeCandidates = $candidatesByCategory['alcalde'] ?? collect();
-                        $totalAlcalde = 0;
-                    ?>
-                    <?php $__empty_1 = true; $__currentLoopData = $alcaldeCandidates; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $candidate): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                        <?php
-                            $vote = $table->votes->firstWhere('candidate_id', $candidate->id);
-                            $quantity = $vote ? $vote->quantity : 0;
-                            $totalAlcalde += $quantity;
-                            $isDisabled = in_array($table->status, ['cerrada', 'escrutada', 'transmitida', 'anulada']) ||
-                                         ($table->validation_status === 'validated' && !$userCan['correct']) ||
-                                         ($table->validation_status === 'approved');
-                        ?>
-                        <tr>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <span class="candidate-color" style="background-color: <?php echo e($candidate->color ?? '#0ab39c'); ?>; width: 20px; height: 20px; border-radius: 4px; display: inline-block; margin-right: 8px;"></span>
-                                    <span class="ms-2"><?php echo e($candidate->name); ?></span>
-                                </div>
-                            </td>
-                            <td><?php echo e($candidate->party); ?></td>
-                            <td>
-                                <input type="number"
-                                       class="form-control form-control-sm vote-input candidate-vote"
-                                       data-table="<?php echo e($table->id); ?>"
-                                       data-candidate="<?php echo e($candidate->id); ?>"
-                                       data-category="alcalde"
-                                       value="<?php echo e($quantity); ?>"
-                                       min="0"
-                                       max="<?php echo e($table->expected_voters ?? 9999); ?>"
-                                       <?php echo e($isDisabled ? 'disabled' : ''); ?>>
-                            </td>
-                        </tr>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                        <tr>
-                            <td colspan="3" class="text-center text-muted">
-                                No hay candidatos a Alcalde disponibles
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+        
+        <td class="table-success text-center">
+            <?php if($concejal): ?>
+                <input type="number"
+                       class="form-control form-control-sm vote-input text-center"
+                       data-table="<?php echo e($table->id); ?>"
+                       data-candidate="<?php echo e($concejal->id); ?>"
+                       data-category="concejal"
+                       value="<?php echo e($quantityConcejal); ?>"
+                       min="0"
+                       max="<?php echo e($table->expected_voters ?? 9999); ?>"
+                       step="1"
+                       <?php echo e($isDisabled ? 'disabled' : ''); ?>
 
-        <!-- Tabla de votos - CONCEJALES -->
-        <h6 class="text-success mb-2">
-            <i class="ri-group-line me-1"></i>
-            Concejales
-        </h6>
-        <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 40%">Candidato</th>
-                        <th style="width: 40%">Partido</th>
-                        <th style="width: 20%">Votos</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php
-                        $concejalCandidates = $candidatesByCategory['concejal'] ?? collect();
-                        $totalConcejal = 0;
-                    ?>
-                    <?php $__empty_1 = true; $__currentLoopData = $concejalCandidates; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $candidate): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                        <?php
-                            $vote = $table->votes->firstWhere('candidate_id', $candidate->id);
-                            $quantity = $vote ? $vote->quantity : 0;
-                            $totalConcejal += $quantity;
-                            $isDisabled = in_array($table->status, ['cerrada', 'escrutada', 'transmitida', 'anulada']) ||
-                                         ($table->validation_status === 'validated' && !$userCan['correct']) ||
-                                         ($table->validation_status === 'approved');
-                        ?>
-                        <tr>
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <span class="candidate-color" style="background-color: <?php echo e($candidate->color ?? '#0ab39c'); ?>; width: 20px; height: 20px; border-radius: 4px; display: inline-block; margin-right: 8px;"></span>
-                                    <span class="ms-2"><?php echo e($candidate->name); ?></span>
-                                </div>
-                            </td>
-                            <td><?php echo e($candidate->party); ?></td>
-                            <td>
-                                <input type="number"
-                                       class="form-control form-control-sm vote-input candidate-vote"
-                                       data-table="<?php echo e($table->id); ?>"
-                                       data-candidate="<?php echo e($candidate->id); ?>"
-                                       data-category="concejal"
-                                       value="<?php echo e($quantity); ?>"
-                                       min="0"
-                                       max="<?php echo e($table->expected_voters ?? 9999); ?>"
-                                       <?php echo e($isDisabled ? 'disabled' : ''); ?>>
-                            </td>
-                        </tr>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                        <tr>
-                            <td colspan="3" class="text-center text-muted">
-                                No hay candidatos a Concejal disponibles
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-                <tfoot class="table-info">
-                    <tr>
-                        <th colspan="2" class="text-end">Total Alcalde:</th>
-                        <th>
-                            <span class="fw-bold" id="total-alcalde-<?php echo e($table->id); ?>"><?php echo e($totalAlcalde); ?></span>
-                        </th>
-                    </tr>
-                    <tr>
-                        <th colspan="2" class="text-end">Total Concejal:</th>
-                        <th>
-                            <span class="fw-bold" id="total-concejal-<?php echo e($table->id); ?>"><?php echo e($totalConcejal); ?></span>
-                        </th>
-                    </tr>
-                    <tr class="table-secondary">
-                        <th colspan="2" class="text-end">Total General:</th>
-                        <th>
-                            <span class="fw-bold" id="total-<?php echo e($table->id); ?>"><?php echo e($totalAlcalde + $totalConcejal); ?></span>
-                        </th>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-    </div>
-</div>
+                       style="width: 70px; margin: 0 auto; <?php echo e($isConcejalObserved ? 'border-color: #f06548;' : ''); ?>">
+            <?php endif; ?>
+        </td>
+
+        
+        <td class="table-success text-center">
+            <?php if($concejal && $userCan['observe'] && !$isDisabled): ?>
+                <input type="checkbox"
+                       class="form-check-input observe-checkbox"
+                       data-table="<?php echo e($table->id); ?>"
+                       data-candidate="<?php echo e($concejal->id); ?>"
+                       data-category="concejal"
+                       data-candidate-name="<?php echo e($concejal->name); ?>"
+                       <?php echo e($isConcejalObserved ? 'checked' : ''); ?>
+
+                       <?php echo e($isConcejalObserved ? 'disabled' : ''); ?>
+
+                       title="Marcar como observado">
+            <?php elseif($isConcejalObserved): ?>
+                <i class="ri-checkbox-circle-fill text-warning" title="Observado"></i>
+            <?php endif; ?>
+        </td>
+    </tr>
+<?php endfor; ?>
+
+
+<?php if($nuloAlcalde || $nuloConcejal): ?>
+<tr class="table-secondary">
+    <td class="text-center"><?php echo e($maxRows + 1); ?></td>
+    <td>-</td>
+
+    
+    <td class="table-primary fw-bold">NULO</td>
+    <td class="table-primary text-center">
+        <?php if($nuloAlcalde): ?>
+            <?php
+                $vote = $table->votes->firstWhere('candidate_id', $nuloAlcalde->id);
+                $quantity = $vote ? $vote->quantity : 0;
+                $totalAlcalde += $quantity;
+                $isObserved = $vote && $vote->vote_status === 'observed';
+            ?>
+            <input type="number"
+                   class="form-control form-control-sm vote-input text-center"
+                   data-table="<?php echo e($table->id); ?>"
+                   data-candidate="<?php echo e($nuloAlcalde->id); ?>"
+                   data-category="alcalde"
+                   value="<?php echo e($quantity); ?>"
+                   min="0"
+                   <?php echo e($isDisabled ? 'disabled' : ''); ?>
+
+                   style="width: 70px; margin: 0 auto; <?php echo e($isObserved ? 'border-color: #f06548;' : ''); ?>">
+        <?php endif; ?>
+    </td>
+    <td class="table-primary text-center">
+        <?php if($nuloAlcalde && $userCan['observe'] && !$isDisabled): ?>
+            <input type="checkbox"
+                   class="form-check-input observe-checkbox"
+                   data-table="<?php echo e($table->id); ?>"
+                   data-candidate="<?php echo e($nuloAlcalde->id); ?>"
+                   data-category="alcalde"
+                   data-candidate-name="NULO"
+                   <?php echo e($isObserved ? 'checked' : ''); ?>
+
+                   <?php echo e($isObserved ? 'disabled' : ''); ?>>
+        <?php elseif($isObserved): ?>
+            <i class="ri-checkbox-circle-fill text-warning"></i>
+        <?php endif; ?>
+    </td>
+
+    
+    <td class="table-success fw-bold">NULO</td>
+    <td class="table-success text-center">
+        <?php if($nuloConcejal): ?>
+            <?php
+                $vote = $table->votes->firstWhere('candidate_id', $nuloConcejal->id);
+                $quantity = $vote ? $vote->quantity : 0;
+                $totalConcejal += $quantity;
+                $isObserved = $vote && $vote->vote_status === 'observed';
+            ?>
+            <input type="number"
+                   class="form-control form-control-sm vote-input text-center"
+                   data-table="<?php echo e($table->id); ?>"
+                   data-candidate="<?php echo e($nuloConcejal->id); ?>"
+                   data-category="concejal"
+                   value="<?php echo e($quantity); ?>"
+                   min="0"
+                   <?php echo e($isDisabled ? 'disabled' : ''); ?>
+
+                   style="width: 70px; margin: 0 auto; <?php echo e($isObserved ? 'border-color: #f06548;' : ''); ?>">
+        <?php endif; ?>
+    </td>
+    <td class="table-success text-center">
+        <?php if($nuloConcejal && $userCan['observe'] && !$isDisabled): ?>
+            <input type="checkbox"
+                   class="form-check-input observe-checkbox"
+                   data-table="<?php echo e($table->id); ?>"
+                   data-candidate="<?php echo e($nuloConcejal->id); ?>"
+                   data-category="concejal"
+                   data-candidate-name="NULO"
+                   <?php echo e($isObserved ? 'checked' : ''); ?>
+
+                   <?php echo e($isObserved ? 'disabled' : ''); ?>>
+        <?php elseif($isObserved): ?>
+            <i class="ri-checkbox-circle-fill text-warning"></i>
+        <?php endif; ?>
+    </td>
+</tr>
+<?php endif; ?>
+
+
+<?php if($blancoAlcalde || $blancoConcejal): ?>
+<tr class="table-secondary">
+    <td class="text-center"><?php echo e($maxRows + 2); ?></td>
+    <td>-</td>
+
+    
+    <td class="table-primary fw-bold">BLANCO</td>
+    <td class="table-primary text-center">
+        <?php if($blancoAlcalde): ?>
+            <?php
+                $vote = $table->votes->firstWhere('candidate_id', $blancoAlcalde->id);
+                $quantity = $vote ? $vote->quantity : 0;
+                $totalAlcalde += $quantity;
+                $isObserved = $vote && $vote->vote_status === 'observed';
+            ?>
+            <input type="number"
+                   class="form-control form-control-sm vote-input text-center"
+                   data-table="<?php echo e($table->id); ?>"
+                   data-candidate="<?php echo e($blancoAlcalde->id); ?>"
+                   data-category="alcalde"
+                   value="<?php echo e($quantity); ?>"
+                   min="0"
+                   <?php echo e($isDisabled ? 'disabled' : ''); ?>
+
+                   style="width: 70px; margin: 0 auto; <?php echo e($isObserved ? 'border-color: #f06548;' : ''); ?>">
+        <?php endif; ?>
+    </td>
+    <td class="table-primary text-center">
+        <?php if($blancoAlcalde && $userCan['observe'] && !$isDisabled): ?>
+            <input type="checkbox"
+                   class="form-check-input observe-checkbox"
+                   data-table="<?php echo e($table->id); ?>"
+                   data-candidate="<?php echo e($blancoAlcalde->id); ?>"
+                   data-category="alcalde"
+                   data-candidate-name="BLANCO"
+                   <?php echo e($isObserved ? 'checked' : ''); ?>
+
+                   <?php echo e($isObserved ? 'disabled' : ''); ?>>
+        <?php elseif($isObserved): ?>
+            <i class="ri-checkbox-circle-fill text-warning"></i>
+        <?php endif; ?>
+    </td>
+
+    
+    <td class="table-success fw-bold">BLANCO</td>
+    <td class="table-success text-center">
+        <?php if($blancoConcejal): ?>
+            <?php
+                $vote = $table->votes->firstWhere('candidate_id', $blancoConcejal->id);
+                $quantity = $vote ? $vote->quantity : 0;
+                $totalConcejal += $quantity;
+                $isObserved = $vote && $vote->vote_status === 'observed';
+            ?>
+            <input type="number"
+                   class="form-control form-control-sm vote-input text-center"
+                   data-table="<?php echo e($table->id); ?>"
+                   data-candidate="<?php echo e($blancoConcejal->id); ?>"
+                   data-category="concejal"
+                   value="<?php echo e($quantity); ?>"
+                   min="0"
+                   <?php echo e($isDisabled ? 'disabled' : ''); ?>
+
+                   style="width: 70px; margin: 0 auto; <?php echo e($isObserved ? 'border-color: #f06548;' : ''); ?>">
+        <?php endif; ?>
+    </td>
+    <td class="table-success text-center">
+        <?php if($blancoConcejal && $userCan['observe'] && !$isDisabled): ?>
+            <input type="checkbox"
+                   class="form-check-input observe-checkbox"
+                   data-table="<?php echo e($table->id); ?>"
+                   data-candidate="<?php echo e($blancoConcejal->id); ?>"
+                   data-category="concejal"
+                   data-candidate-name="BLANCO"
+                   <?php echo e($isObserved ? 'checked' : ''); ?>
+
+                   <?php echo e($isObserved ? 'disabled' : ''); ?>>
+        <?php elseif($isObserved): ?>
+            <i class="ri-checkbox-circle-fill text-warning"></i>
+        <?php endif; ?>
+    </td>
+</tr>
+<?php endif; ?>
+
+
+<tr class="table-info fw-bold">
+    <td colspan="2" class="text-end">TOTALES:</td>
+    <td class="table-primary text-center" colspan="2">
+        <span id="total-alcalde-<?php echo e($table->id); ?>"><?php echo e($totalAlcalde); ?></span>
+    </td>
+    <td class="table-primary"></td>
+    <td class="table-success text-center" colspan="2">
+        <span id="total-concejal-<?php echo e($table->id); ?>"><?php echo e($totalConcejal); ?></span>
+    </td>
+    <td class="table-success"></td>
+</tr>
 <?php /**PATH D:\_Mine\corporate\resources\views/voting-table-votes/partials/table-row.blade.php ENDPATH**/ ?>

@@ -29,40 +29,42 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/{user}', [UserController::class, 'update'])->name('update');
         Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
         Route::post('/{user}/activate', [UserController::class, 'activate'])->name('activate');
-        Route::get('/{user}/assign-recinto', [UserController::class, 'assignRecintoForm'])->name('assign-recinto.form');
-        Route::post('/{user}/assign-recinto', [UserController::class, 'assignRecinto'])->name('assign-recinto');
+        Route::get('/{user}/assign-roles', [UserController::class, 'assignRolesForm'])->name('assign-roles.form');
+        Route::post('/{user}/assign-roles', [UserController::class, 'assignRoles'])->name('assign-roles');
+        Route::get('/{user}/permissions', [UserController::class, 'permissionsForm'])->name('permissions.form');
+        Route::put('/{user}/permissions', [UserController::class, 'updatePermissions'])->name('permissions.update');
+        Route::get('/{user}/assign-institution', [UserController::class, 'assignInstitutionForm'])->name('assign-institution.form');
+        Route::post('/{user}/assign-institution', [UserController::class, 'assignInstitution'])->name('assign-institution');
         Route::get('/{user}/assign-table', [UserController::class, 'assignTableForm'])->name('assign-table.form');
         Route::post('/{user}/assign-table', [UserController::class, 'assignTable'])->name('assign-table');
-        Route::delete('/{user}/{type}/assignment/{assignmentId}/remove', [UserController::class, 'removeAssignment'])->name('remove-assignment');
+        Route::delete('/{user}/assignment/{assignment}', [UserController::class, 'removeAssignment'])->name('remove-assignment');
+        Route::get('/check-email', [UserController::class, 'checkEmail'])->name('users.check-email');
     });
-
     // ===== INSTITUCIONES (RECINTOS) =====
-// En tu archivo routes/web.php, actualiza las rutas de instituciones:
+    Route::prefix('institutions')->name('institutions.')->group(function () {
+        // Export/Import
+        Route::get('/export-all', [InstitutionController::class, 'exportAll'])->name('export-all');
+        Route::post('/export-selected', [InstitutionController::class, 'exportSelected'])->name('export-selected');
+        Route::get('/template', [InstitutionController::class, 'downloadTemplate'])->name('template');
+        Route::post('/import', [InstitutionController::class, 'import'])->name('import');
+        Route::post('/delete-multiple', [InstitutionController::class, 'deleteMultiple'])->name('deleteMultiple');
 
-Route::prefix('institutions')->name('institutions.')->group(function () {
-    // Export/Import
-    Route::get('/export-all', [InstitutionController::class, 'exportAll'])->name('export-all');
-    Route::post('/export-selected', [InstitutionController::class, 'exportSelected'])->name('export-selected');
-    Route::get('/template', [InstitutionController::class, 'downloadTemplate'])->name('template');
-    Route::post('/import', [InstitutionController::class, 'import'])->name('import');
-    Route::post('/delete-multiple', [InstitutionController::class, 'deleteMultiple'])->name('deleteMultiple');
+        // Carga dinámica (CORREGIDO - sin parámetros en el nombre de la ruta)
+        Route::get('/provinces/{department}', [InstitutionController::class, 'getProvinces'])->name('provinces');
+        Route::get('/municipalities/{province}', [InstitutionController::class, 'getMunicipalities'])->name('municipalities');
+        Route::get('/localities/{municipality}', [InstitutionController::class, 'getLocalities'])->name('localities');
+        Route::get('/districts/{locality}', [InstitutionController::class, 'getDistricts'])->name('districts');
+        Route::get('/zones/{district}', [InstitutionController::class, 'getZones'])->name('zones');
 
-    // Carga dinámica (CORREGIDO - sin parámetros en el nombre de la ruta)
-    Route::get('/provinces/{department}', [InstitutionController::class, 'getProvinces'])->name('provinces');
-    Route::get('/municipalities/{province}', [InstitutionController::class, 'getMunicipalities'])->name('municipalities');
-    Route::get('/localities/{municipality}', [InstitutionController::class, 'getLocalities'])->name('localities');
-    Route::get('/districts/{locality}', [InstitutionController::class, 'getDistricts'])->name('districts');
-    Route::get('/zones/{district}', [InstitutionController::class, 'getZones'])->name('zones');
-
-    // CRUD
-    Route::get('/', [InstitutionController::class, 'index'])->name('index');
-    Route::get('/create', [InstitutionController::class, 'create'])->name('create');
-    Route::post('/', [InstitutionController::class, 'store'])->name('store');
-    Route::get('/{institution}', [InstitutionController::class, 'show'])->name('show');
-    Route::get('/{institution}/edit', [InstitutionController::class, 'edit'])->name('edit');
-    Route::put('/{institution}', [InstitutionController::class, 'update'])->name('update');
-    Route::delete('/{institution}', [InstitutionController::class, 'destroy'])->name('destroy');
-});
+        // CRUD
+        Route::get('/', [InstitutionController::class, 'index'])->name('index');
+        Route::get('/create', [InstitutionController::class, 'create'])->name('create');
+        Route::post('/', [InstitutionController::class, 'store'])->name('store');
+        Route::get('/{institution}', [InstitutionController::class, 'show'])->name('show');
+        Route::get('/{institution}/edit', [InstitutionController::class, 'edit'])->name('edit');
+        Route::put('/{institution}', [InstitutionController::class, 'update'])->name('update');
+        Route::delete('/{institution}', [InstitutionController::class, 'destroy'])->name('destroy');
+    });
 
     // ===== MESAS ELECTORALES =====
     Route::prefix('voting-tables')->name('voting-tables.')->group(function () {
@@ -103,28 +105,28 @@ Route::prefix('institutions')->name('institutions.')->group(function () {
     // ===== VOTOS =====
     Route::prefix('voting-table-votes')->name('voting-table-votes.')->group(function () {
         Route::get('/', [VotingTableVoteController::class, 'index'])->name('index');
-        Route::post('/register', [VotingTableVoteController::class, 'registerVotes'])->name('register');
-        Route::post('/register-all', [VotingTableVoteController::class, 'registerAllVotes'])->name('register-all');
-        Route::get('/table/{table}', [VotingTableVoteController::class, 'getTableVotes'])->name('table');
+        Route::post('register', [VotingTableVoteController::class, 'registerVotes'])->name('register');
+        Route::post('register-all', [VotingTableVoteController::class, 'registerAllVotes'])->name('register-all');
+        Route::post('{tableId}/review', [VotingTableVoteController::class, 'reviewTable'])->name('review');
+        Route::post('{tableId}/validate', [VotingTableVoteController::class, 'validateTable'])->name('validate');
+        Route::post('{tableId}/correct', [VotingTableVoteController::class, 'correctTable'])->name('correct');
+        Route::post('{tableId}/close', [VotingTableVoteController::class, 'closeTable'])->name('close');
+        Route::get('{tableId}/votes', [VotingTableVoteController::class, 'getTableVotes'])->name('votes');
+        Route::get('{tableId}/stats', [VotingTableVoteController::class, 'getTableStats'])->name('stats');
     });
-
-    // ===== ACTAS =====
-    Route::prefix('actas')->name('actas.')->group(function () {
-        Route::get('/', [ActaController::class, 'index'])->name('index');
-        Route::post('/upload', [ActaController::class, 'upload'])->name('upload');
-        Route::get('/{acta}', [ActaController::class, 'show'])->name('show');
-        Route::delete('/{acta}', [ActaController::class, 'destroy'])->name('destroy');
-        Route::post('/{acta}/verify', [ActaController::class, 'verify'])->name('verify');
-        Route::get('/table/{table}', [ActaController::class, 'getByTable'])->name('by-table');
-    });
-
-    // ===== OBSERVACIONES =====
     Route::prefix('observations')->name('observations.')->group(function () {
-        Route::get('/', [ObservationController::class, 'index'])->name('index');
         Route::post('/', [ObservationController::class, 'store'])->name('store');
-        Route::get('/{observation}', [ObservationController::class, 'show'])->name('show');
-        Route::post('/{observation}/resolve', [ObservationController::class, 'resolve'])->name('resolve');
-        Route::get('/table/{table}', [ObservationController::class, 'getByTable'])->name('by-table');
+        Route::post('{id}/resolve', [ObservationController::class, 'resolve'])->name('resolve');
+        Route::get('table/{tableId}', [ObservationController::class, 'getTableObservations'])->name('table');
+        Route::get('stats', [ObservationController::class, 'getStats'])->name('stats');
+    });
+    Route::prefix('actas')->name('actas.')->group(function () {
+        // Route::post('/', [ActaController::class, 'store'])->name('store');
+        Route::post('/upload', [ActaController::class, 'store'])->name('upload');
+        Route::post('{id}/verify', [ActaController::class, 'verify'])->name('verify');
+        Route::post('{id}/observe', [ActaController::class, 'observe'])->name('observe');
+        Route::post('{id}/approve', [ActaController::class, 'approve'])->name('approve');
+        Route::get('table/{tableId}', [ActaController::class, 'getTableActas'])->name('table');
     });
 
     // ===== PERFIL =====

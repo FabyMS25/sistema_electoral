@@ -37,9 +37,10 @@ class Acta extends Model
         'is_signed',
         'signed_at',
         'signed_by',
-        'has_physical_acta'
+        'is_consistent',
+        'inconsistencies',
     ];
-    
+
     protected $casts = [
         'total_votes' => 'integer',
         'blank_votes' => 'integer',
@@ -48,14 +49,12 @@ class Acta extends Model
         'file_size' => 'integer',
         'metadata' => 'array',
         'ocr_data' => 'array',
+        'inconsistencies' => 'array',
         'ocr_processed' => 'boolean',
         'is_signed' => 'boolean',
-        'has_physical_acta' => 'boolean',
+        'is_consistent' => 'boolean',
         'ocr_processed_at' => 'datetime',
         'signed_at' => 'datetime',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'is_consistent' => 'boolean',
     ];
 
     const STATUS_UPLOADED = 'uploaded';
@@ -76,6 +75,18 @@ class Acta extends Model
             self::STATUS_REJECTED => 'Rechazada',
         ];
     }
+    public function getStatusBadgeAttribute(): string
+    {
+        return match($this->status) {
+            self::STATUS_UPLOADED => '<span class="badge bg-info">Subida</span>',
+            self::STATUS_VERIFIED => '<span class="badge bg-success">Verificada</span>',
+            self::STATUS_OBSERVED => '<span class="badge bg-warning">Observada</span>',
+            self::STATUS_CORRECTED => '<span class="badge bg-primary">Corregida</span>',
+            self::STATUS_APPROVED => '<span class="badge bg-success">Aprobada</span>',
+            self::STATUS_REJECTED => '<span class="badge bg-danger">Rechazada</span>',
+            default => '<span class="badge bg-secondary">Desconocido</span>',
+        };
+    }
 
     public function votingTable(): BelongsTo
     {
@@ -93,20 +104,100 @@ class Acta extends Model
     {
         return $this->belongsTo(User::class, 'signed_by');
     }
-    
-    public function getStatusBadgeAttribute(): string
+
+    // ===== MÉTODOS DE ACCIÓN =====
+    public function verifyConsistency(VotingTable $votingTable)
     {
-        return match($this->status) {
-            self::STATUS_UPLOADED => '<span class="badge bg-info">Subida</span>',
-            self::STATUS_VERIFIED => '<span class="badge bg-success">Verificada</span>',
-            self::STATUS_OBSERVED => '<span class="badge bg-warning">Observada</span>',
-            self::STATUS_CORRECTED => '<span class="badge bg-primary">Corregida</span>',
-            self::STATUS_APPROVED => '<span class="badge bg-success">Aprobada</span>',
-            self::STATUS_REJECTED => '<span class="badge bg-danger">Rechazada</span>',
-            default => '<span class="badge bg-secondary">Desconocido</span>',
-        };
+        $inconsistencies = [];
+        $isConsistent = true;
+
+        // Verificar total de votos
+        if ($this->total_votes !== $votingTable->total_voters) {
+            $inconsistencies[] = "Total de votos: Acta {$this->total_votes} vs Mesa {$votingTable->total_voters}";
+            $isConsistent = false;
+        }
+
+        // Verificar votos válidos
+        if ($this->valid_votes !== $votingTable->valid_votes) {
+            $inconsistencies[] = "Votos válidos: Acta {$this->valid_votes} vs Mesa {$votingTable->valid_votes}";
+            $isConsistent = false;
+        }
+
+        // Verificar votos en blanco
+        if ($this->blank_votes !== $votingTable->blank_votes) {
+            $inconsistencies[] = "Votos en blanco: Acta {$this->blank_votes} vs Mesa {$votingTable->blank_votes}";
+            $isConsistent = false;
+        }
+
+        // Verificar votos nulos
+        if ($this->null_votes !== $votingTable->null_votes) {
+            $inconsistencies[] = "Votos nulos: Acta {$this->null_votes} vs Mesa {$votingTable->null_votes}";
+            $isConsistent = false;
+        }
+
+        $this->is_consistent = $isConsistent;
+        $this->inconsistencies = $inconsistencies;
+        $this->save();
+
+        return $isConsistent;
     }
 
+    public function markAsVerified($userId)
+    {
+        $this->update([
+            'status' => self::STATUS_VERIFIED,
+        ]);
+
+        // Crear observación si hay inconsistencias
+        if (!$this->is_consistent && !empty($this->inconsistencies)) {
+            $observation = Observation::create([
+                'code' => Observation::generateCode(),
+                'type' => Observation::TYPE_INCONSISTENCIA_ACTA,
+                'description' => 'Inconsistencias detectadas en el acta: ' . implode(', ', $this->inconsistencies),
+                'severity' => Observation::SEVERITY_ERROR,
+                'status' => Observation::STATUS_PENDING,
+                'voting_table_id' => $this->voting_table_id,
+                'election_type_id' => $this->election_type_id,
+                'reviewed_by' => $userId,
+                'reviewer_role' => 'revisor',
+            ]);
+
+            $this->votingTable->markAsObserved($userId, $observation->id, 'Acta con inconsistencias');
+        }
+    }
+
+    public function markAsObserved($userId, $notes = null)
+    {
+        $this->update([
+            'status' => self::STATUS_OBSERVED,
+        ]);
+
+        Observation::create([
+            'code' => Observation::generateCode(),
+            'type' => Observation::TYPE_ACTA_ILEGIBLE,
+            'description' => $notes ?? 'Acta observada durante revisión',
+            'severity' => Observation::SEVERITY_WARNING,
+            'status' => Observation::STATUS_PENDING,
+            'voting_table_id' => $this->voting_table_id,
+            'election_type_id' => $this->election_type_id,
+            'reviewed_by' => $userId,
+            'reviewer_role' => 'revisor',
+        ]);
+    }
+
+    public function markAsApproved($userId)
+    {
+        $this->update([
+            'status' => self::STATUS_APPROVED,
+            'is_signed' => true,
+            'signed_by' => $userId,
+            'signed_at' => now(),
+        ]);
+
+        $this->votingTable->markAsApproved($userId, 'Acta aprobada');
+    }
+
+    // ===== MÉTODOS DE CONSULTA =====
     public function getFileSizeFormattedAttribute(): string
     {
         $bytes = $this->file_size;
@@ -117,5 +208,22 @@ class Acta extends Model
             $i++;
         }
         return round($bytes, 2) . ' ' . $units[$i];
+    }
+
+    public static function generateCode(): string
+    {
+        $date = date('Ymd');
+        $lastActa = self::whereDate('created_at', today())
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if ($lastActa) {
+            $lastNumber = intval(substr($lastActa->code, -4));
+            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
+        } else {
+            $newNumber = '0001';
+        }
+
+        return "ACTA-{$date}-{$newNumber}";
     }
 }

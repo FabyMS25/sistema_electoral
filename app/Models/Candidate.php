@@ -78,6 +78,31 @@ class Candidate extends Model
     {
         return $this->belongsTo(Department::class);
     }
+    public function scopeBlankVotes($query)
+    {
+        return $query->where('type', 'blank_votes');
+    }
+
+    public function scopeNullVotes($query)
+    {
+        return $query->where('type', 'null_votes');
+    }
+    public function scopeRealCandidates($query)
+    {
+        return $query->where('type', 'candidato');
+    }
+    public function isBlankVote(): bool
+    {
+        return $this->type === 'blank_votes';
+    }
+    public function isNullVote(): bool
+    {
+        return $this->type === 'null_votes';
+    }
+    public function isRealCandidate(): bool
+    {
+        return $this->type === 'candidato';
+    }
 
     public function getPhotoUrlAttribute()
     {
@@ -109,37 +134,28 @@ class Candidate extends Model
         return $this->electionTypeCategory?->electionCategory;
     }
 
-    // Scope para candidatos activos
     public function scopeActive($query)
     {
         return $query->where('active', true);
     }
-
-    // Scope para candidatos por tipo de elección
     public function scopeByElectionType($query, $electionTypeId)
     {
         return $query->whereHas('electionTypeCategory', function($q) use ($electionTypeId) {
             $q->where('election_type_id', $electionTypeId);
         });
     }
-
-    // Scope para candidatos por categoría (por código)
     public function scopeByCategoryCode($query, $code)
     {
         return $query->whereHas('electionTypeCategory.electionCategory', function($q) use ($code) {
             $q->where('code', $code);
         });
     }
-
-    // Scope para candidatos de Alcalde
     public function scopeAlcaldes($query)
     {
         return $query->whereHas('electionTypeCategory.electionCategory', function($q) {
             $q->where('code', 'ALC');
         });
     }
-
-    // Scope para candidatos de Concejal
     public function scopeConcejales($query)
     {
         return $query->whereHas('electionTypeCategory.electionCategory', function($q) {
