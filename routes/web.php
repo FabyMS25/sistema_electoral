@@ -121,7 +121,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('stats', [ObservationController::class, 'getStats'])->name('stats');
     });
     Route::prefix('actas')->name('actas.')->group(function () {
-        // Route::post('/', [ActaController::class, 'store'])->name('store');
         Route::post('/upload', [ActaController::class, 'store'])->name('upload');
         Route::post('{id}/verify', [ActaController::class, 'verify'])->name('verify');
         Route::post('{id}/observe', [ActaController::class, 'observe'])->name('observe');

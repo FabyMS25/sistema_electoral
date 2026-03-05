@@ -35,68 +35,12 @@
 
 <?php $__env->startSection('content'); ?>
     <?php $__env->startComponent('components.breadcrumb'); ?>
-        <?php $__env->slot('li_1'); ?>
-            Votos
-        <?php $__env->endSlot(); ?>
-        <?php $__env->slot('title'); ?>
-            Registro de Votos - <?php echo e($electionType->name ?? 'Elecciones'); ?>
-
-        <?php $__env->endSlot(); ?>
+        <?php $__env->slot('li_1'); ?> Votos <?php $__env->endSlot(); ?>
+        <?php $__env->slot('title'); ?> Registro de Votos - <?php echo e($electionType->name ?? 'Elecciones'); ?> <?php $__env->endSlot(); ?>
     <?php echo $__env->renderComponent(); ?>
 
-    <div class="filter-section">
-        <form method="GET" action="<?php echo e(route('voting-table-votes.index')); ?>" class="row g-3">
-            <input type="hidden" name="election_type_id" value="<?php echo e($electionTypeId); ?>">
-            <div class="col-md-3">
-                <label class="form-label">Institución/Recinto</label>
-                <select name="institution_id" class="form-select">
-                    <option value="">Todas</option>
-                    <?php $__currentLoopData = $institutions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $institution): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($institution->id); ?>" <?php echo e(request('institution_id') == $institution->id ? 'selected' : ''); ?>>
-                            <?php echo e($institution->name); ?>
+    <?php echo $__env->make('voting-table-votes.partials.filters', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
-                        </option>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Estado Mesa</label>
-                <select name="status" class="form-select">
-                    <option value="">Todos</option>
-                    <?php $__currentLoopData = $statusLabels; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $value => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($value); ?>" <?php echo e(request('status') == $value ? 'selected' : ''); ?>>
-                            <?php echo e($label); ?>
-
-                        </option>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">Validación</label>
-                <select name="validation_status" class="form-select">
-                    <option value="">Todos</option>
-                    <?php $__currentLoopData = $validationLabels; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $value => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($value); ?>" <?php echo e(request('validation_status') == $value ? 'selected' : ''); ?>>
-                            <?php echo e($label); ?>
-
-                        </option>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">N° Mesa</label>
-                <input type="number" name="table_number" class="form-control" value="<?php echo e(request('table_number')); ?>">
-            </div>
-            <div class="col-md-3 d-flex align-items-end gap-2">
-                <button type="submit" class="btn btn-primary">
-                    <i class="ri-filter-3-line me-1"></i>Filtrar
-                </button>
-                <a href="<?php echo e(route('voting-table-votes.index', ['election_type_id' => $electionTypeId])); ?>" class="btn btn-secondary">
-                    <i class="ri-refresh-line me-1"></i>Limpiar
-                </a>
-            </div>
-        </form>
-    </div>
     <div class="row mb-2">
         <div class="col-md-3">
             <div class="card bg-primary text-white">
@@ -151,6 +95,7 @@
             </div>
         </div>
     </div>
+
     <div class="row">
         <div class="col-12">
             <?php $__empty_1 = true; $__currentLoopData = $votingTables->items(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $table): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
@@ -175,27 +120,19 @@
                         colors="primary:#121331,secondary:#08a88a" style="width:75px;height:75px">
                     </lord-icon>
                     <h5 class="mt-3">No hay mesas disponibles</h5>
-                    <p class="text-muted">
-                        No se encontraron mesas para los filtros seleccionados.
-                    </p>
+                    <p class="text-muted">No se encontraron mesas para los filtros seleccionados.</p>
                 </div>
             <?php endif; ?>
         </div>
     </div>
+
     <?php if($votingTables->hasPages()): ?>
     <div class="pagination-wrapper">
         <div class="d-flex justify-content-between">
             <div class="pagination-info">
                 Mostrando <?php echo e($votingTables->firstItem() ?? 0); ?> - <?php echo e($votingTables->lastItem() ?? 0); ?> de <?php echo e($votingTables->total()); ?> mesas
             </div>
-            <div class="pagination-info">
-                Página <?php echo e($votingTables->currentPage()); ?> de <?php echo e($votingTables->lastPage()); ?>
-
-            </div>
-            <div>
-                <?php echo e($votingTables->links()); ?>
-
-            </div>
+            <div><?php echo e($votingTables->links()); ?></div>
         </div>
     </div>
     <?php endif; ?>
@@ -212,7 +149,7 @@
             </div>
         </div>
     <?php endif; ?>
-    
+
     <?php echo $__env->make('voting-table-votes.partials.modals.observation-modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
     <?php echo $__env->make('voting-table-votes.partials.modals.upload-acta-modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
     <?php echo $__env->make('voting-table-votes.partials.modals.validation-modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
@@ -227,40 +164,77 @@
         var pendingTables = new Set();
         var saveTimeouts = {};
 
-        window.updateTableTotals = function(tableId) {
-            console.log('🔄 Actualizando totales para mesa:', tableId);
+window.updateTableTotals = function(tableId) {
+    console.log('🔄 Actualizando totales para mesa:', tableId);
 
-            const inputs = document.querySelectorAll(`#table-${tableId} .vote-input`);
-            let totalAlcalde = 0;
-            let totalConcejal = 0;
+    const inputs = document.querySelectorAll(`#table-${tableId} .vote-input`);
+    const categoryTotals = {};
 
-            inputs.forEach(input => {
-                const value = parseInt(input.value) || 0;
-                if (input.dataset.category === 'alcalde') {
-                    totalAlcalde += value;
-                } else if (input.dataset.category === 'concejal') {
-                    totalConcejal += value;
-                }
-            });
+    inputs.forEach(input => {
+        const value = parseInt(input.value) || 0;
+        const category = input.dataset.category;
 
-            const totalAlcaldeEl = document.getElementById(`total-alcalde-${tableId}`);
-            const totalConcejalEl = document.getElementById(`total-concejal-${tableId}`);
-            const totalEl = document.getElementById(`total-${tableId}`);
+        if (!categoryTotals[category]) {
+            categoryTotals[category] = 0;
+        }
+        categoryTotals[category] += value;
+    });
 
-            if (totalAlcaldeEl) totalAlcaldeEl.textContent = totalAlcalde;
-            if (totalConcejalEl) totalConcejalEl.textContent = totalConcejal;
-            if (totalEl) totalEl.textContent = totalAlcalde + totalConcejal;
+    console.log(`📊 Mesa ${tableId} - Totales por categoría:`, categoryTotals);
 
-            console.log(`📊 Mesa ${tableId} - Alcaldes: ${totalAlcalde}, Concejales: ${totalConcejal}, Total: ${totalAlcalde + totalConcejal}`);
+    // Actualizar totales por categoría
+    Object.entries(categoryTotals).forEach(([category, total]) => {
+        const el = document.getElementById(`total-${category}-${tableId}`);
+        if (el) {
+            el.textContent = total;
+        }
+    });
 
-            return { totalAlcalde, totalConcejal };
-        };
+    // Calcular total general (todas las categorías deberían tener el mismo total)
+    const totals = Object.values(categoryTotals);
+    const totalVotes = totals.length > 0 ? totals[0] : 0;
+
+    const totalEl = document.getElementById(`total-${tableId}`);
+    if (totalEl) {
+        totalEl.textContent = totalVotes;
+    }
+
+    // Actualizar contadores de selección
+    updateSelectedCounts(tableId);
+
+    return categoryTotals;
+};
+
+function updateSelectedCounts(tableId) {
+    const checkboxes = document.querySelectorAll(`#table-${tableId} .observe-checkbox:checked`);
+    const categoryCounts = {};
+
+    checkboxes.forEach(cb => {
+        const category = cb.dataset.category;
+        if (!categoryCounts[category]) categoryCounts[category] = 0;
+        categoryCounts[category]++;
+    });
+
+    const totalSelected = checkboxes.length;
+    const selectedCountEl = document.getElementById(`selected-count-${tableId}`);
+    if (selectedCountEl) selectedCountEl.textContent = totalSelected;
+
+    Object.entries(categoryCounts).forEach(([category, count]) => {
+        const el = document.getElementById(`selected-${category}-${tableId}`);
+        if (el) el.textContent = count;
+    });
+}
     </script>
+
+    <?php echo $__env->make('voting-table-votes.scripts.votes-table-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    <?php echo $__env->make('voting-table-votes.scripts.observations-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    <?php echo $__env->make('voting-table-votes.scripts.observations-by-vote-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+    <?php echo $__env->make('voting-table-votes.scripts.view-toggle-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Inicializando variables...');
 
-            // Verificar que las variables existen
             window.electionTypeId = <?php echo e($electionTypeId ?? 'null'); ?>;
             window.userPermissions = {
                 register: <?php echo e(auth()->user()->can('register_votes') ? 'true' : 'false'); ?>,
@@ -271,17 +245,12 @@
                 uploadActa: <?php echo e(auth()->user()->can('upload_actas') ? 'true' : 'false'); ?>
 
             };
-            console.log('✅ Variables inicializadas:', {
-                electionTypeId: window.electionTypeId,
-                userPermissions: window.userPermissions
-            });
 
-            // 🔴 IMPORTANTE: Inicializar los listeners después de que el DOM esté listo
+            console.log('✅ Variables inicializadas:', window.userPermissions);
+
             if (typeof window.initVoteListeners === 'function') {
                 window.initVoteListeners();
                 console.log('✅ Listeners de votos inicializados');
-            } else {
-                console.error('❌ Función initVoteListeners no encontrada');
             }
 
             if (typeof window.initObservationListeners === 'function') {
@@ -292,31 +261,21 @@
                 window.initViewToggle();
             }
 
-            // Inicializar atajos de teclado
             function initKeyboardShortcuts() {
                 document.addEventListener('keydown', function(e) {
                     if (e.ctrlKey && e.key === 's') {
                         e.preventDefault();
-                        if (typeof window.saveAllTables === 'function') {
-                            window.saveAllTables();
-                        }
+                        if (typeof window.saveAllTables === 'function') window.saveAllTables();
                     }
                     if (e.ctrlKey && e.key === 'c') {
                         e.preventDefault();
-                        if (typeof window.closeAllTables === 'function') {
-                            window.closeAllTables();
-                        }
+                        if (typeof window.closeAllTables === 'function') window.closeAllTables();
                     }
                 });
             }
             initKeyboardShortcuts();
         });
     </script>
-    <?php echo $__env->make('voting-table-votes.scripts.votes-table-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
-    <?php echo $__env->make('voting-table-votes.scripts.observations-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
-    <?php echo $__env->make('voting-table-votes.scripts.observations-by-vote-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
-    <?php echo $__env->make('voting-table-votes.scripts.view-toggle-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
-
 <?php $__env->stopSection(); ?>
 
 <?php echo $__env->make('layouts.master', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\_Mine\corporate\resources\views/voting-table-votes/index.blade.php ENDPATH**/ ?>

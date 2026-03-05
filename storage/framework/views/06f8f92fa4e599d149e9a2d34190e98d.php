@@ -1,4 +1,4 @@
-{{-- resources/views/voting-table-votes/partials/filters.blade.php --}}
+
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
@@ -9,31 +9,32 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form method="GET" action="{{ route('voting-table-votes.index') }}" id="filterForm" class="row g-3">
+                <form method="GET" action="<?php echo e(route('voting-table-votes.index')); ?>" id="filterForm" class="row g-3">
                     <div class="row">
                         <div class="col-md-3">
                             <label class="form-label fw-bold">Recinto/Institución</label>
                             <select name="institution_id" class="form-select select2" id="institutionFilter">
                                 <option value="">Todos los recintos</option>
-                                @foreach($institutions as $institution)
-                                    <option value="{{ $institution->id }}"
-                                        data-code="{{ $institution->code }}"
-                                        {{ ($institutionId ?? '') == $institution->id ? 'selected' : '' }}>
-                                        {{ $institution->name }} ({{ $institution->code }})
+                                <?php $__currentLoopData = $institutions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $institution): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($institution->id); ?>"
+                                        data-code="<?php echo e($institution->code); ?>"
+                                        <?php echo e(($institutionId ?? '') == $institution->id ? 'selected' : ''); ?>>
+                                        <?php echo e($institution->name); ?> (<?php echo e($institution->code); ?>)
                                     </option>
-                                @endforeach
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </select>
                         </div>
 
                         <div class="col-md-3">
                             <label class="form-label fw-bold">Tipo de Elección</label>
                             <select name="election_type_id" class="form-select select2" id="electionTypeFilter">
-                                @foreach($electionTypes as $type)
-                                    <option value="{{ $type->id }}"
-                                        {{ ($electionTypeId ?? '') == $type->id ? 'selected' : '' }}>
-                                        {{ $type->name }} - {{ \Carbon\Carbon::parse($type->election_date)->format('d/m/Y') }}
+                                <?php $__currentLoopData = $electionTypes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $type): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <option value="<?php echo e($type->id); ?>"
+                                        <?php echo e(($electionTypeId ?? '') == $type->id ? 'selected' : ''); ?>>
+                                        <?php echo e($type->name); ?> - <?php echo e(\Carbon\Carbon::parse($type->election_date)->format('d/m/Y')); ?>
+
                                     </option>
-                                @endforeach
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                             </select>
                         </div>
 
@@ -41,18 +42,18 @@
                             <label class="form-label fw-bold">Estado de Mesa</label>
                             <select name="status" class="form-select" id="statusFilter">
                                 <option value="">Todos</option>
-                                <option value="pendiente" {{ request('status') == 'pendiente' ? 'selected' : '' }}>Pendiente</option>
-                                <option value="en_proceso" {{ request('status') == 'en_proceso' ? 'selected' : '' }}>En Proceso</option>
-                                <option value="activo" {{ request('status') == 'activo' ? 'selected' : '' }}>Activo</option>
-                                <option value="cerrado" {{ request('status') == 'cerrado' ? 'selected' : '' }}>Cerrado</option>
-                                <option value="observado" {{ request('status') == 'observado' ? 'selected' : '' }}>Observado</option>
+                                <option value="pendiente" <?php echo e(request('status') == 'pendiente' ? 'selected' : ''); ?>>Pendiente</option>
+                                <option value="en_proceso" <?php echo e(request('status') == 'en_proceso' ? 'selected' : ''); ?>>En Proceso</option>
+                                <option value="activo" <?php echo e(request('status') == 'activo' ? 'selected' : ''); ?>>Activo</option>
+                                <option value="cerrado" <?php echo e(request('status') == 'cerrado' ? 'selected' : ''); ?>>Cerrado</option>
+                                <option value="observado" <?php echo e(request('status') == 'observado' ? 'selected' : ''); ?>>Observado</option>
                             </select>
                         </div>
 
                         <div class="col-md-2">
                             <label class="form-label fw-bold">N° Mesa</label>
                             <input type="number" name="table_number" class="form-control"
-                                   placeholder="Ej: 1, 2, 3..." value="{{ request('table_number') }}">
+                                   placeholder="Ej: 1, 2, 3..." value="<?php echo e(request('table_number')); ?>">
                         </div>
 
                         <div class="col-md-2 d-flex align-items-end">
@@ -61,7 +62,7 @@
                                     <i class="ri-search-line me-1"></i>
                                     Buscar
                                 </button>
-                                <a href="{{ route('voting-table-votes.index', ['election_type_id' => $electionTypeId ?? '']) }}"
+                                <a href="<?php echo e(route('voting-table-votes.index', ['election_type_id' => $electionTypeId ?? ''])); ?>"
                                    class="btn btn-secondary" title="Limpiar filtros">
                                     <i class="ri-refresh-line"></i>
                                 </a>
@@ -84,28 +85,28 @@
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Código de Mesa</label>
                                 <input type="text" name="table_code" class="form-control"
-                                       placeholder="Ej: MESA-001" value="{{ request('table_code') }}">
+                                       placeholder="Ej: MESA-001" value="<?php echo e(request('table_code')); ?>">
                             </div>
 
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Desde (Apellido)</label>
                                 <input type="text" name="from_name" class="form-control"
-                                       placeholder="Apellido inicial" value="{{ request('from_name') }}">
+                                       placeholder="Apellido inicial" value="<?php echo e(request('from_name')); ?>">
                             </div>
 
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Hasta (Apellido)</label>
                                 <input type="text" name="to_name" class="form-control"
-                                       placeholder="Apellido final" value="{{ request('to_name') }}">
+                                       placeholder="Apellido final" value="<?php echo e(request('to_name')); ?>">
                             </div>
 
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Tipo de Mesa</label>
                                 <select name="table_type" class="form-select">
                                     <option value="">Todos</option>
-                                    <option value="mixta" {{ request('table_type') == 'mixta' ? 'selected' : '' }}>Mixta</option>
-                                    <option value="masculina" {{ request('table_type') == 'masculina' ? 'selected' : '' }}>Masculina</option>
-                                    <option value="femenina" {{ request('table_type') == 'femenina' ? 'selected' : '' }}>Femenina</option>
+                                    <option value="mixta" <?php echo e(request('table_type') == 'mixta' ? 'selected' : ''); ?>>Mixta</option>
+                                    <option value="masculina" <?php echo e(request('table_type') == 'masculina' ? 'selected' : ''); ?>>Masculina</option>
+                                    <option value="femenina" <?php echo e(request('table_type') == 'femenina' ? 'selected' : ''); ?>>Femenina</option>
                                 </select>
                             </div>
                         </div>
@@ -114,22 +115,22 @@
                             <div class="col-md-2">
                                 <label class="form-label fw-bold">Votos Mínimos</label>
                                 <input type="number" name="min_votes" class="form-control"
-                                       placeholder="Mínimo" value="{{ request('min_votes') }}">
+                                       placeholder="Mínimo" value="<?php echo e(request('min_votes')); ?>">
                             </div>
 
                             <div class="col-md-2">
                                 <label class="form-label fw-bold">Votos Máximos</label>
                                 <input type="number" name="max_votes" class="form-control"
-                                       placeholder="Máximo" value="{{ request('max_votes') }}">
+                                       placeholder="Máximo" value="<?php echo e(request('max_votes')); ?>">
                             </div>
 
                             <div class="col-md-2">
                                 <label class="form-label fw-bold">Participación %</label>
                                 <select name="participation" class="form-select">
                                     <option value="">Cualquier</option>
-                                    <option value="alta" {{ request('participation') == 'alta' ? 'selected' : '' }}>Alta (>75%)</option>
-                                    <option value="media" {{ request('participation') == 'media' ? 'selected' : '' }}>Media (50-75%)</option>
-                                    <option value="baja" {{ request('participation') == 'baja' ? 'selected' : '' }}>Baja (<50%)</option>
+                                    <option value="alta" <?php echo e(request('participation') == 'alta' ? 'selected' : ''); ?>>Alta (>75%)</option>
+                                    <option value="media" <?php echo e(request('participation') == 'media' ? 'selected' : ''); ?>>Media (50-75%)</option>
+                                    <option value="baja" <?php echo e(request('participation') == 'baja' ? 'selected' : ''); ?>>Baja (<50%)</option>
                                 </select>
                             </div>
 
@@ -137,18 +138,18 @@
                                 <label class="form-label fw-bold">Con Observaciones</label>
                                 <select name="has_observations" class="form-select">
                                     <option value="">Todos</option>
-                                    <option value="1" {{ request('has_observations') == '1' ? 'selected' : '' }}>Con observaciones</option>
-                                    <option value="0" {{ request('has_observations') == '0' ? 'selected' : '' }}>Sin observaciones</option>
+                                    <option value="1" <?php echo e(request('has_observations') == '1' ? 'selected' : ''); ?>>Con observaciones</option>
+                                    <option value="0" <?php echo e(request('has_observations') == '0' ? 'selected' : ''); ?>>Sin observaciones</option>
                                 </select>
                             </div>
 
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Ordenar por</label>
                                 <select name="sort_by" class="form-select">
-                                    <option value="number" {{ request('sort_by') == 'number' ? 'selected' : '' }}>Número de Mesa</option>
-                                    <option value="registered_citizens" {{ request('sort_by') == 'registered_citizens' ? 'selected' : '' }}>Ciudadanos</option>
-                                    <option value="computed_records" {{ request('sort_by') == 'computed_records' ? 'selected' : '' }}>Votos Computados</option>
-                                    <option value="status" {{ request('sort_by') == 'status' ? 'selected' : '' }}>Estado</option>
+                                    <option value="number" <?php echo e(request('sort_by') == 'number' ? 'selected' : ''); ?>>Número de Mesa</option>
+                                    <option value="registered_citizens" <?php echo e(request('sort_by') == 'registered_citizens' ? 'selected' : ''); ?>>Ciudadanos</option>
+                                    <option value="computed_records" <?php echo e(request('sort_by') == 'computed_records' ? 'selected' : ''); ?>>Votos Computados</option>
+                                    <option value="status" <?php echo e(request('sort_by') == 'status' ? 'selected' : ''); ?>>Estado</option>
                                 </select>
                             </div>
                         </div>
@@ -168,7 +169,7 @@
     </div>
 </div>
 
-@push('styles')
+<?php $__env->startPush('styles'); ?>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 <style>
@@ -194,9 +195,9 @@
         color: #bb2d3b;
     }
 </style>
-@endpush
+<?php $__env->stopPush(); ?>
 
-@push('scripts')
+<?php $__env->startPush('scripts'); ?>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -216,29 +217,29 @@
         // Mostrar filtros activos
         const activeFilters = [];
 
-        @if(request('institution_id'))
+        <?php if(request('institution_id')): ?>
             activeFilters.push({
                 name: 'Recinto',
                 value: $('#institutionFilter option:selected').text(),
                 param: 'institution_id'
             });
-        @endif
+        <?php endif; ?>
 
-        @if(request('status'))
+        <?php if(request('status')): ?>
             activeFilters.push({
                 name: 'Estado',
                 value: $('#statusFilter option:selected').text(),
                 param: 'status'
             });
-        @endif
+        <?php endif; ?>
 
-        @if(request('table_number'))
+        <?php if(request('table_number')): ?>
             activeFilters.push({
                 name: 'Mesa N°',
-                value: '{{ request('table_number') }}',
+                value: '<?php echo e(request('table_number')); ?>',
                 param: 'table_number'
             });
-        @endif
+        <?php endif; ?>
 
         if (activeFilters.length > 0) {
             let filterHtml = '<div class="mt-2"><strong>Filtros activos:</strong> ';
@@ -262,4 +263,5 @@
         }
     });
 </script>
-@endpush
+<?php $__env->stopPush(); ?>
+<?php /**PATH D:\_Mine\corporate\resources\views/voting-table-votes/partials/filters.blade.php ENDPATH**/ ?>

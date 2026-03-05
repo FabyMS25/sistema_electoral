@@ -18,6 +18,8 @@ window.observeTable = function(tableId) {
 
 function loadTableVotesForObservation(tableId) {
     const container = document.getElementById('voteCheckboxes');
+    if (!container) return;
+
     container.innerHTML = '<div class="text-center text-muted py-3"><i class="ri-loader-4-line ri-spin me-1"></i>Cargando votos...</div>';
 
     fetch(`/voting-table-votes/${tableId}/votes`)
@@ -30,6 +32,7 @@ function loadTableVotesForObservation(tableId) {
 
             let html = '<div class="row">';
             votes.forEach(vote => {
+                // 🔴 CORRECCIÓN: Usar 'observed' directamente o VOTE_STATUS_OBSERVED
                 const isObserved = vote.vote_status === 'observed';
                 const disabledAttr = isObserved ? 'disabled' : '';
                 const checkedAttr = isObserved ? 'checked' : '';
@@ -62,6 +65,7 @@ function loadTableVotesForObservation(tableId) {
         });
 }
 
+// Botón guardar observación
 document.getElementById('saveObservationBtn')?.addEventListener('click', function() {
     if (!window.currentObservationTable) {
         Swal.fire({
@@ -282,7 +286,7 @@ window.showObservations = function(tableId) {
 
 // Inicializar listeners de observaciones
 document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.observe-table').forEach(btn => {
+    document.querySelectorAll('.observe-table-general').forEach(btn => {
         btn.addEventListener('click', function() {
             window.observeTable(this.dataset.tableId);
         });

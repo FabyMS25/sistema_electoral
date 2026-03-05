@@ -9,40 +9,30 @@
             return;
         }
 
-        // Obtener votantes habilitados
         const expectedVoters = parseInt(tableCard.dataset.expectedVoters) || 0;
-
-        // Recolectar votos - CORREGIDO: Asegurar que tomamos los valores actuales
         const votes = {};
-        let totalVotosAlcalde = 0;
-        let totalVotosConcejal = 0;
+        const categoryTotals = {};
 
-        // IMPORTANTE: Usar querySelectorAll con el ID correcto de la mesa
+        // Recolectar votos por categoría
         document.querySelectorAll(`#table-${tableId} .vote-input`).forEach(input => {
-            if (input.dataset.candidate) {
-                const candidateId = input.dataset.candidate;
-                // 🔴 CORRECCIÓN CRÍTICA: Asegurar que tomamos el valor actual del input
-                const value = parseInt(input.value) || 0;
+            const candidateId = input.dataset.candidate;
+            const value = parseInt(input.value) || 0;
+            const category = input.dataset.category;
 
-                // Solo incluir votos con valor > 0
-                if (value > 0) {
-                    votes[candidateId] = value;
-                }
-
-                if (input.dataset.category === 'alcalde') {
-                    totalVotosAlcalde += value;
-                } else if (input.dataset.category === 'concejal') {
-                    totalVotosConcejal += value;
-                }
+            if (value > 0) {
+                votes[candidateId] = value;
             }
+
+            if (!categoryTotals[category]) {
+                categoryTotals[category] = 0;
+            }
+            categoryTotals[category] += value;
         });
 
-        console.log('📊 Votos recolectados (con valores > 0):', votes);
-        console.log('📊 Total Alcaldes (votantes):', totalVotosAlcalde);
-        console.log('📊 Total Concejales (votantes):', totalVotosConcejal);
-        console.log('📊 Votantes habilitados:', expectedVoters);
+        console.log('📊 Votos recolectados:', votes);
+        console.log('📊 Totales por categoría:', categoryTotals);
 
-        // Validar que hay votos para registrar
+        // Validar que hay votos
         if (Object.keys(votes).length === 0) {
             Swal.fire({
                 icon: 'warning',
@@ -53,36 +43,31 @@
             return;
         }
 
-        if (totalVotosAlcalde === 0 && totalVotosConcejal === 0) {
-            Swal.fire({
-                icon: 'warning',
-                title: '⚠️ Sin votos',
-                text: 'No hay votos registrados en esta mesa',
-                confirmButtonColor: '#f7b84b'
+        // Validación DINÁMICA: Todas las categorías deben tener el mismo total
+        const totals = Object.values(categoryTotals);
+        if (totals.length > 1 && new Set(totals).size > 1) {
+            let errorHtml = 'El número de votantes debe ser el mismo en todas las categorías:<br><br>';
+            Object.entries(categoryTotals).forEach(([cat, val]) => {
+                errorHtml += `<strong>${cat}:</strong> ${val} votantes<br>`;
             });
-            return;
-        }
 
-        // Validación: Los votantes deben ser iguales en ambas categorías
-        if (totalVotosAlcalde !== totalVotosConcejal) {
             Swal.fire({
                 icon: 'error',
                 title: '❌ Error de consistencia',
-                html: `El número de votantes debe ser el mismo en ambas categorías:<br><br>
-                       <strong>Alcaldes:</strong> ${totalVotosAlcalde} votantes<br>
-                       <strong>Concejales:</strong> ${totalVotosConcejal} votantes<br><br>
-                       <span class="text-muted">Cada votante emite un voto para Alcalde y un voto para Concejal.</span>`,
+                html: errorHtml,
                 confirmButtonColor: '#f06548'
             });
             return;
         }
 
+        const totalVoters = totals[0] || 0;
+
         // Validar contra votantes habilitados
-        if (expectedVoters > 0 && totalVotosAlcalde > expectedVoters) {
+        if (expectedVoters > 0 && totalVoters > expectedVoters) {
             Swal.fire({
                 icon: 'error',
                 title: '❌ Error de consistencia',
-                html: `Los votos registrados (${totalVotosAlcalde}) exceden<br>
+                html: `Los votos registrados (${totalVoters}) exceden<br>
                        los votantes habilitados (${expectedVoters})`,
                 confirmButtonColor: '#f06548'
             });
@@ -108,11 +93,10 @@
             }
         });
 
-        // Preparar datos para enviar
         const requestData = {
             voting_table_id: parseInt(tableId),
             election_type_id: window.electionTypeId,
-            votes: votes,  // Solo votos con valor > 0
+            votes: votes,
             close: close
         };
 
@@ -129,7 +113,9 @@
         })
         .then(response => {
             if (!response.ok) {
-                return response.json().then(err => { throw new Error(err.message || 'Error en la respuesta'); });
+                return response.json().then(err => {
+                    throw new Error(err.message || 'Error en la respuesta');
+                });
             }
             return response.json();
         })
@@ -137,15 +123,20 @@
             Swal.close();
 
             if (data.success) {
-                // Actualizar los totales mostrados
-                if (data.totals) {
-                    const totalAlcaldeEl = document.getElementById(`total-alcalde-${tableId}`);
-                    const totalConcejalEl = document.getElementById(`total-concejal-${tableId}`);
-                    const totalEl = document.getElementById(`total-${tableId}`);
+                // Actualizar totales por categoría si vienen del servidor
+                if (data.category_totals) {
+                    Object.entries(data.category_totals).forEach(([category, total]) => {
+                        const el = document.getElementById(`total-${category}-${tableId}`);
+                        if (el) {
+                            el.textContent = total;
+                        }
+                    });
+                }
 
-                    if (totalAlcaldeEl) totalAlcaldeEl.textContent = data.totals.alcalde || 0;
-                    if (totalConcejalEl) totalConcejalEl.textContent = data.totals.concejal || 0;
-                    if (totalEl) totalEl.textContent = data.totals.total || 0;
+                // Actualizar total general
+                if (data.total_voters) {
+                    const totalEl = document.getElementById(`total-${tableId}`);
+                    if (totalEl) totalEl.textContent = data.total_voters;
                 }
 
                 Swal.fire({
@@ -185,7 +176,6 @@
         });
     };
 
-    // También corregir saveAllTables
     window.saveAllTables = function() {
         const tables = document.querySelectorAll('.table-card');
         if (tables.length === 0) {
@@ -203,11 +193,9 @@
             const votes = {};
 
             document.querySelectorAll(`#table-${tableId} .vote-input`).forEach(input => {
-                if (input.dataset.candidate) {
-                    const value = parseInt(input.value) || 0;
-                    if (value > 0) {  // Solo incluir votos con valor > 0
-                        votes[input.dataset.candidate] = value;
-                    }
+                const value = parseInt(input.value) || 0;
+                if (value > 0) {
+                    votes[input.dataset.candidate] = value;
                 }
             });
 
@@ -348,6 +336,95 @@
         if (closeAllBtn) {
             closeAllBtn.addEventListener('click', window.closeAllTables);
         }
+    };
+
+    window.closeAllTables = function() {
+        const tables = document.querySelectorAll('.table-card:not([data-status="cerrada"])');
+
+        if (tables.length === 0) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Sin mesas',
+                text: 'No hay mesas abiertas para cerrar.'
+            });
+            return;
+        }
+
+        const tablesData = {};
+        tables.forEach(table => {
+            const tableId = table.dataset.tableId;
+            const votes = {};
+
+            document.querySelectorAll(`#table-${tableId} .vote-input`).forEach(input => {
+                const value = parseInt(input.value) || 0;
+                if (value > 0) {
+                    votes[input.dataset.candidate] = value;
+                }
+            });
+
+            tablesData[tableId] = votes;
+        });
+
+        Swal.fire({
+            title: '⚠️ Cerrar todas las mesas',
+            html: `¿Cerrar <strong>${tables.length}</strong> mesas?<br><br>Esta acción no se puede deshacer.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#f06548',
+            confirmButtonText: 'Sí, cerrar todas',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: 'Cerrando mesas...',
+                    text: 'Por favor espere',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                fetch('<?php echo e(route("voting-table-votes.register-all")); ?>', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '<?php echo e(csrf_token()); ?>'
+                    },
+                    body: JSON.stringify({
+                        election_type_id: window.electionTypeId,
+                        tables: tablesData,
+                        close_all: true
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    Swal.close();
+
+                    let icon = data.success ? 'success' : 'warning';
+                    let title = data.success ? '✅ Proceso completado' : '⚠️ Proceso con advertencias';
+
+                    Swal.fire({
+                        icon: icon,
+                        title: title,
+                        html: data.message.replace(/\n/g, '<br>'),
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#0ab39c'
+                    }).then(() => {
+                        if (data.success) {
+                            location.reload();
+                        }
+                    });
+                })
+                .catch(error => {
+                    Swal.close();
+                    Swal.fire({
+                        icon: 'error',
+                        title: '❌ Error',
+                        text: 'Error al procesar las mesas: ' + error.message
+                    });
+                });
+            }
+        });
     };
 </script>
 <?php /**PATH D:\_Mine\corporate\resources\views/voting-table-votes/scripts/votes-table-js.blade.php ENDPATH**/ ?>

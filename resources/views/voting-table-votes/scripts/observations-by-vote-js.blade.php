@@ -69,7 +69,7 @@ function createObservationWithSelected(tableId) {
             formData.append('severity', 'warning');
 
             selected.forEach(s => {
-                formData.append('vote_ids[]', s.candidateId);
+                formData.append('candidate_ids[]', s.candidateId);
             });
 
             fetch('/observations', {
@@ -90,9 +90,16 @@ function createObservationWithSelected(tableId) {
                         timer: 1500,
                         showConfirmButton: false
                     });
+
+                    // Marcar los checkboxes como disabled después de crear la observación
+                    checkboxes.forEach(cb => {
+                        cb.checked = true;
+                        cb.disabled = true;
+                    });
+
                     setTimeout(() => location.reload(), 1500);
                 } else {
-                    throw new Error(data.message);
+                    throw new Error(data.message || 'Error al crear la observación');
                 }
             })
             .catch(error => {
