@@ -1,5 +1,4 @@
 <?php
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -34,7 +33,7 @@ class AdminUserSeeder extends Seeder
                     'email' => 'admin@gmail.com',
                     'password' => Hash::make('12345678'),
                     'email_verified_at' => now(),
-                    'avatar' => 'avatar-6.jpg',
+                    'avatar' => 'avatar-admin-w.png',
                     'is_active' => true,
                 ],
                 [
@@ -43,7 +42,7 @@ class AdminUserSeeder extends Seeder
                     'email' => 'moralessfaby.dev@gmail.com',
                     'password' => Hash::make('12345678'),
                     'email_verified_at' => now(),
-                    'avatar' => 'avatar-6.jpg',
+                    'avatar' => 'avatar-admin-w.png',
                     'is_active' => true,
                 ]
             ];
@@ -62,8 +61,6 @@ class AdminUserSeeder extends Seeder
                         'voting_table_id' => null,
                         'election_type_id' => null,
                         'scope_settings' => json_encode(['full_access' => true]),
-                        'created_at' => now(),
-                        'updated_at' => now(),
                     ]
                 ]);
             }

@@ -32,28 +32,6 @@ class Candidate extends Model
     {
         return $this->belongsTo(ElectionTypeCategory::class);
     }
-    public function electionType()
-    {
-        return $this->hasOneThrough(
-            ElectionType::class,
-            ElectionTypeCategory::class,
-            'id',
-            'id',
-            'election_type_category_id',
-            'election_type_id'
-        );
-    }
-    public function electionCategory()
-    {
-        return $this->hasOneThrough(
-            ElectionCategory::class,
-            ElectionTypeCategory::class,
-            'id',
-            'id',
-            'election_type_category_id',
-            'election_category_id'
-        );
-    }
     public function votes()
     {
         return $this->hasMany(Vote::class);

@@ -70,10 +70,6 @@ class Acta extends Model
         ];
     }
 
-    // =========================================================================
-    // RELATIONSHIPS
-    // =========================================================================
-
     public function votingTable(): BelongsTo
     {
         return $this->belongsTo(VotingTable::class);
@@ -94,23 +90,11 @@ class Acta extends Model
         return $this->belongsTo(User::class, 'signed_by');
     }
 
-    /**
-     * Per-franja totals as written on the physical acta.
-     * One row per franja (ALC, CON for municipal; GOB, AST, ASP for departamental).
-     */
     public function categoryResults(): HasMany
     {
         return $this->hasMany(ActaCategoryResult::class);
     }
 
-    // =========================================================================
-    // CONSISTENCY
-    // =========================================================================
-
-    /**
-     * Compare each franja result on this acta against the digital tally.
-     * Sets is_consistent and persists. Call after all categoryResults are saved.
-     */
     public function verifyConsistency(): bool
     {
         $inconsistencies = [];
@@ -155,24 +139,12 @@ class Acta extends Model
         return $isConsistent;
     }
 
-    // =========================================================================
-    // ACTIONS
-    // =========================================================================
-
-    /**
-     * Verify the acta against digital data.
-     * If inconsistencies are found, creates an Observation and marks the
-     * VotingTableElection as observed — NOT the whole VotingTable.
-     *
-     * @param int $userId  The reviewer's user ID. Nullable since reviewed_by is nullable in DB.
-     */
     public function markAsVerified(int $userId): void
     {
         $this->verifyConsistency();
         $this->update(['status' => self::STATUS_VERIFIED]);
 
         if (!$this->is_consistent && !empty($this->inconsistencies)) {
-            // ✅ reviewed_by is nullable in the DB — pass $userId normally
             Observation::create([
                 'code'             => Observation::generateCode(),
                 'type'             => Observation::TYPE_INCONSISTENCIA_ACTA,
@@ -181,11 +153,9 @@ class Acta extends Model
                 'status'           => Observation::STATUS_PENDING,
                 'voting_table_id'  => $this->voting_table_id,
                 'election_type_id' => $this->election_type_id,
-                'reviewed_by'      => $userId,  // nullable — fine to pass null if system-triggered
+                'reviewed_by'      => $userId,
                 'reviewer_role'    => 'revisor',
             ]);
-
-            // ✅ Target only this mesa × election pivot, not the physical mesa
             VotingTableElection::where('voting_table_id', $this->voting_table_id)
                 ->where('election_type_id', $this->election_type_id)
                 ->first()
@@ -224,8 +194,6 @@ class Acta extends Model
             'signed_by' => $userId,
             'signed_at' => now(),
         ]);
-
-        // ✅ Use the model action method — keeps status logic in one place
         VotingTableElection::where('voting_table_id', $this->voting_table_id)
             ->where('election_type_id', $this->election_type_id)
             ->first()
@@ -248,10 +216,6 @@ class Acta extends Model
             'reviewer_role'    => 'revisor',
         ]);
     }
-
-    // =========================================================================
-    // DISPLAY HELPERS
-    // =========================================================================
 
     public function getStatusBadgeAttribute(): string
     {

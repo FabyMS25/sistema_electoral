@@ -175,14 +175,6 @@
     "file": "icons/new.png",
     "src": "resources/images/new.png"
   },
-  "resources/images/nft/bg-home.jpg": {
-    "file": "icons/bg-home.jpg",
-    "src": "resources/images/nft/bg-home.jpg"
-  },
-  "resources/images/nft/marketplace.png": {
-    "file": "icons/marketplace.png",
-    "src": "resources/images/nft/marketplace.png"
-  },
   "resources/images/sidebar/img-1.jpg": {
     "file": "icons/img-1.jpg",
     "src": "resources/images/sidebar/img-1.jpg"

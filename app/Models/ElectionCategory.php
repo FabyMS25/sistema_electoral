@@ -52,15 +52,6 @@ class ElectionCategory extends Model
         ];
     }
 
-    // =========================================================================
-    // RELATIONSHIPS
-    // =========================================================================
-
-    /**
-     * ⚠️  withPivot columns must match election_type_categories migration.
-     *     ballot_order, min/max_votes_per_person are NOT in the current migration.
-     *     Only include columns that actually exist until migration is updated.
-     */
     public function electionTypes(): BelongsToMany
     {
         return $this->belongsToMany(ElectionType::class, 'election_type_categories')
@@ -87,10 +78,6 @@ class ElectionCategory extends Model
             'election_type_category_id'
         );
     }
-
-    // =========================================================================
-    // HELPERS
-    // =========================================================================
 
     public function isMunicipal(): bool
     {

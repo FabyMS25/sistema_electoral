@@ -1,119 +1,142 @@
 {{-- resources/views/voting-table-votes/scripts/observations-by-vote-js.blade.php --}}
 <script>
-// ===== FUNCIONES PARA OBSERVACIONES POR VOTO =====
+// =============================================================================
+//  PER-VOTE OBSERVATION  (the "Crear Observación" button in the table footer)
+//  Reads the checked .observe-checkbox inputs for that table, then POSTs
+//  to /observations with the actual vote IDs (not candidate IDs).
+// =============================================================================
 
 function createObservationWithSelected(tableId) {
-    // Obtener checkboxes seleccionados
-    const checkboxes = document.querySelectorAll(`#table-${tableId} .observe-checkbox:checked`);
+    // Only consider checkboxes that have a real saved vote ID
+    const allChecked = document.querySelectorAll(
+        `#table-${tableId} .observe-checkbox:checked:not(:disabled)`
+    );
+    const checkboxes = Array.from(allChecked).filter(cb => cb.dataset.voteId);
 
     if (checkboxes.length === 0) {
+        const anyChecked = document.querySelectorAll(
+            `#table-${tableId} .observe-checkbox:checked:not(:disabled)`
+        ).length;
         Swal.fire({
             icon: 'warning',
-            title: 'Sin selección',
-            text: 'Debe seleccionar al menos un voto para observar'
+            title: 'Sin selección válida',
+            text: anyChecked > 0
+                ? 'Los votos marcados aún no están guardados. Guarde primero con el botón Guardar.'
+                : 'Marque al menos un voto (☑) para crear una observación.',
         });
         return;
     }
 
-    // Preparar lista de candidatos seleccionados
+    // Build a readable list of selected votes
     const selected = Array.from(checkboxes).map(cb => ({
-        candidateId: cb.dataset.candidate,
-        candidateName: cb.dataset.candidateName,
-        category: cb.dataset.category
+        // data-vote-id is set on the checkbox (see table-rows.blade.php)
+        voteId:        cb.dataset.voteId ?? cb.value,
+        candidateName: cb.dataset.candidateName ?? '—',
+        category:      cb.dataset.category ?? '',
     }));
 
-    const candidatesList = selected.map(s => `• ${s.candidateName} (${s.category})`).join('<br>');
+    const candidatesList = selected
+        .map(s => `• ${escHtml(s.candidateName)} (${escHtml(s.category)})`)
+        .join('<br>');
 
     Swal.fire({
-        title: 'Crear Observación',
+        title: `Observar ${selected.length} voto(s)`,
+        width: 600,
         html: `
             <div class="text-start mb-3">
-                <label class="form-label fw-bold">Tipo de Observación</label>
-                <select id="swal-observation-type" class="form-select">
+                <label class="form-label fw-bold">Tipo de Observación <span class="text-danger">*</span></label>
+                <select id="swal-obs-type" class="form-select">
                     <option value="votos_inconsistentes">Votos Inconsistentes</option>
                     <option value="error_datos">Error en Datos</option>
+                    <option value="diferencia_papeletas">Diferencia de Papeletas</option>
                     <option value="otro">Otro</option>
                 </select>
             </div>
             <div class="text-start mb-3">
-                <label class="form-label fw-bold">Descripción</label>
-                <textarea id="swal-observation-desc" class="form-control" rows="3" placeholder="Describa la observación..."></textarea>
+                <label class="form-label fw-bold">Severidad</label>
+                <select id="swal-obs-severity" class="form-select">
+                    <option value="info">Info</option>
+                    <option value="warning" selected>Advertencia</option>
+                    <option value="error">Error</option>
+                    <option value="critical">Crítico</option>
+                </select>
             </div>
             <div class="text-start mb-3">
-                <label class="form-label fw-bold">Votos a observar:</label>
-                <div class="border rounded p-2 bg-light" style="max-height: 150px; overflow-y: auto;">
+                <label class="form-label fw-bold">Descripción <span class="text-danger">*</span></label>
+                <textarea id="swal-obs-desc" class="form-control" rows="3"
+                          placeholder="Describa el problema observado..."></textarea>
+            </div>
+            <div class="text-start">
+                <label class="form-label fw-bold">Votos seleccionados:</label>
+                <div class="border rounded p-2 bg-light small" style="max-height:120px;overflow-y:auto;">
                     ${candidatesList}
                 </div>
-            </div>
-        `,
+            </div>`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Crear Observación',
         cancelButtonText: 'Cancelar',
         preConfirm: () => {
-            const type = document.getElementById('swal-observation-type').value;
-            const description = document.getElementById('swal-observation-desc').value;
-
-            if (!description) {
-                Swal.showValidationMessage('La descripción es requerida');
+            const desc = document.getElementById('swal-obs-desc').value.trim();
+            if (!desc) {
+                Swal.showValidationMessage('La descripción es obligatoria');
                 return false;
             }
-            return { type, description };
-        }
-    }).then((result) => {
-        if (result.isConfirmed) {
-            const formData = new FormData();
-            formData.append('voting_table_id', tableId);
-            formData.append('type', result.value.type);
-            formData.append('description', result.value.description);
-            formData.append('severity', 'warning');
+            return {
+                type:        document.getElementById('swal-obs-type').value,
+                severity:    document.getElementById('swal-obs-severity').value,
+                description: desc,
+            };
+        },
+    }).then(result => {
+        if (!result.isConfirmed) return;
 
-            selected.forEach(s => {
-                formData.append('candidate_ids[]', s.candidateId);
-            });
+        const formData = new FormData();
+        formData.append('voting_table_id',  tableId);
+        formData.append('election_type_id', window.electionTypeId ?? '');
+        formData.append('type',             result.value.type);
+        formData.append('severity',         result.value.severity);
+        formData.append('description',      result.value.description);
 
-            fetch('/observations', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'Accept': 'application/json'
-                },
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: '✅ Observación creada',
-                        text: data.message,
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+        // Send vote IDs (not candidate IDs) — the controller expects vote_ids[]
+        selected.forEach(s => formData.append('vote_ids[]', parseInt(s.voteId)));
 
-                    // Marcar los checkboxes como disabled después de crear la observación
-                    checkboxes.forEach(cb => {
-                        cb.checked = true;
-                        cb.disabled = true;
-                    });
+        fetch('/observations', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+            },
+            body: formData,
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                // Visually lock the checkboxes
+                checkboxes.forEach(cb => { cb.checked = true; cb.disabled = true; });
 
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    throw new Error(data.message || 'Error al crear la observación');
-                }
-            })
-            .catch(error => {
                 Swal.fire({
-                    icon: 'error',
-                    title: '❌ Error',
-                    text: error.message
+                    icon: 'success', title: '✅ Observación creada',
+                    text: data.message,
+                    timer: 2000, showConfirmButton: false,
+                    toast: true, position: 'top-end',
                 });
-            });
-        }
+                setTimeout(() => location.reload(), 1800);
+            } else {
+                const msg = data.errors
+                    ? Object.values(data.errors).flat().join('\n')
+                    : (data.message ?? 'Error desconocido');
+                Swal.fire({ icon: 'error', title: '❌ Error', text: msg });
+            }
+        })
+        .catch(err => {
+            Swal.fire({ icon: 'error', title: '❌ Error de red', text: err.message });
+        });
     });
 }
 
-// Inicializar botones de observación con seleccionados
+// ─── Bind buttons ─────────────────────────────────────────────────────────────
+
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.create-observation-btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -121,4 +144,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+function escHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>

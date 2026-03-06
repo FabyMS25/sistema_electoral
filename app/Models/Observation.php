@@ -42,10 +42,6 @@ class Observation extends Model
         'is_escalated' => 'boolean',
     ];
 
-    // =========================================================================
-    // CONSTANTS
-    // =========================================================================
-
     const TYPE_INCONSISTENCIA_ACTA   = 'inconsistencia_acta';
     const TYPE_ERROR_DATOS           = 'error_datos';
     const TYPE_FALTA_FIRMA           = 'falta_firma';
@@ -72,10 +68,6 @@ class Observation extends Model
     const RESOLUTION_ANULACION    = 'anulacion';
     const RESOLUTION_RECHAZO      = 'rechazo';
     const RESOLUTION_ESCALAMIENTO = 'escalamiento';
-
-    // =========================================================================
-    // RELATIONSHIPS
-    // =========================================================================
 
     public function votingTable(): BelongsTo
     {
@@ -119,17 +111,6 @@ class Observation extends Model
         return $this->hasMany(Vote::class);
     }
 
-    // =========================================================================
-    // ACTIONS
-    // =========================================================================
-
-    /**
-     * Resolve this observation.
-     *
-     * For CORRECCION: detaches the observation from related votes (clears observation_id)
-     *   and moves them back to CORRECTED status so they can be re-validated.
-     * For ANULACION: marks votes as REJECTED.
-     */
     public function resolve(int $userId, string $resolutionType, ?string $notes = null): void
     {
         $this->update([
@@ -141,21 +122,16 @@ class Observation extends Model
         ]);
 
         if ($resolutionType === self::RESOLUTION_CORRECCION) {
-            // Detach observation from votes — they can now be corrected and re-validated
             $this->votes()->update([
                 'observation_id' => null,
                 'vote_status'    => Vote::VOTE_STATUS_CORRECTED,
             ]);
-
-            // Move the VotingTableElection back to escrutinio so data entry can continue
             VotingTableElection::where('voting_table_id', $this->voting_table_id)
                 ->where('election_type_id', $this->election_type_id)
                 ->first()
                 ?->markAsCorrected($userId, $notes);
-
         } elseif ($resolutionType === self::RESOLUTION_ANULACION) {
             $this->votes()->update(['vote_status' => Vote::VOTE_STATUS_REJECTED]);
-
             VotingTableElection::where('voting_table_id', $this->voting_table_id)
                 ->where('election_type_id', $this->election_type_id)
                 ->first()
@@ -193,10 +169,6 @@ class Observation extends Model
         ]);
     }
 
-    // =========================================================================
-    // QUERY HELPERS
-    // =========================================================================
-
     public function isPending(): bool   { return $this->status === self::STATUS_PENDING; }
     public function isResolved(): bool  { return $this->status === self::STATUS_RESOLVED; }
     public function isEscalated(): bool { return $this->is_escalated; }
@@ -204,10 +176,6 @@ class Observation extends Model
     public function scopePending($query)   { return $query->where('status', self::STATUS_PENDING); }
     public function scopeResolved($query)  { return $query->where('status', self::STATUS_RESOLVED); }
     public function scopeBySeverity($query, string $severity) { return $query->where('severity', $severity); }
-
-    // =========================================================================
-    // DISPLAY HELPERS
-    // =========================================================================
 
     public static function getTypes(): array
     {

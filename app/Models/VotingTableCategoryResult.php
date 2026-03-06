@@ -6,16 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * VotingTableCategoryResult — aggregate totals per (mesa × franja).
- *
- * One row per (voting_table × election_type_category).
- * Stores: valid_votes, blank_votes, null_votes, total_votes.
- * blank and null votes live HERE — never as fake Candidate rows.
- *
- * The sum of Vote.quantity for all candidates in this franja must equal valid_votes.
- * blank_votes + null_votes + valid_votes must equal total_votes.
- */
 class VotingTableCategoryResult extends Model
 {
     use HasFactory;
@@ -57,10 +47,6 @@ class VotingTableCategoryResult extends Model
     public const STATUS_OBSERVED  = 'observed';
     public const STATUS_CORRECTED = 'corrected';
     public const STATUS_CLOSED    = 'closed';
-
-    // =========================================================================
-    // RELATIONSHIPS
-    // =========================================================================
 
     public function votingTable(): BelongsTo
     {
@@ -127,10 +113,6 @@ class VotingTableCategoryResult extends Model
 
         return $this->is_consistent;
     }
-
-    // =========================================================================
-    // DISPLAY HELPERS
-    // =========================================================================
 
     public function getCategoryNameAttribute(): string
     {

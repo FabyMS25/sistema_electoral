@@ -26,11 +26,6 @@ class ValidationHistory extends Model
         'new_values'      => 'array',
     ];
 
-    // ⚠️ ACTION_UPDATE is defined here but was missing from the original DB enum.
-    // Your migration enum is: ['review','observe','correct','validate','approve','reject','update']
-    // The 'update' value was added in the comment fix noted in the original model.
-    // Make sure your validation_history migration includes 'update' in the enum or
-    // inserting ACTION_UPDATE will throw a SQLSTATE enum error.
     public const ACTION_REVIEW   = 'review';
     public const ACTION_OBSERVE  = 'observe';
     public const ACTION_CORRECT  = 'correct';
@@ -52,10 +47,6 @@ class ValidationHistory extends Model
         ];
     }
 
-    // =========================================================================
-    // RELATIONSHIPS
-    // =========================================================================
-
     public function vote(): BelongsTo
     {
         return $this->belongsTo(Vote::class);
@@ -65,10 +56,6 @@ class ValidationHistory extends Model
     {
         return $this->belongsTo(User::class);
     }
-
-    // =========================================================================
-    // DISPLAY HELPERS
-    // =========================================================================
 
     public function getActionBadgeAttribute(): string
     {

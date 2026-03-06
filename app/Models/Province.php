@@ -4,12 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Province extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = ['name', 'department_id','latitude','longitude'];
 
@@ -17,15 +16,9 @@ class Province extends Model
     {
         return $this->belongsTo(Department::class);
     }
-    
+
     public function municipalities()
     {
         return $this->hasMany(Municipality::class);
     }
-
-    // public function institutions(): HasMany
-    // {
-    //     return $this->hasMany(Institution::class);
-    // }
-
 }

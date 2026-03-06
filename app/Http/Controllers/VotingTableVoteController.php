@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Vote;
@@ -7,12 +6,11 @@ use App\Models\Candidate;
 use App\Models\VotingTable;
 use App\Models\VotingTableElection;
 use App\Models\VotingTableCategoryResult;
-use App\Models\Institution;
 use App\Models\ElectionType;
-use App\Models\ElectionCategory;
 use App\Models\ElectionTypeCategory;
+use App\Models\Institution;
 use App\Models\Observation;
-use App\Models\User;
+use App\Models\ValidationHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -24,370 +22,275 @@ class VotingTableVoteController extends Controller
     public function __construct()
     {
         $this->middleware('auth');
-        $this->middleware('permission:view_votes')->only(['index', 'getTableVotes', 'getTableStats']);
-        $this->middleware('permission:register_votes')->only(['registerVotes', 'registerAllVotes']);
-        $this->middleware('permission:observe_votes')->only(['observeTable']);
-        $this->middleware('permission:validate_votes')->only(['validateTable']);
-        $this->middleware('permission:correct_votes')->only(['correctTable']);
-        $this->middleware('permission:close_table')->only(['closeTable']);
-        $this->middleware('permission:reopen_table')->only(['reopenTable']);
-        $this->middleware('permission:upload_acta')->only(['uploadActa']);
     }
 
-    private function canAccessTable($votingTable, $permission = null)
+    private function resolvePermissions(VotingTable $table = null): array
     {
-        $user = Auth::user();
-        if ($user->roles()->where('name', 'administrador')->exists()) {
-            return true;
+        $user    = Auth::user();
+        $isAdmin = $user->roles()->where('name', 'administrador')->exists();
+
+        if ($isAdmin) {
+            return array_fill_keys([
+                'can_view', 'can_register', 'can_observe', 'can_review',
+                'can_correct', 'can_validate', 'can_close', 'can_reopen',
+                'can_upload_acta',
+            ], true);
         }
 
-        if ($permission) {
-            $scope = 'global';
-            $scopeId = null;
+        $check = fn(string $perm) => $this->userCanOnTable($user, $perm, $table);
 
-            $roleAssignment = $user->roles()
-                ->wherePivot('scope', 'institution')
-                ->wherePivot('institution_id', $votingTable->institution_id)
-                ->first();
-
-            if ($roleAssignment) {
-                $scope = 'institution';
-                $scopeId = $votingTable->institution_id;
-            }
-
-            $tableAssignment = $user->roles()
-                ->wherePivot('scope', 'voting_table')
-                ->wherePivot('voting_table_id', $votingTable->id)
-                ->first();
-
-            if ($tableAssignment) {
-                $scope = 'voting_table';
-                $scopeId = $votingTable->id;
-            }
-
-            if (!$this->userHasPermission($user, $permission, $scope, $scopeId)) {
-                return false;
-            }
-        }
-        return true;
+        return [
+            'can_view'        => $check('view_votes'),
+            'can_register'    => $check('register_votes'),
+            'can_observe'     => $check('observe_votes'),
+            'can_review'      => $check('review_votes'),
+            'can_correct'     => $check('correct_votes'),
+            'can_validate'    => $check('validate_votes'),
+            'can_close'       => $check('close_table'),
+            'can_reopen'      => $check('reopen_table'),
+            'can_upload_acta' => $check('upload_acta'),
+        ];
     }
 
-    private function userHasPermission($user, $permissionName, $scope = null, $scopeId = null)
+    private function userCanOnTable($user, string $permission, ?VotingTable $table): bool
     {
-        if ($user->roles()->where('name', 'administrador')->exists()) {
+        if ($user->permissions()
+            ->where('name', $permission)
+            ->where('scope', 'global')
+            ->exists()) {
             return true;
         }
-
-        $hasDirectPermission = $user->permissions()
-            ->where('name', $permissionName)
-            ->where(function($q) use ($scope, $scopeId) {
-                $q->where('scope', 'global');
-                if ($scope && $scopeId) {
-                    $q->orWhere(function($q2) use ($scope, $scopeId) {
-                        $q2->where('scope', $scope)
-                           ->where('scope_id', $scopeId);
-                    });
-                }
-            })->exists();
-
-        if ($hasDirectPermission) {
-            return true;
-        }
-
-        foreach ($user->roles as $role) {
-            $hasRolePermission = $role->permissions()
-                ->where('name', $permissionName)
-                ->exists();
-
-            if ($hasRolePermission) {
-                if ($role->pivot->scope === 'global') {
-                    return true;
-                }
-                if ($scope === 'institution' && $role->pivot->scope === 'institution' && $role->pivot->institution_id == $scopeId) {
-                    return true;
-                }
-                if ($scope === 'voting_table' && $role->pivot->scope === 'voting_table' && $role->pivot->voting_table_id == $scopeId) {
-                    return true;
-                }
+        $roles = $user->roles()->with('permissions')->get();
+        foreach ($roles as $role) {
+            if (!$role->permissions->contains('name', $permission)) {
+                continue;
+            }
+            $pivot = $role->pivot;
+            if ($pivot->scope === 'global') {
+                return true;
+            }
+            if ($table === null) {
+                return true;
+            }
+            if ($pivot->scope === 'recinto'
+                && (int) $pivot->institution_id === (int) $table->institution_id) {
+                return true;
+            }
+            if ($pivot->scope === 'mesa'
+                && (int) $pivot->voting_table_id === (int) $table->id) {
+                return true;
             }
         }
         return false;
     }
 
-    private function applyScopeFilter($query)
+    private function scopedTableQuery()
     {
-        $user = Auth::user();
-        if ($user->roles()->where('name', 'administrador')->exists()) {
-            return $query;
+        $user    = Auth::user();
+        $isAdmin = $user->roles()->where('name', 'administrador')->exists();
+
+        if ($isAdmin) {
+            return VotingTable::query();
         }
 
-        $institutionIds = $user->roles()
-            ->wherePivot('scope', 'institution')
-            ->wherePivot('institution_id', '!=', null)
-            ->get()
+        $roles = $user->roles()->get();
+
+        $institutionIds = $roles
+            ->where('pivot.scope', 'recinto')
             ->pluck('pivot.institution_id')
+            ->filter()
+            ->values()
             ->toArray();
 
-        $tableIds = $user->roles()
-            ->wherePivot('scope', 'voting_table')
-            ->wherePivot('voting_table_id', '!=', null)
-            ->get()
+        $tableIds = $roles
+            ->where('pivot.scope', 'mesa')
             ->pluck('pivot.voting_table_id')
+            ->filter()
+            ->values()
             ->toArray();
 
         if (!empty($tableIds)) {
-            return $query->whereIn('id', $tableIds);
+            return VotingTable::whereIn('id', $tableIds);
         }
 
         if (!empty($institutionIds)) {
-            return $query->whereIn('institution_id', $institutionIds);
+            return VotingTable::whereIn('institution_id', $institutionIds);
         }
 
-        return $query->whereRaw('1 = 0');
+        return VotingTable::whereRaw('1 = 0');
     }
 
     public function index(Request $request)
     {
         try {
-            $user = Auth::user();
-            if (!$this->userHasPermission($user, 'view_votes')) {
+            $user    = Auth::user();
+            $isAdmin = $user->roles()->where('name', 'administrador')->exists();
+            if (!$isAdmin && !$this->userCanOnTable($user, 'view_votes', null)) {
                 abort(403, 'No tiene permiso para ver votos');
             }
-
-            $institutionId = $request->input('institution_id');
             $electionTypeId = $request->input('election_type_id');
-            $status = $request->input('status');
-            $tableNumber = $request->input('table_number');
-            $tableCode = $request->input('table_code');
-            $tableType = $request->input('table_type');
-            $fromName = $request->input('from_name');
-            $toName = $request->input('to_name');
-            $minVotes = $request->input('min_votes');
-            $maxVotes = $request->input('max_votes');
-            $participation = $request->input('participation');
-            $hasObservations = $request->input('has_observations');
-            $sortBy = $request->input('sort_by', 'number');
-            $sortDirection = $request->input('sort_direction', 'asc');
-
             if (!$electionTypeId) {
-                $defaultElectionType = ElectionType::where('active', true)->first();
-                $electionTypeId = $defaultElectionType?->id;
+                $electionTypeId = ElectionType::where('active', true)
+                    ->orderBy('election_date', 'desc')
+                    ->value('id');
             }
-
-            $electionType = ElectionType::with('typeCategories.electionCategory')->find($electionTypeId);
-
-            $categories = collect();
-            $candidatesByCategory = [];
-            $typeCategoryIds = [];
-
+            $electionType = ElectionType::with('typeCategories.electionCategory')
+                ->find($electionTypeId);
+            $typeCategories       = collect();
+            $candidatesByCategory = [];   // [categoryCode => Collection<Candidate>]
+            $typeCategoryIds      = [];
             if ($electionType) {
-                // Get all type categories for this election
                 $typeCategories = ElectionTypeCategory::where('election_type_id', $electionTypeId)
                     ->with('electionCategory')
                     ->orderBy('ballot_order')
                     ->get();
 
-                foreach ($typeCategories as $typeCategory) {
-                    $categoryCode = $typeCategory->electionCategory->code;
-                    $typeCategoryIds[] = $typeCategory->id;
-
-                    $candidatesByCategory[$categoryCode] = Candidate::where('election_type_category_id', $typeCategory->id)
+                foreach ($typeCategories as $tc) {
+                    $code                        = $tc->electionCategory->code;
+                    $typeCategoryIds[]           = $tc->id;
+                    $candidatesByCategory[$code] = Candidate::where('election_type_category_id', $tc->id)
                         ->where('active', true)
                         ->orderBy('list_order')
                         ->orderBy('name')
                         ->get();
-
-                    $categories->push($typeCategory->electionCategory);
                 }
-
-                Log::info("Categorías para elección {$electionTypeId}:", [
-                    'count' => $typeCategories->count(),
-                    'candidates_by_category' => collect($candidatesByCategory)->map->count()
-                ]);
             }
-
-            // Institutions filter
-            $institutionsQuery = Institution::where('status', 'activo');
-            $assignedInstitutionIds = $user->roles()
-                ->wherePivot('scope', 'institution')
-                ->wherePivot('institution_id', '!=', null)
-                ->get()
-                ->pluck('pivot.institution_id')
-                ->toArray();
-
-            if (!empty($assignedInstitutionIds)) {
-                $institutionsQuery->whereIn('id', $assignedInstitutionIds);
-            }
-
-            $institutions = $institutionsQuery->orderBy('name')->get(['id', 'name', 'code']);
-            $electionTypes = ElectionType::where('active', true)->orderBy('election_date', 'desc')->get(['id', 'name', 'election_date']);
-
-            // Voting tables query
-            $query = VotingTable::with([
+            $institutionId   = $request->input('institution_id');
+            $status          = $request->input('status');
+            $tableNumber     = $request->input('table_number');
+            $tableCode       = $request->input('table_code');
+            $tableType       = $request->input('table_type');
+            $fromName        = $request->input('from_name');
+            $toName          = $request->input('to_name');
+            $minVotes        = $request->input('min_votes');
+            $maxVotes        = $request->input('max_votes');
+            $hasObservations = $request->input('has_observations');
+            $sortBy          = $request->input('sort_by', 'number');
+            $sortDir         = $request->input('sort_direction', 'asc');
+            $query = $this->scopedTableQuery()->with([
                 'institution:id,name,code',
-                'tableElections' => function($q) use ($electionTypeId) {
-                    $q->where('election_type_id', $electionTypeId);
-                },
-                'categoryResults' => function($q) use ($typeCategoryIds) {
-                    $q->whereIn('election_type_category_id', $typeCategoryIds)
-                      ->with('electionTypeCategory.electionCategory');
-                },
-                'observations' => function($q) {
-                    $q->where('status', 'pending');
-                },
-                'president:id,name,last_name',
-                'secretary:id,name,last_name',
-                'vocal1:id,name,last_name',
-                'vocal2:id,name,last_name',
-                'vocal3:id,name,last_name',
-                'vocal4:id,name,last_name',
-            ])->withCount(['observations as observations_count' => function($q) {
-                $q->where('status', 'pending');
-            }]);
-
-            $query = $this->applyScopeFilter($query);
-
+                'tableElections' => fn($q) => $q->where('election_type_id', $electionTypeId),
+                'categoryResults' => fn($q) => $q
+                    ->whereIn('election_type_category_id', $typeCategoryIds)
+                    ->with('electionTypeCategory.electionCategory'),
+                'votes' => fn($q) => $q->where('election_type_id', $electionTypeId),
+            ])->withCount([
+                'observations as observations_count' => fn($q) => $q->where('status', 'pending'),
+            ]);
             if ($institutionId) {
                 $query->where('institution_id', $institutionId);
             }
-
             if ($tableNumber) {
                 $query->where('number', $tableNumber);
             }
-
             if ($tableCode) {
-                $query->where(function($q) use ($tableCode) {
-                    $q->where('oep_code', 'ilike', "%{$tableCode}%")
-                      ->orWhere('internal_code', 'ilike', "%{$tableCode}%");
-                });
+                $query->where(fn($q) => $q
+                    ->where('oep_code', 'ilike', "%{$tableCode}%")
+                    ->orWhere('internal_code', 'ilike', "%{$tableCode}%")
+                );
             }
-
             if ($tableType) {
                 $query->where('type', $tableType);
             }
-
             if ($fromName) {
                 $query->where('voter_range_start_name', 'ilike', "%{$fromName}%");
             }
-
             if ($toName) {
                 $query->where('voter_range_end_name', 'ilike', "%{$toName}%");
             }
-
-            // Apply status filter on table elections
             if ($status) {
-                $query->whereHas('tableElections', function($q) use ($electionTypeId, $status) {
-                    $q->where('election_type_id', $electionTypeId)
-                      ->where('status', $status);
-                });
+                $query->whereHas('tableElections', fn($q) => $q
+                    ->where('election_type_id', $electionTypeId)
+                    ->where('status', $status)
+                );
             }
-
-            // Apply min/max votes filters
             if ($minVotes) {
-                $query->whereHas('tableElections', function($q) use ($electionTypeId, $minVotes) {
-                    $q->where('election_type_id', $electionTypeId)
-                      ->where('total_voters', '>=', $minVotes);
-                });
+                $query->whereHas('tableElections', fn($q) => $q
+                    ->where('election_type_id', $electionTypeId)
+                    ->where('total_voters', '>=', $minVotes)
+                );
             }
-
             if ($maxVotes) {
-                $query->whereHas('tableElections', function($q) use ($electionTypeId, $maxVotes) {
-                    $q->where('election_type_id', $electionTypeId)
-                      ->where('total_voters', '<=', $maxVotes);
-                });
+                $query->whereHas('tableElections', fn($q) => $q
+                    ->where('election_type_id', $electionTypeId)
+                    ->where('total_voters', '<=', $maxVotes)
+                );
             }
-
-            if ($hasObservations === 'true') {
+            if ($hasObservations === 'true' || $hasObservations === '1') {
                 $query->has('observations');
-            } elseif ($hasObservations === 'false') {
+            } elseif ($hasObservations === 'false' || $hasObservations === '0') {
                 $query->doesntHave('observations');
             }
-
-            // Sorting
-            switch ($sortBy) {
-                case 'number':
-                    $query->orderBy('number', $sortDirection);
-                    break;
-                case 'expected_voters':
-                    $query->orderBy('expected_voters', $sortDirection);
-                    break;
-                default:
-                    $query->orderBy('institution_id')->orderBy('number', 'asc');
-            }
-
-            $votingTables = $query->paginate(10)->withQueryString();
-
-            // Enhance tables with election data
-            $votingTables->getCollection()->transform(function($table) use ($electionTypeId, $typeCategoryIds) {
-                $tableElection = $table->tableElections->first();
-
-                $table->current_status = $tableElection ? $tableElection->status : 'sin_configurar';
-                $table->total_voters = $tableElection ? $tableElection->total_voters : 0;
-                $table->ballots_received = $tableElection ? $tableElection->ballots_received : 0;
-                $table->ballots_used = $tableElection ? $tableElection->ballots_used : 0;
-                $table->ballots_leftover = $tableElection ? $tableElection->ballots_leftover : 0;
-                $table->ballots_spoiled = $tableElection ? $tableElection->ballots_spoiled : 0;
-
-                // Group results by category
-                $resultsByCategory = [];
-                foreach ($table->categoryResults as $result) {
-                    $categoryCode = $result->electionTypeCategory->electionCategory->code;
-                    $resultsByCategory[$categoryCode] = [
-                        'valid_votes' => $result->valid_votes,
-                        'blank_votes' => $result->blank_votes,
-                        'null_votes' => $result->null_votes,
-                        'total_votes' => $result->total_votes,
-                        'is_consistent' => $result->is_consistent,
+            $participationFilter = $request->input('participation');
+            match ($sortBy) {
+                'expected_voters' => $query->orderBy('expected_voters', $sortDir),
+                'institution'     => $query->orderBy('institution_id', $sortDir)->orderBy('number'),
+                'status'          => $query->orderBy('institution_id')->orderBy('number'),
+                default           => $query->orderBy('institution_id')->orderBy('number', $sortDir),
+            };
+            $votingTables = $query->paginate(20)->withQueryString();
+            $votingTables->getCollection()->transform(function (VotingTable $table) {
+                $te = $table->tableElections->first();
+                $table->current_status   = $te?->status ?? 'sin_configurar';
+                $table->total_voters     = $te?->total_voters ?? 0;
+                $table->ballots_received = $te?->ballots_received ?? 0;
+                $table->ballots_used     = $te?->ballots_used ?? 0;
+                $table->ballots_leftover = $te?->ballots_leftover ?? 0;
+                $table->ballots_spoiled  = $te?->ballots_spoiled ?? 0;
+                $byCategory = [];
+                foreach ($table->categoryResults as $r) {
+                    $code = $r->electionTypeCategory->electionCategory->code;
+                    $byCategory[$code] = [
+                        'valid_votes'   => $r->valid_votes,
+                        'blank_votes'   => $r->blank_votes,
+                        'null_votes'    => $r->null_votes,
+                        'total_votes'   => $r->total_votes,
+                        'is_consistent' => (bool) $r->is_consistent,
+                        'status'        => $r->status,
                     ];
                 }
-                $table->results_by_category = $resultsByCategory;
+                $table->results_by_category = $byCategory;
 
                 return $table;
             });
-
-            // Calculate totals
-            $totals = $this->calculateTotals($votingTables);
-            $totals['participation'] = $totals['expected'] > 0 ? round(($totals['total'] / $totals['expected']) * 100, 1) : 0;
-
-            // Table statistics by status
-            $tableStats = [
-                'total' => $votingTables->total(),
-                'configurada' => $this->countTablesByStatus($votingTables, 'configurada'),
-                'en_espera' => $this->countTablesByStatus($votingTables, 'en_espera'),
-                'votacion' => $this->countTablesByStatus($votingTables, 'votacion'),
-                'en_escrutinio' => $this->countTablesByStatus($votingTables, 'en_escrutinio'),
-                'cerrada' => $this->countTablesByStatus($votingTables, 'cerrada'),
-                'observada' => $this->countTablesByStatus($votingTables, 'observada'),
-                'escrutada' => $this->countTablesByStatus($votingTables, 'escrutada'),
-                'transmitida' => $this->countTablesByStatus($votingTables, 'transmitida'),
-                'anulada' => $this->countTablesByStatus($votingTables, 'anulada'),
+            $institutionsQuery = Institution::where('status', 'activo');
+            if (!$isAdmin) {
+                $assignedIds = $user->roles()
+                    ->wherePivot('scope', 'recinto')
+                    ->get()
+                    ->pluck('pivot.institution_id')
+                    ->filter()
+                    ->values()
+                    ->toArray();
+                if (!empty($assignedIds)) {
+                    $institutionsQuery->whereIn('id', $assignedIds);
+                }
+            }
+            $institutions = $institutionsQuery->orderBy('name')->get(['id', 'name', 'code']);
+            $electionTypes = ElectionType::where('active', true)
+                ->orderBy('election_date', 'desc')
+                ->get(['id', 'name', 'election_date']);
+            $totals = [
+                'expected'      => $votingTables->sum('expected_voters'),
+                'total'         => $votingTables->sum('total_voters'),
+                'participation' => 0,
             ];
-
-            $statusLabels = VotingTableElection::getStatuses();
-
+            if ($totals['expected'] > 0) {
+                $totals['participation'] = round(($totals['total'] / $totals['expected']) * 100, 1);
+            }
+            $allStatuses = array_keys(VotingTableElection::getStatuses());
+            $tableStats  = ['total' => $votingTables->total()];
+            foreach ($allStatuses as $s) {
+                $tableStats[$s] = $votingTables->getCollection()
+                    ->where('current_status', $s)->count();
+            }
+            $permissions = $this->resolvePermissions(null);
+            $statusLabels     = VotingTableElection::getStatuses();
             $validationLabels = Vote::getVoteStatuses();
-
-            $permissions = [
-                'can_register' => $this->userHasPermission($user, 'register_votes'),
-                'can_observe' => $this->userHasPermission($user, 'observe_votes'),
-                'can_validate' => $this->userHasPermission($user, 'validate_votes'),
-                'can_correct' => $this->userHasPermission($user, 'correct_votes'),
-                'can_close' => $this->userHasPermission($user, 'close_table'),
-                'can_reopen' => $this->userHasPermission($user, 'reopen_table'),
-                'can_view' => $this->userHasPermission($user, 'view_votes'),
-                'can_upload_acta' => $this->userHasPermission($user, 'upload_acta'),
-                'can_review' => $this->userHasPermission($user, 'review_votes'),
-            ];
-
-            Log::info('Datos enviados a la vista:', [
-                'categories_count' => $categories->count(),
-                'candidates_count' => collect($candidatesByCategory)->map->count(),
-                'permissions' => $permissions
-            ]);
 
             return view('voting-table-votes.index', compact(
                 'votingTables',
-                'categories',
+                'typeCategories',
                 'candidatesByCategory',
                 'institutions',
                 'electionTypes',
@@ -402,803 +305,660 @@ class VotingTableVoteController extends Controller
             ));
 
         } catch (\Exception $e) {
-            Log::error('Error loading voting table votes: ' . $e->getMessage());
+            Log::error('VotingTableVoteController@index: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
             return redirect()->back()->with('error', 'Error al cargar los datos de votación: ' . $e->getMessage());
         }
     }
 
-    private function countTablesByStatus($votingTables, $status)
-    {
-        return $votingTables->filter(function($table) use ($status) {
-            return $table->current_status === $status;
-        })->count();
-    }
-
     public function registerVotes(Request $request)
     {
-        Log::info('========== REGISTRAR VOTOS ==========');
-        Log::info('Request completo:', $request->all());
-
         try {
             $validated = $request->validate([
-                'voting_table_id' => 'required|integer|exists:voting_tables,id',
-                'election_type_id' => 'required|integer|exists:election_types,id',
-                'votes' => 'required|array',
-                'votes.*' => 'integer|min:0',
-                'close' => 'boolean'
+                'voting_table_id'    => 'required|integer|exists:voting_tables,id',
+                'election_type_id'   => 'required|integer|exists:election_types,id',
+                'votes'              => 'required|array',
+                'votes.*'            => 'integer|min:0',
+                'blank_votes'        => 'nullable|array',
+                'blank_votes.*'      => 'integer|min:0',
+                'null_votes'         => 'nullable|array',
+                'null_votes.*'       => 'integer|min:0',
+                'close'              => 'nullable|boolean',
             ]);
 
-            Log::info('✅ Validación pasada', $validated);
-
-            $user = Auth::user();
-            $votingTableId = $validated['voting_table_id'];
+            $user           = Auth::user();
+            $tableId        = $validated['voting_table_id'];
             $electionTypeId = $validated['election_type_id'];
-            $votesData = $validated['votes'];
-            $closeTable = $validated['close'] ?? false;
+            $votesData      = $validated['votes'];
+            $blankData      = $validated['blank_votes'] ?? [];
+            $nullData       = $validated['null_votes']  ?? [];
+            $closeTable     = (bool) ($validated['close'] ?? false);
 
             DB::beginTransaction();
 
-            try {
-                $votingTable = VotingTable::lockForUpdate()->find($votingTableId);
-                if (!$votingTable) {
-                    throw new \Exception('Mesa no encontrada');
-                }
+            $votingTable   = VotingTable::lockForUpdate()->findOrFail($tableId);
+            $perms         = $this->resolvePermissions($votingTable);
 
-                // Get or create table election record
-                $tableElection = VotingTableElection::firstOrCreate(
-                    [
-                        'voting_table_id' => $votingTable->id,
-                        'election_type_id' => $electionTypeId,
-                    ],
-                    [
-                        'ballots_received' => 0,
-                        'ballots_used' => 0,
-                        'ballots_leftover' => 0,
-                        'ballots_spoiled' => 0,
-                        'total_voters' => 0,
-                        'status' => 'configurada',
-                        'election_date' => now(),
-                    ]
-                );
+            if (!$perms['can_register']) {
+                throw new \Exception('No tiene permiso para registrar votos en esta mesa');
+            }
 
-                Log::info('✅ Mesa encontrada', [
-                    'id' => $votingTable->id,
-                    'status' => $tableElection->status,
-                    'expected_voters' => $votingTable->expected_voters
-                ]);
-
-                if (!$this->canAccessTable($votingTable, 'register_votes')) {
-                    throw new \Exception('No tiene permisos para registrar votos en esta mesa');
-                }
-
-                if (in_array($tableElection->status, ['cerrada', 'escrutada', 'transmitida', 'anulada'])) {
-                    throw new \Exception('No se pueden modificar votos de una mesa ' . $tableElection->status);
-                }
-
-                // Get all type categories for this election
-                $typeCategories = ElectionTypeCategory::where('election_type_id', $electionTypeId)
-                    ->with('electionCategory')
-                    ->get();
-
-                Log::info('✅ Categorías encontradas', ['count' => $typeCategories->count()]);
-
-                // Get valid candidates
-                $candidateIds = array_keys($votesData);
-                Log::info('Buscando candidatos con IDs:', $candidateIds);
-
-                $candidates = Candidate::whereIn('id', $candidateIds)
-                    ->where('active', true)
-                    ->with('electionTypeCategory.electionCategory')
-                    ->get()
-                    ->keyBy('id');
-
-                Log::info('✅ Candidatos encontrados', ['count' => $candidates->count()]);
-
-                // Verify all candidates are valid
-                $invalidCandidates = [];
-                foreach ($candidateIds as $candidateId) {
-                    if (!isset($candidates[$candidateId])) {
-                        $invalidCandidates[] = $candidateId;
-                    }
-                }
-
-                if (!empty($invalidCandidates)) {
-                    throw new \Exception("Candidatos no válidos: " . implode(', ', $invalidCandidates));
-                }
-
-                // Group votes by category
-                $categoryTotals = [];
-                foreach ($typeCategories as $typeCategory) {
-                    $categoryCode = $typeCategory->electionCategory->code;
-                    $categoryTotals[$categoryCode] = [
-                        'total' => 0,
-                        'blank' => 0,
-                        'null' => 0,
-                    ];
-                }
-
-                // Get or create category result records
-                $categoryResults = [];
-                foreach ($typeCategories as $typeCategory) {
-                    $result = VotingTableCategoryResult::firstOrCreate(
+            $tableElection = VotingTableElection::firstOrCreate(
+                ['voting_table_id' => $tableId, 'election_type_id' => $electionTypeId],
+                [
+                    'ballots_received' => 0, 'ballots_used' => 0,
+                    'ballots_leftover' => 0, 'ballots_spoiled' => 0,
+                    'total_voters'     => 0, 'status' => VotingTableElection::STATUS_CONFIGURADA,
+                    'election_date'    => now()->toDateString(),
+                ]
+            );
+            $blocked = [
+                VotingTableElection::STATUS_ESCRUTADA,
+                VotingTableElection::STATUS_TRANSMITIDA,
+                VotingTableElection::STATUS_ANULADA,
+            ];
+            if (in_array($tableElection->status, $blocked)) {
+                throw new \Exception("No se pueden modificar votos de una mesa {$tableElection->status}");
+            }
+            $typeCategories = ElectionTypeCategory::where('election_type_id', $electionTypeId)
+                ->with('electionCategory')
+                ->get()
+                ->keyBy(fn($tc) => $tc->electionCategory->code);
+            $candidateIds = array_map('intval', array_keys($votesData));
+            $candidates   = Candidate::whereIn('id', $candidateIds)
+                ->where('active', true)
+                ->with('electionTypeCategory.electionCategory')
+                ->get()
+                ->keyBy('id');
+            $missing = array_diff($candidateIds, $candidates->keys()->toArray());
+            if (!empty($missing)) {
+                throw new \Exception('Candidatos no válidos: ' . implode(', ', $missing));
+            }
+            foreach ($votesData as $candidateId => $quantity) {
+                $quantity  = max(0, (int) $quantity);
+                $candidate = $candidates[(int) $candidateId];
+                if ($quantity > 0) {
+                    Vote::updateOrCreate(
                         [
-                            'voting_table_id' => $votingTable->id,
-                            'election_type_category_id' => $typeCategory->id,
+                            'voting_table_id'           => $tableId,
+                            'candidate_id'              => $candidateId,
+                            'election_type_id'          => $electionTypeId,
+                            'election_type_category_id' => $candidate->election_type_category_id,
                         ],
                         [
-                            'valid_votes' => 0,
-                            'blank_votes' => 0,
-                            'null_votes' => 0,
-                            'total_votes' => 0,
-                            'status' => 'pending',
+                            'quantity'      => $quantity,
+                            'user_id'       => $user->id,
+                            'registered_at' => now(),
+                            'vote_status'   => Vote::VOTE_STATUS_PENDING_REVIEW,
                         ]
                     );
-                    $categoryResults[$typeCategory->electionCategory->code] = $result;
+                } else {
+                    Vote::where('voting_table_id', $tableId)
+                        ->where('candidate_id', $candidateId)
+                        ->where('election_type_id', $electionTypeId)
+                        ->delete();
                 }
-
-                Log::info('Procesando votos individuales...');
-
-                // Save votes
-                foreach ($votesData as $candidateId => $quantity) {
-                    $quantity = intval($quantity);
-                    $candidate = $candidates[$candidateId];
-                    $categoryCode = $candidate->electionTypeCategory->electionCategory->code;
-
-                    Log::info("Procesando candidato {$candidateId}: {$quantity} votos (categoría {$categoryCode})");
-
-                    if ($quantity > 0) {
-                        // Save or update vote
-                        $vote = Vote::updateOrCreate(
-                            [
-                                'voting_table_id' => $votingTable->id,
-                                'candidate_id' => $candidateId,
-                                'election_type_id' => $electionTypeId,
-                                'election_type_category_id' => $candidate->election_type_category_id,
-                            ],
-                            [
-                                'quantity' => $quantity,
-                                'user_id' => $user->id,
-                                'registered_at' => now(),
-                                'vote_status' => Vote::VOTE_STATUS_PENDING_REVIEW,
-                            ]
-                        );
-
-                        // Update category total
-                        $categoryTotals[$categoryCode]['total'] += $quantity;
-
-                        Log::info("✅ Voto guardado/actualizado", [
-                            'vote_id' => $vote->id,
-                            'candidate_id' => $candidateId,
-                            'quantity' => $quantity
-                        ]);
-                    } else {
-                        // Delete vote if quantity is 0
-                        $deleted = Vote::where('voting_table_id', $votingTable->id)
-                            ->where('candidate_id', $candidateId)
-                            ->where('election_type_id', $electionTypeId)
-                            ->delete();
-
-                        Log::info("🗑️ Votos eliminados", ['candidate_id' => $candidateId, 'deleted' => $deleted]);
-                    }
-                }
-
-                // Update category results
-                $totalVoters = 0;
-                foreach ($typeCategories as $typeCategory) {
-                    $categoryCode = $typeCategory->electionCategory->code;
-                    $result = $categoryResults[$categoryCode];
-
-                    // Get blank and null votes from the category result
-                    $blankVotes = $result->blank_votes; // These would come from UI or be set separately
-                    $nullVotes = $result->null_votes;
-
-                    $result->valid_votes = $categoryTotals[$categoryCode]['total'];
-                    $result->total_votes = $categoryTotals[$categoryCode]['total'] + $blankVotes + $nullVotes;
-                    $result->checkConsistency(); // This will validate and save
-                }
-
-                // All categories should have the same total voters
-                $categoryTotalsList = array_column($categoryTotals, 'total');
-                $firstTotal = !empty($categoryTotalsList) ? $categoryTotalsList[0] : 0;
-                $totalVoters = $firstTotal;
-
-                Log::info('✅ Votos procesados. Totales por categoría:', $categoryTotals);
-
-                // Validate that all categories have the same total
-                $inconsistencies = [];
-                foreach ($categoryTotals as $code => $data) {
-                    if ($data['total'] != $firstTotal) {
-                        $inconsistencies[] = "$code: {$data['total']} votos (debería ser $firstTotal)";
-                    }
-                }
-
-                if (!empty($inconsistencies)) {
-                    throw new \Exception(
-                        "Inconsistencia en el número de votantes por categoría:\n" .
-                        implode("\n", $inconsistencies) .
-                        "\n\nTodas las categorías deben tener el MISMO número de votantes."
-                    );
-                }
-
-                // Validate against expected voters
-                if ($votingTable->expected_voters && $firstTotal > $votingTable->expected_voters) {
-                    throw new \Exception(
-                        "Los votos registrados ({$firstTotal}) exceden " .
-                        "los votantes habilitados ({$votingTable->expected_voters})"
-                    );
-                }
-
-                // Update table election
-                $tableElection->total_voters = $firstTotal;
-                $tableElection->ballots_used = $firstTotal;
-
-                if (in_array($tableElection->status, ['configurada', 'en_espera'])) {
-                    $tableElection->status = 'votacion';
-                }
-
-                if ($closeTable) {
-                    if (!$this->canAccessTable($votingTable, 'close_table')) {
-                        throw new \Exception('No tiene permiso para cerrar esta mesa');
-                    }
-
-                    // Validate all category results are consistent
-                    $allConsistent = true;
-                    foreach ($categoryResults as $result) {
-                        if (!$result->fresh()->is_consistent) {
-                            $allConsistent = false;
-                            break;
-                        }
-                    }
-
-                    if (!$allConsistent) {
-                        throw new \Exception('No se puede cerrar la mesa: hay categorías inconsistentes');
-                    }
-
-                    $tableElection->status = 'cerrada';
-                    $tableElection->closing_time = now()->format('H:i:s');
-                }
-
-                $tableElection->save();
-                DB::commit();
-
-                // Verify votes were saved
-                $savedVotes = Vote::where('voting_table_id', $votingTable->id)
-                    ->where('election_type_id', $electionTypeId)
-                    ->get();
-
-                Log::info('✅ Transacción completada. Votos guardados:', [
-                    'total' => $savedVotes->sum('quantity'),
-                    'count' => $savedVotes->count()
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => $closeTable ? '✅ Votos registrados y mesa cerrada exitosamente' : '✅ Votos registrados exitosamente',
-                    'table_status' => $tableElection->status,
-                    'category_totals' => $categoryTotals,
-                    'total_voters' => $firstTotal
-                ]);
-
-            } catch (\Exception $e) {
-                DB::rollBack();
-                Log::error('❌ Error en transacción: ' . $e->getMessage());
-                Log::error('Stack trace: ' . $e->getTraceAsString());
-                throw $e;
             }
+            $categoryTotals = [];
+            foreach ($typeCategories as $code => $tc) {
+                $validVotes = Vote::where('voting_table_id', $tableId)
+                    ->where('election_type_category_id', $tc->id)
+                    ->where('election_type_id', $electionTypeId)
+                    ->sum('quantity');
+                $blankVotes = max(0, (int) ($blankData[$code] ?? 0));
+                $nullVotes  = max(0, (int) ($nullData[$code] ?? 0));
+                $totalVotes = $validVotes + $blankVotes + $nullVotes;
+                $result = VotingTableCategoryResult::firstOrCreate(
+                    ['voting_table_id' => $tableId, 'election_type_category_id' => $tc->id],
+                    ['status' => 'pending']
+                );
+                $result->valid_votes = $validVotes;
+                $result->blank_votes = $blankVotes;
+                $result->null_votes  = $nullVotes;
+                $result->total_votes = $totalVotes;
+                $result->entered_by  = $user->id;
+                $result->entered_at  = now();
+                $result->status      = VotingTableCategoryResult::STATUS_ENTERED;
+                $result->save();
+                $result->checkConsistency();
+                $categoryTotals[$code] = $totalVotes;
+            }
+            $counts = array_values($categoryTotals);
+            $first  = $counts[0] ?? 0;
+            foreach ($categoryTotals as $code => $total) {
+                if ($total !== $first) {
+                    throw new \Exception(
+                        "Inconsistencia: la categoría {$code} tiene {$total} votos " .
+                        "pero se esperaban {$first}. Todas las categorías deben tener el mismo total de votantes."
+                    );
+                }
+            }
+            if ($votingTable->expected_voters && $first > $votingTable->expected_voters) {
+                throw new \Exception(
+                    "Los votos registrados ({$first}) exceden los votantes habilitados ({$votingTable->expected_voters})"
+                );
+            }
+            if (in_array($tableElection->status, [
+                VotingTableElection::STATUS_CONFIGURADA,
+                VotingTableElection::STATUS_EN_ESPERA,
+            ])) {
+                $tableElection->status = VotingTableElection::STATUS_VOTACION;
+            }
+            $tableElection->total_voters = $first;
+            $tableElection->ballots_used = $first;
+            if ($closeTable) {
+                if (!$perms['can_close']) {
+                    throw new \Exception('No tiene permiso para cerrar esta mesa');
+                }
+                $allConsistent = VotingTableCategoryResult::where('voting_table_id', $tableId)
+                    ->whereIn('election_type_category_id', $typeCategories->pluck('id'))
+                    ->where('is_consistent', false)
+                    ->doesntExist();
+
+                if (!$allConsistent) {
+                    throw new \Exception('No se puede cerrar la mesa: hay categorías con inconsistencias');
+                }
+                $tableElection->status       = VotingTableElection::STATUS_CERRADA;
+                $tableElection->closing_time = now()->toTimeString();
+            }
+            $tableElection->save();
+            DB::commit();
+            return response()->json([
+                'success'         => true,
+                'message'         => $closeTable
+                    ? '✅ Votos registrados y mesa cerrada exitosamente'
+                    : '✅ Votos registrados exitosamente',
+                'table_status'    => $tableElection->status,
+                'category_totals' => $categoryTotals,
+                'total_voters'    => $first,
+            ]);
 
         } catch (ValidationException $e) {
-            Log::error('❌ Error de validación:', $e->errors());
-            return response()->json([
-                'success' => false,
-                'message' => '❌ Datos inválidos',
-                'errors' => $e->errors()
-            ], 422);
+            return response()->json(['success' => false, 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
-            Log::error('❌ Error general: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => '❌ ' . $e->getMessage()
-            ], 500);
+            DB::rollBack();
+            Log::error('registerVotes: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    public function registerAllVotes(Request $request)
+    public function reviewTable(Request $request, int $tableId)
     {
         try {
             $validated = $request->validate([
-                'election_type_id' => 'required|integer|exists:election_types,id',
-                'tables' => 'required|array',
-                'tables.*' => 'required|array',
-                'tables.*.*' => 'integer|min:0',
-                'close_all' => 'boolean'
+                'election_type_id'    => 'required|exists:election_types,id',
+                'observed_vote_ids'   => 'nullable|array',
+                'observed_vote_ids.*' => 'integer|exists:votes,id',
+                'observation_type'    => 'nullable|string',
+                'observation_notes'   => 'nullable|string|max:1000',
+                'general_observation' => 'nullable|string|max:1000',
             ]);
 
-            $user = Auth::user();
-            if (!$this->userHasPermission($user, 'register_votes')) {
-                return response()->json(['success' => false, 'message' => 'No tiene permiso para registrar votos'], 403);
+            $table = VotingTable::findOrFail($tableId);
+            $perms = $this->resolvePermissions($table);
+
+            if (!$perms['can_review']) {
+                return response()->json(['success' => false, 'message' => 'Sin permiso para revisar esta mesa'], 403);
             }
 
-            $electionTypeId = $validated['election_type_id'];
-            $tablesData = $validated['tables'];
-            $closeAll = $validated['close_all'] ?? false;
+            $te = VotingTableElection::where('voting_table_id', $tableId)
+                ->where('election_type_id', $validated['election_type_id'])
+                ->firstOrFail();
 
             DB::beginTransaction();
 
-            try {
-                $processedTables = 0;
-                $errors = [];
+            $user           = Auth::user();
+            $electionTypeId = (int) $validated['election_type_id'];
+            $observedIds    = $validated['observed_vote_ids'] ?? [];
+            $hasObserved    = !empty($observedIds) || !empty($validated['general_observation']);
 
-                foreach ($tablesData as $tableId => $votesData) {
-                    try {
-                        $votingTable = VotingTable::lockForUpdate()->find($tableId);
-                        if (!$votingTable) {
-                            $errors[] = "Mesa ID $tableId no encontrada";
-                            continue;
-                        }
-
-                        $tableElection = VotingTableElection::firstOrCreate(
-                            [
-                                'voting_table_id' => $votingTable->id,
-                                'election_type_id' => $electionTypeId,
-                            ]
-                        );
-
-                        if (!$this->canAccessTable($votingTable, 'register_votes')) {
-                            $errors[] = "Mesa {$votingTable->internal_code}: Sin permiso";
-                            continue;
-                        }
-
-                        if (in_array($tableElection->status, ['cerrada', 'escrutada', 'transmitida', 'anulada'])) {
-                            continue;
-                        }
-
-                        // Process votes individually
-                        foreach ($votesData as $candidateId => $quantity) {
-                            $candidate = Candidate::find($candidateId);
-                            if (!$candidate) continue;
-
-                            if ($quantity > 0) {
-                                Vote::updateOrCreate(
-                                    [
-                                        'voting_table_id' => $votingTable->id,
-                                        'candidate_id' => $candidateId,
-                                        'election_type_id' => $electionTypeId,
-                                        'election_type_category_id' => $candidate->election_type_category_id,
-                                    ],
-                                    [
-                                        'quantity' => $quantity,
-                                        'user_id' => $user->id,
-                                        'registered_at' => now(),
-                                        'vote_status' => Vote::VOTE_STATUS_PENDING_REVIEW,
-                                    ]
-                                );
-                            } else {
-                                Vote::where('voting_table_id', $votingTable->id)
-                                    ->where('candidate_id', $candidateId)
-                                    ->where('election_type_id', $electionTypeId)
-                                    ->delete();
-                            }
-                        }
-
-                        // Update category results
-                        $typeCategories = ElectionTypeCategory::where('election_type_id', $electionTypeId)->get();
-                        foreach ($typeCategories as $typeCategory) {
-                            $result = VotingTableCategoryResult::firstOrCreate(
-                                [
-                                    'voting_table_id' => $votingTable->id,
-                                    'election_type_category_id' => $typeCategory->id,
-                                ]
-                            );
-                            $result->checkConsistency();
-                        }
-
-                        if ($closeAll && !in_array($tableElection->status, ['cerrada', 'escrutada', 'transmitida', 'anulada'])) {
-                            $tableElection->status = 'cerrada';
-                            $tableElection->closing_time = now()->format('H:i:s');
-                        }
-
-                        $tableElection->save();
-                        $processedTables++;
-
-                    } catch (\Exception $e) {
-                        $errors[] = "Error en mesa {$tableId}: " . $e->getMessage();
-                    }
-                }
-
-                DB::commit();
-
-                return response()->json([
-                    'success' => empty($errors),
-                    'message' => "Se procesaron {$processedTables} mesas",
-                    'processed' => $processedTables,
-                    'errors' => $errors
+            if ($hasObserved) {
+                $observation = Observation::create([
+                    'code'             => Observation::generateCode(),
+                    'type'             => $validated['observation_type'] ?? Observation::TYPE_VOTOS_INCONSISTENTES,
+                    'description'      => $validated['observation_notes'] ?? $validated['general_observation'] ?? 'Revisión con observaciones',
+                    'severity'         => Observation::SEVERITY_WARNING,
+                    'status'           => Observation::STATUS_PENDING,
+                    'voting_table_id'  => $tableId,
+                    'election_type_id' => $electionTypeId,
+                    'reviewed_by'      => $user->id,
+                    'reviewer_role'    => $this->safeReviewerRole($user),
                 ]);
+                foreach ($observedIds as $voteId) {
+                    $vote = Vote::find($voteId);
+                    if (!$vote || $vote->voting_table_id != $tableId) {
+                        continue;
+                    }
+                    $vote->markAsObserved($user->id, $observation->id, $validated['observation_notes'] ?? null);
+                }
+                $te->markAsObserved($user->id, $validated['observation_notes'] ?? $validated['general_observation'] ?? null);
+            } else {
+                $votes = Vote::where('voting_table_id', $tableId)
+                    ->where('election_type_id', $electionTypeId)
+                    ->where('vote_status', Vote::VOTE_STATUS_PENDING_REVIEW)
+                    ->get();
 
-            } catch (\Exception $e) {
-                DB::rollBack();
-                throw $e;
+                foreach ($votes as $vote) {
+                    $vote->markAsReviewed($user->id);
+                }
+                VotingTableCategoryResult::where('voting_table_id', $tableId)
+                    ->whereHas('electionTypeCategory', fn($q) => $q->where('election_type_id', $electionTypeId))
+                    ->where('status', VotingTableCategoryResult::STATUS_ENTERED)
+                    ->update(['status' => VotingTableCategoryResult::STATUS_REVIEWED]);
+                $te->startEscrutinio($user->id);
             }
-
+            DB::commit();
+            return response()->json([
+                'success'           => true,
+                'message'           => $hasObserved
+                    ? '⚠️ Mesa marcada como observada. Se creó la observación #' . ($observation->code ?? '')
+                    : '✅ Mesa revisada correctamente. Pasó a estado En Escrutinio.',
+                'table_status'      => $te->fresh()->status,
+                'has_observations'  => $hasObserved,
+            ]);
         } catch (\Exception $e) {
-            Log::error('Error registering all votes: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Error al procesar las mesas'], 500);
+            DB::rollBack();
+            Log::error('reviewTable: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    public function observeTable(Request $request, $tableId)
+    public function correctTable(Request $request, int $tableId)
     {
         try {
-            $validated = $request->validate(['notes' => 'nullable|string|max:500']);
+            $validated = $request->validate([
+                'election_type_id'  => 'required|exists:election_types,id',
+                'corrections'       => 'required|array',
+                'corrections.*'     => 'integer|min:0',
+                'blank_votes'       => 'nullable|array',
+                'blank_votes.*'     => 'integer|min:0',
+                'null_votes'        => 'nullable|array',
+                'null_votes.*'      => 'integer|min:0',
+                'notes'             => 'required|string|max:1000',
+            ]);
 
-            $votingTable = VotingTable::findOrFail($tableId);
-            $electionTypeId = $request->input('election_type_id');
+            $table = VotingTable::findOrFail($tableId);
+            $perms = $this->resolvePermissions($table);
 
-            if (!$electionTypeId) {
-                return response()->json(['success' => false, 'message' => 'Se requiere tipo de elección'], 422);
+            if (!$perms['can_correct']) {
+                return response()->json(['success' => false, 'message' => 'Sin permiso para corregir esta mesa'], 403);
+            }
+            $te = VotingTableElection::where('voting_table_id', $tableId)
+                ->where('election_type_id', $validated['election_type_id'])
+                ->firstOrFail();
+            $correctable = [
+                VotingTableElection::STATUS_OBSERVADA,
+                VotingTableElection::STATUS_EN_ESCRUTINIO,
+                VotingTableElection::STATUS_CERRADA,
+            ];
+            if (!in_array($te->status, $correctable)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "La mesa no puede ser corregida en estado '{$te->status}'",
+                ], 422);
+            }
+            DB::beginTransaction();
+            $user           = Auth::user();
+            $electionTypeId = (int) $validated['election_type_id'];
+            foreach ($validated['corrections'] as $voteId => $newQty) {
+                $vote = Vote::find((int) $voteId);
+                if (!$vote || $vote->voting_table_id != $tableId) {
+                    continue;
+                }
+                $vote->markAsCorrected($user->id, max(0, (int) $newQty), $validated['notes']);
+            }
+            $typeCategories = ElectionTypeCategory::where('election_type_id', $electionTypeId)
+                ->with('electionCategory')
+                ->get();
+            foreach ($typeCategories as $tc) {
+                $code   = $tc->electionCategory->code;
+                $result = VotingTableCategoryResult::where('voting_table_id', $tableId)
+                    ->where('election_type_category_id', $tc->id)
+                    ->first();
+
+                if (!$result) {
+                    continue;
+                }
+
+                if (array_key_exists($code, $validated['blank_votes'] ?? [])) {
+                    $result->blank_votes = max(0, (int) $validated['blank_votes'][$code]);
+                }
+                if (array_key_exists($code, $validated['null_votes'] ?? [])) {
+                    $result->null_votes = max(0, (int) $validated['null_votes'][$code]);
+                }
+
+                $result->valid_votes = Vote::where('voting_table_id', $tableId)
+                    ->where('election_type_category_id', $tc->id)
+                    ->sum('quantity');
+
+                $result->total_votes = $result->valid_votes + $result->blank_votes + $result->null_votes;
+                $result->status      = VotingTableCategoryResult::STATUS_CORRECTED;
+                $result->save();
+                $result->checkConsistency();
+            }
+            Observation::where('voting_table_id', $tableId)
+                ->where('election_type_id', $electionTypeId)
+                ->where('status', Observation::STATUS_PENDING)
+                ->get()
+                ->each(fn($obs) => $obs->resolve($user->id, Observation::RESOLUTION_CORRECCION, $validated['notes']));
+            $te->markAsCorrected($user->id, $validated['notes']);
+            DB::commit();
+            return response()->json(['success' => true, 'message' => '✅ Correcciones aplicadas. Mesa pasó a En Escrutinio.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('correctTable: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function validateTable(Request $request, int $tableId)
+    {
+        try {
+            $validated = $request->validate([
+                'election_type_id' => 'required|exists:election_types,id',
+                'action'           => 'required|in:validate,close_validated,reject',
+                'notes'            => 'nullable|string|max:500',
+            ]);
+
+            $table = VotingTable::findOrFail($tableId);
+            $perms = $this->resolvePermissions($table);
+
+            if (!$perms['can_validate']) {
+                return response()->json(['success' => false, 'message' => 'Sin permiso para validar esta mesa'], 403);
             }
 
-            $tableElection = VotingTableElection::where('voting_table_id', $tableId)
+            $te = VotingTableElection::where('voting_table_id', $tableId)
+                ->where('election_type_id', $validated['election_type_id'])
+                ->firstOrFail();
+            DB::beginTransaction();
+            $user   = Auth::user();
+            $action = $validated['action'];
+            $notes  = $validated['notes'] ?? null;
+            $votesToUpdate = Vote::where('voting_table_id', $tableId)
+                ->where('election_type_id', $validated['election_type_id'])
+                ->whereNotIn('vote_status', [Vote::VOTE_STATUS_OBSERVED, Vote::VOTE_STATUS_REJECTED])
+                ->get();
+
+            foreach ($votesToUpdate as $vote) {
+                match ($action) {
+                    'validate' => $vote->markAsValidated($user->id, $notes),
+                    'close_validated' => $vote->markAsValidated($user->id, $notes),
+                    'reject'   => $vote->markAsRejected($user->id, $notes),
+                };
+            }
+            $resultStatus = match ($action) {
+                'validate' => VotingTableCategoryResult::STATUS_VALIDATED,
+                'close_validated' => VotingTableCategoryResult::STATUS_CLOSED,
+                'reject'   => VotingTableCategoryResult::STATUS_OBSERVED,
+            };
+            VotingTableCategoryResult::where('voting_table_id', $tableId)
+                ->whereHas('electionTypeCategory', fn($q) => $q
+                    ->where('election_type_id', $validated['election_type_id'])
+                )
+                ->update(['status' => $resultStatus]);
+            match ($action) {
+                'validate' => $te->startEscrutinio($user->id),
+                'close_validated' => $te->markAsEscrutada($user->id),
+                'reject'   => $te->markAsObserved($user->id, $notes),
+            };
+            DB::commit();
+            $labels = ['validate' => 'Validado - En Escrutinio', 'close_validated' => '✅ Escrutada', 'reject' => '⚠️ Observada'];
+            return response()->json([
+                'success'      => true,
+                'message'      => "✅ Mesa pasó a {$labels[$action]}",
+                'table_status' => $te->fresh()->status,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('validateTable: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function observeTable(Request $request, int $tableId)
+    {
+        try {
+            $validated = $request->validate([
+                'election_type_id' => 'required|exists:election_types,id',
+                'type'             => 'nullable|string',
+                'notes'            => 'required|string|max:1000',
+                'severity'         => 'nullable|in:info,warning,error,critical',
+            ]);
+
+            $table = VotingTable::findOrFail($tableId);
+            $perms = $this->resolvePermissions($table);
+
+            if (!$perms['can_observe']) {
+                return response()->json(['success' => false, 'message' => 'Sin permiso para observar esta mesa'], 403);
+            }
+
+            DB::beginTransaction();
+
+            $user = Auth::user();
+
+            $observation = Observation::create([
+                'code'             => Observation::generateCode(),
+                'type'             => $validated['type'] ?? Observation::TYPE_OTRO,
+                'description'      => $validated['notes'],
+                'severity'         => $validated['severity'] ?? Observation::SEVERITY_WARNING,
+                'status'           => Observation::STATUS_PENDING,
+                'voting_table_id'  => $tableId,
+                'election_type_id' => (int) $validated['election_type_id'],
+                'reviewed_by'      => $user->id,
+                'reviewer_role'    => $this->safeReviewerRole($user),
+            ]);
+
+            VotingTableElection::where('voting_table_id', $tableId)
+                ->where('election_type_id', $validated['election_type_id'])
+                ->first()
+                ?->markAsObserved($user->id, $validated['notes']);
+
+            DB::commit();
+
+            return response()->json([
+                'success'     => true,
+                'message'     => '✅ Observación registrada',
+                'observation' => ['id' => $observation->id, 'code' => $observation->code],
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('observeTable: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function closeTable(Request $request, int $tableId)
+    {
+        try {
+            $electionTypeId = $request->input('election_type_id');
+            if (!$electionTypeId) {
+                return response()->json(['success' => false, 'message' => 'Se requiere election_type_id'], 422);
+            }
+
+            $table = VotingTable::findOrFail($tableId);
+            $perms = $this->resolvePermissions($table);
+
+            if (!$perms['can_close']) {
+                return response()->json(['success' => false, 'message' => 'Sin permiso para cerrar esta mesa'], 403);
+            }
+
+            $te = VotingTableElection::where('voting_table_id', $tableId)
                 ->where('election_type_id', $electionTypeId)
                 ->firstOrFail();
 
-            if (!$this->canAccessTable($votingTable, 'observe_votes')) {
-                return response()->json(['success' => false, 'message' => 'No tiene permiso'], 403);
+            if (in_array($te->status, [
+                VotingTableElection::STATUS_ESCRUTADA,
+                VotingTableElection::STATUS_TRANSMITIDA,
+                VotingTableElection::STATUS_ANULADA,
+            ])) {
+                return response()->json(['success' => false, 'message' => 'La mesa ya está finalizada'], 422);
+            }
+
+            $inconsistent = VotingTableCategoryResult::where('voting_table_id', $tableId)
+                ->whereHas('electionTypeCategory', fn($q) => $q->where('election_type_id', $electionTypeId))
+                ->where('is_consistent', false)
+                ->exists();
+
+            if ($inconsistent) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede cerrar: hay categorías con inconsistencias',
+                ], 422);
             }
 
             DB::beginTransaction();
-
-            $observation = Observation::create([
-                'code' => Observation::generateCode(),
-                'type' => 'inconsistencia_acta',
-                'description' => $validated['notes'] ?? 'Mesa observada',
-                'severity' => 'warning',
-                'status' => 'pending',
-                'voting_table_id' => $votingTable->id,
-                'election_type_id' => $electionTypeId,
-                'reviewed_by' => Auth::id(),
-                'reviewer_role' => 'revisor',
-            ]);
-
-            $tableElection->status = 'observada';
-            $tableElection->save();
-
+            $te->close(Auth::id());
             DB::commit();
 
-            return response()->json(['success' => true, 'message' => 'Mesa observada correctamente']);
+            return response()->json(['success' => true, 'message' => '✅ Mesa cerrada correctamente']);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error observing table: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Error al observar'], 500);
+            Log::error('closeTable: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    public function validateTable(Request $request, $tableId)
+    public function reopenTable(Request $request, int $tableId)
     {
         try {
-            $validated = $request->validate([
-                'action' => 'required|in:validate,approve,reject',
-                'notes' => 'nullable|string|max:500',
-                'election_type_id' => 'required|exists:election_types,id',
-            ]);
+            $electionTypeId = $request->input('election_type_id');
+            if (!$electionTypeId) {
+                return response()->json(['success' => false, 'message' => 'Se requiere election_type_id'], 422);
+            }
 
-            $votingTable = VotingTable::findOrFail($tableId);
-            $tableElection = VotingTableElection::where('voting_table_id', $tableId)
-                ->where('election_type_id', $validated['election_type_id'])
+            $table = VotingTable::findOrFail($tableId);
+            $perms = $this->resolvePermissions($table);
+
+            if (!$perms['can_reopen']) {
+                return response()->json(['success' => false, 'message' => 'Sin permiso para reabrir esta mesa'], 403);
+            }
+
+            $te = VotingTableElection::where('voting_table_id', $tableId)
+                ->where('election_type_id', $electionTypeId)
                 ->firstOrFail();
 
-            if (!$this->canAccessTable($votingTable, 'validate_votes')) {
-                return response()->json(['success' => false, 'message' => 'No tiene permiso'], 403);
+            if (!in_array($te->status, [
+                VotingTableElection::STATUS_CERRADA,
+                VotingTableElection::STATUS_OBSERVADA,
+            ])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Solo se pueden reabrir mesas cerradas u observadas',
+                ], 422);
             }
 
             DB::beginTransaction();
-
-            $tableStatus = match($validated['action']) {
-                'validate' => 'en_escrutinio',
-                'approve' => 'escrutada',
-                'reject' => 'observada',
-                default => 'en_escrutinio'
-            };
-
-            $voteStatus = match($validated['action']) {
-                'validate' => Vote::VOTE_STATUS_VALIDATED,
-                'approve' => Vote::VOTE_STATUS_APPROVED,
-                'reject' => Vote::VOTE_STATUS_REJECTED,
-                default => Vote::VOTE_STATUS_VALIDATED
-            };
-
-            $tableElection->status = $tableStatus;
-            $tableElection->save();
-
-            Vote::where('voting_table_id', $tableId)
-                ->where('election_type_id', $validated['election_type_id'])
-                ->update([
-                    'vote_status' => $voteStatus,
-                    'validated_by' => Auth::id(),
-                    'validated_at' => now(),
-                ]);
-
+            $te->reopen(Auth::id());
             DB::commit();
 
-            $messages = ['validate' => 'Validada', 'approve' => 'Aprobada', 'reject' => 'Rechazada'];
-            return response()->json(['success' => true, 'message' => "Mesa {$messages[$validated['action']]} correctamente"]);
+            return response()->json(['success' => true, 'message' => '✅ Mesa reabierta. Pasó a estado Votación.']);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error validating table: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Error al validar'], 500);
+            Log::error('reopenTable: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    public function correctTable(Request $request, $tableId)
-    {
-        try {
-            $validated = $request->validate([
-                'notes' => 'nullable|string|max:500',
-                'election_type_id' => 'required|exists:election_types,id',
-            ]);
-
-            $votingTable = VotingTable::findOrFail($tableId);
-            $tableElection = VotingTableElection::where('voting_table_id', $tableId)
-                ->where('election_type_id', $validated['election_type_id'])
-                ->firstOrFail();
-
-            if (!$this->canAccessTable($votingTable, 'correct_votes')) {
-                return response()->json(['success' => false, 'message' => 'No tiene permiso'], 403);
-            }
-
-            DB::beginTransaction();
-
-            $tableElection->status = 'en_escrutinio';
-            $tableElection->save();
-
-            Vote::where('voting_table_id', $tableId)
-                ->where('election_type_id', $validated['election_type_id'])
-                ->where('vote_status', Vote::VOTE_STATUS_OBSERVED)
-                ->update([
-                    'vote_status' => Vote::VOTE_STATUS_CORRECTED,
-                    'corrected_by' => Auth::id(),
-                    'corrected_at' => now(),
-                ]);
-
-            Observation::where('voting_table_id', $tableId)
-                ->where('election_type_id', $validated['election_type_id'])
-                ->where('status', 'pending')
-                ->update([
-                    'status' => 'resolved',
-                    'resolved_by' => Auth::id(),
-                    'resolved_at' => now(),
-                    'resolution_notes' => $validated['notes'] ?? 'Corregido',
-                ]);
-
-            DB::commit();
-
-            return response()->json(['success' => true, 'message' => 'Mesa corregida correctamente']);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error correcting table: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Error al corregir'], 500);
-        }
-    }
-
-    public function getTableVotes(Request $request, $tableId)
+    public function getTableVotes(Request $request, int $tableId)
     {
         try {
             $electionTypeId = $request->query('election_type_id');
 
             $query = Vote::where('voting_table_id', $tableId)
-                ->with(['candidate:id,name,party,color,party_logo,election_type_category_id']);
+                ->with(['candidate:id,name,party,color,party_logo,election_type_category_id,photo', 'electionTypeCategory.electionCategory']);
 
             if ($electionTypeId) {
                 $query->where('election_type_id', $electionTypeId);
             }
 
-            $votes = $query->get()
-                ->map(function ($vote) {
-                    return [
-                        'candidate_id' => $vote->candidate_id,
-                        'candidate_name' => $vote->candidate->name,
-                        'candidate_party' => $vote->candidate->party,
-                        'candidate_color' => $vote->candidate->color,
-                        'candidate_logo' => $vote->candidate->party_logo_url,
-                        'quantity' => $vote->quantity,
-                        'vote_status' => $vote->vote_status,
-                    ];
-                });
+            $votes = $query->get()->map(fn(Vote $v) => [
+                'id'              => $v->id,
+                'candidate_id'    => $v->candidate_id,
+                'candidate_name'  => $v->candidate->name,
+                'candidate_party' => $v->candidate->party,
+                'candidate_color' => $v->candidate->color,
+                'candidate_logo'  => $v->candidate->party_logo_url ?? null,
+                'quantity'        => $v->quantity,
+                'vote_status'     => $v->vote_status,
+                'category_id'     => $v->election_type_category_id,
+                'category_code'   => $v->electionTypeCategory?->electionCategory?->code ?? '',
+                'category_name'   => $v->electionTypeCategory?->electionCategory?->name ?? '',
+            ]);
 
             return response()->json($votes);
 
         } catch (\Exception $e) {
-            Log::error('Error getting table votes: ' . $e->getMessage());
+            Log::error('getTableVotes: ' . $e->getMessage());
             return response()->json(['error' => 'Error al cargar votos'], 500);
         }
     }
 
-    public function closeTable(Request $request, $tableId)
-    {
-        try {
-            $electionTypeId = $request->input('election_type_id');
-
-            if (!$electionTypeId) {
-                return response()->json(['success' => false, 'message' => 'Se requiere tipo de elección'], 422);
-            }
-
-            DB::beginTransaction();
-
-            $tableElection = VotingTableElection::where('voting_table_id', $tableId)
-                ->where('election_type_id', $electionTypeId)
-                ->firstOrFail();
-
-            if (in_array($tableElection->status, ['cerrada', 'escrutada', 'transmitida', 'anulada'])) {
-                throw new \Exception('La mesa ya está cerrada o finalizada');
-            }
-
-            // Check all category results are consistent
-            $inconsistentResults = VotingTableCategoryResult::where('voting_table_id', $tableId)
-                ->whereHas('electionTypeCategory', function($q) use ($electionTypeId) {
-                    $q->where('election_type_id', $electionTypeId);
-                })
-                ->where('is_consistent', false)
-                ->exists();
-
-            if ($inconsistentResults) {
-                throw new \Exception('No se puede cerrar la mesa: hay categorías inconsistentes');
-            }
-
-            $tableElection->status = 'cerrada';
-            $tableElection->closing_time = now()->format('H:i:s');
-            $tableElection->save();
-
-            DB::commit();
-
-            return response()->json(['success' => true, 'message' => 'Mesa cerrada correctamente']);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error closing table: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Error al cerrar: ' . $e->getMessage()], 500);
-        }
-    }
-
-    public function reopenTable(Request $request, $tableId)
-    {
-        try {
-            $electionTypeId = $request->input('election_type_id');
-
-            if (!$electionTypeId) {
-                return response()->json(['success' => false, 'message' => 'Se requiere tipo de elección'], 422);
-            }
-
-            DB::beginTransaction();
-
-            $tableElection = VotingTableElection::where('voting_table_id', $tableId)
-                ->where('election_type_id', $electionTypeId)
-                ->firstOrFail();
-
-            if (!in_array($tableElection->status, ['cerrada', 'observada'])) {
-                throw new \Exception('Solo se pueden reabrir mesas cerradas u observadas');
-            }
-
-            $tableElection->status = 'en_escrutinio';
-            $tableElection->save();
-
-            DB::commit();
-
-            return response()->json(['success' => true, 'message' => 'Mesa reabierta correctamente']);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error reopening table: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Error al reabrir'], 500);
-        }
-    }
-
-    public function getTableStats(Request $request, $tableId)
+    public function getTableStats(Request $request, int $tableId)
     {
         try {
             $electionTypeId = $request->query('election_type_id');
 
-            $votingTable = VotingTable::with([
+            $table = VotingTable::with([
                 'institution:id,name,code',
-                'tableElections' => function($q) use ($electionTypeId) {
-                    if ($electionTypeId) {
-                        $q->where('election_type_id', $electionTypeId);
-                    }
-                },
+                'tableElections' => fn($q) => $q->when($electionTypeId,
+                    fn($q2) => $q2->where('election_type_id', $electionTypeId)
+                ),
                 'categoryResults.electionTypeCategory.electionCategory',
-                'observations' => function($q) {
-                    $q->where('status', 'pending');
-                }
+                'observations'   => fn($q) => $q->where('status', 'pending'),
             ])->findOrFail($tableId);
 
-            $tableElection = $votingTable->tableElections->first();
+            $te = $table->tableElections->first();
 
-            $stats = [
-                'table' => [
-                    'id' => $votingTable->id,
-                    'number' => $votingTable->number,
-                    'code' => $votingTable->internal_code,
-                    'oep_code' => $votingTable->oep_code,
-                    'status' => $tableElection ? $tableElection->status : 'sin_configurar',
-                    'institution' => $votingTable->institution->name,
+            return response()->json([
+                'table'   => [
+                    'id'          => $table->id,
+                    'number'      => $table->number,
+                    'code'        => $table->full_code,
+                    'status'      => $te?->status ?? 'sin_configurar',
+                    'institution' => $table->institution->name,
                 ],
-                'voters' => [
-                    'expected' => $votingTable->expected_voters,
-                    'total' => $tableElection ? $tableElection->total_voters : 0,
-                    'participation' => $votingTable->expected_voters > 0 && $tableElection
-                        ? round(($tableElection->total_voters / $votingTable->expected_voters) * 100, 1)
+                'voters'  => [
+                    'expected'      => $table->expected_voters,
+                    'total'         => $te?->total_voters ?? 0,
+                    'participation' => $table->expected_voters > 0 && $te
+                        ? round(($te->total_voters / $table->expected_voters) * 100, 1)
                         : 0,
                 ],
                 'ballots' => [
-                    'received' => $tableElection ? $tableElection->ballots_received : 0,
-                    'used' => $tableElection ? $tableElection->ballots_used : 0,
-                    'leftover' => $tableElection ? $tableElection->ballots_leftover : 0,
-                    'spoiled' => $tableElection ? $tableElection->ballots_spoiled : 0,
+                    'received' => $te?->ballots_received ?? 0,
+                    'used'     => $te?->ballots_used ?? 0,
+                    'leftover' => $te?->ballots_leftover ?? 0,
+                    'spoiled'  => $te?->ballots_spoiled ?? 0,
                 ],
-                'observations_count' => $votingTable->observations->count(),
-                'category_results' => $votingTable->categoryResults->map(function($result) {
-                    return [
-                        'category' => $result->electionTypeCategory->electionCategory->name,
-                        'code' => $result->electionTypeCategory->electionCategory->code,
-                        'valid_votes' => $result->valid_votes,
-                        'blank_votes' => $result->blank_votes,
-                        'null_votes' => $result->null_votes,
-                        'total_votes' => $result->total_votes,
-                        'is_consistent' => $result->is_consistent,
-                    ];
-                }),
-            ];
-
-            return response()->json($stats);
+                'observations_count' => $table->observations->count(),
+                'category_results'   => $table->categoryResults->map(fn($r) => [
+                    'category'      => $r->electionTypeCategory->electionCategory->name,
+                    'code'          => $r->electionTypeCategory->electionCategory->code,
+                    'valid_votes'   => $r->valid_votes,
+                    'blank_votes'   => $r->blank_votes,
+                    'null_votes'    => $r->null_votes,
+                    'total_votes'   => $r->total_votes,
+                    'is_consistent' => (bool) $r->is_consistent,
+                    'status'        => $r->status,
+                ]),
+            ]);
 
         } catch (\Exception $e) {
-            Log::error('Error getting table stats: ' . $e->getMessage());
+            Log::error('getTableStats: ' . $e->getMessage());
             return response()->json(['error' => 'Error al cargar estadísticas'], 500);
         }
     }
 
-    public function uploadActa(Request $request)
+    private function safeReviewerRole($user): string
     {
-        try {
-            $validated = $request->validate([
-                'voting_table_id' => 'required|exists:voting_tables,id',
-                'election_type_id' => 'required|exists:election_types,id',
-                'acta_number' => 'required|string|max:50',
-                'photo' => 'required|image|mimes:jpeg,png,jpg|max:5120',
-                'pdf' => 'nullable|mimes:pdf|max:10240',
-                'has_physical' => 'nullable|in:on,off,true,false,1,0',
-            ]);
-
-            DB::beginTransaction();
-
-            $votingTable = VotingTable::findOrFail($validated['voting_table_id']);
-            $tableElection = VotingTableElection::where('voting_table_id', $validated['voting_table_id'])
-                ->where('election_type_id', $validated['election_type_id'])
-                ->firstOrFail();
-
-            $actaController = new ActaController();
-            return $actaController->upload($request);
-
-        } catch (\Exception $e) {
-            Log::error('Error uploading acta: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Error al subir el acta'], 500);
+        $allowed = ['revisor', 'fiscal', 'notario', 'coordinador'];
+        foreach ($allowed as $role) {
+            if ($user->hasRole($role)) return $role;
         }
-    }
-
-    private function calculateTotals($votingTables)
-    {
-        $totals = [
-            'expected' => 0,
-            'total' => 0,
-            'by_candidate' => []
-        ];
-
-        foreach ($votingTables as $table) {
-            $totals['expected'] += $table->expected_voters ?? 0;
-            $totals['total'] += $table->total_voters ?? 0;
-        }
-
-        return $totals;
+        return 'coordinador';
     }
 }

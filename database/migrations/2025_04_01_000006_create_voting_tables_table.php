@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -33,10 +34,19 @@ return new class extends Migration
             $table->foreignId('updated_by')->nullable()->constrained('users');
             $table->timestamps();
             $table->softDeletes();
-
-            $table->unique(['institution_id', 'number', 'letter']);
             $table->index('institution_id');
         });
+
+        DB::statement('
+            CREATE UNIQUE INDEX idx_vt_inst_num_null_letter
+            ON voting_tables (institution_id, number)
+            WHERE letter IS NULL AND deleted_at IS NULL
+        ');
+        DB::statement('
+            CREATE UNIQUE INDEX idx_vt_inst_num_letter
+            ON voting_tables (institution_id, number, letter)
+            WHERE letter IS NOT NULL AND deleted_at IS NULL
+        ');
 
         Schema::create('voting_table_elections', function (Blueprint $table) {
             $table->id();
@@ -46,11 +56,11 @@ return new class extends Migration
             $table->foreignId('election_type_id')
                 ->constrained('election_types')
                 ->onDelete('cascade');
-            $table->integer('ballots_received')->default(0);   // Papeletas recibidas para esta elección
-            $table->integer('ballots_used')->default(0);       // Papeletas usadas
-            $table->integer('ballots_leftover')->default(0);   // Papeletas sobrantes
-            $table->integer('ballots_spoiled')->default(0);    // Papeletas deterioradas
-            $table->integer('total_voters')->default(0);       // Votantes que asistieron (same both, but tracked per)
+            $table->integer('ballots_received')->default(0);
+            $table->integer('ballots_used')->default(0);
+            $table->integer('ballots_leftover')->default(0);
+            $table->integer('ballots_spoiled')->default(0);
+            $table->integer('total_voters')->default(0);
             $table->enum('status', [
                 'configurada',
                 'en_espera',
@@ -77,6 +87,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('voting_table_elections');
+        DB::statement('DROP INDEX IF EXISTS idx_vt_inst_num_null_letter');
+        DB::statement('DROP INDEX IF EXISTS idx_vt_inst_num_letter');
         Schema::dropIfExists('voting_tables');
     }
 };

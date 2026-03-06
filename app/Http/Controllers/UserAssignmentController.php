@@ -18,13 +18,10 @@ class UserAssignmentController extends Controller
         if (!auth()->user()->hasPermission('assign_recinto_delegates')) {
             abort(403);
         }
-
         $request->validate([
             'institution_id' => 'required|exists:institutions,id',
             'assigned_until' => 'nullable|date|after:today'
         ]);
-
-        // Desactivar asignaciones anteriores
         RecintoDelegate::where('user_id', $user->id)
             ->where('is_active', true)
             ->update(['is_active' => false]);
@@ -80,8 +77,8 @@ class UserAssignmentController extends Controller
 
         Reviewer::create([
             'user_id' => $user->id,
-            'assignable_type' => $request->assignable_type === 'institution' 
-                ? Institution::class 
+            'assignable_type' => $request->assignable_type === 'institution'
+                ? Institution::class
                 : VotingTable::class,
             'assignable_id' => $request->assignable_id,
             'assigned_at' => now(),
@@ -105,8 +102,8 @@ class UserAssignmentController extends Controller
 
         Modifier::create([
             'user_id' => $user->id,
-            'assignable_type' => $request->assignable_type === 'institution' 
-                ? Institution::class 
+            'assignable_type' => $request->assignable_type === 'institution'
+                ? Institution::class
                 : VotingTable::class,
             'assignable_id' => $request->assignable_id,
             'assigned_at' => now(),

@@ -6,9 +6,6 @@ use Illuminate\Database\Seeder;
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Support\Facades\DB;
-
-// ✅ No schema-breaking issues in this seeder.
-// One silent logic bug fixed: missing permissions were calculated but never logged/thrown.
 class PermissionRoleSeeder extends Seeder
 {
     protected $permissionStructure = [
@@ -304,8 +301,6 @@ class PermissionRoleSeeder extends Seeder
                 $permissionIds    = Permission::whereIn('name', $roleData['permissions'])->pluck('id');
                 $foundNames       = Permission::whereIn('name', $roleData['permissions'])->pluck('name')->toArray();
                 $missingNames     = array_diff($roleData['permissions'], $foundNames);
-
-                // ✅ FIX: actually log missing permissions instead of silently ignoring
                 if (!empty($missingNames)) {
                     $this->command->warn("  ⚠️  Role [{$name}] missing permissions: " . implode(', ', $missingNames));
                 }

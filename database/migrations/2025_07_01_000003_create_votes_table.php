@@ -27,7 +27,7 @@ return new class extends Migration
                 'rejected',
             ])->default('pending_review');
 
-            $table->foreignId('observation_id')->nullable()->constrained('observations');
+            $table->foreignId('observation_id')->nullable()->constrained('observations')->onDelete('set null');
             $table->foreignId('verified_by')->nullable()->constrained('users');
             $table->timestamp('verified_at')->nullable();
             $table->text('verification_notes')->nullable();

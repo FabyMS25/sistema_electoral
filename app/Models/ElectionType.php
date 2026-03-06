@@ -76,9 +76,6 @@ class ElectionType extends Model
         return $this->hasMany(VotingTableElection::class);
     }
 
-    /**
-     * Physical voting tables participating in this election via pivot.
-     */
     public function votingTables()
     {
         return $this->hasManyThrough(
@@ -116,10 +113,6 @@ class ElectionType extends Model
         return $this->hasMany(Observation::class);
     }
 
-    // =========================================================================
-    // SCOPES
-    // =========================================================================
-
     public function scopeActive($query)
     {
         return $query->where('active', true);
@@ -144,10 +137,6 @@ class ElectionType extends Model
     {
         return $query->where('level', self::LEVEL_DEPARTAMENTAL);
     }
-
-    // =========================================================================
-    // HELPERS
-    // =========================================================================
 
     public function isMunicipal(): bool
     {

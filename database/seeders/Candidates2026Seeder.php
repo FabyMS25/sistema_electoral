@@ -20,20 +20,16 @@ class Candidates2026Seeder extends Seeder
             $this->command->error('❌ No se encontró el municipio de Quillacollo');
             return;
         }
-
-        // ✅ UPDATED: Match new election name format from ElectionTypeSeeder
         $electionType = ElectionType::where('name', 'LIKE', '%Municipal%2026%')->first();
         if (!$electionType) {
             $this->command->error('❌ No se encontró el tipo de elección Municipal 2026');
             return;
         }
-
         $alcaldeCategory = ElectionCategory::where('code', 'ALC')->first();
         if (!$alcaldeCategory) {
             $this->command->error('❌ No se encontró la categoría "Alcalde"');
             return;
         }
-
         $electionTypeCategory = ElectionTypeCategory::where([
             'election_type_id'    => $electionType->id,
             'election_category_id' => $alcaldeCategory->id,
@@ -51,9 +47,6 @@ class Candidates2026Seeder extends Seeder
             'A-UPP' => 13, 'FRI' => 14,
         ];
 
-        // ❌ REMOVED: 'type' field from all candidate data — blank/null votes are NOT candidates.
-        // Blank and null vote counts live in voting_table_category_results, not here.
-        // The original 'BLANCO' and 'NULO' fake-candidate rows are also removed.
         $candidatos = [
             ['name' => 'Hector Cartagena',  'party' => 'UNE', 'party_full_name' => 'Unidad Nacional de Esperanza',
              'party_logo' => 'candidates/party-logos/s5K2f3KYMeeieGDHLFuV6ZPUvTM2vr11feDDOHYJ.jpg',
@@ -120,7 +113,6 @@ class Candidates2026Seeder extends Seeder
                         'municipality_id'           => $quillacollo->id,
                         'province_id'               => $quillacollo->province_id,
                         'department_id'             => $quillacollo->province->department_id ?? null,
-                        // ❌ NO 'type' field — removed from schema and model
                     ]
                 );
                 $this->command->info("  ✅ {$data['name']} ({$data['party']}) - Franja {$ordenFranjas[$data['party']]}");

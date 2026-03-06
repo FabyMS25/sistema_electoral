@@ -1,7 +1,7 @@
 {
-    "name": "laravel/laravel",
+    "name": "app/sistema_electoral",
+    "description": "Sistema Electoral",
     "type": "project",
-    "description": "Sistema de Conteo",
     "keywords": ["framework", "laravel"],
     "license": "MIT",
     "require": {

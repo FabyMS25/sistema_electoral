@@ -1,7 +1,9 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -9,14 +11,11 @@ return new class extends Migration
     {
         Schema::create('permissions', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->unique(); // 'create_users', 'register_votes'
+            $table->string('name')->unique();
             $table->string('display_name')->nullable();
             $table->string('description')->nullable();
-            $table->string('group')->nullable(); // 'usuarios', 'votos', 'mesas'
-
-            // Ámbito del permiso (opcional)
+            $table->string('group')->nullable();
             $table->enum('scope', ['global', 'recinto', 'mesa'])->default('global');
-
             $table->timestamps();
         });
 
@@ -25,10 +24,7 @@ return new class extends Migration
             $table->string('name')->unique();
             $table->string('display_name')->nullable();
             $table->string('description')->nullable();
-
-            // Ámbito por defecto del rol
             $table->enum('default_scope', ['global', 'recinto', 'mesa'])->default('global');
-
             $table->timestamps();
         });
 
@@ -45,37 +41,47 @@ return new class extends Migration
             $table->foreignId('role_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->enum('scope', ['global', 'recinto', 'mesa'])->default('global');
-
-            // ID del recinto o mesa si el ámbito es específico
             $table->foreignId('institution_id')->nullable()->constrained();
             $table->foreignId('voting_table_id')->nullable()->constrained();
-            $table->foreignId('election_type_id')->nullable()->constrained(); // Para filtrar por elección
-
-            // Metadata adicional
-            $table->json('scope_settings')->nullable(); // Para configuraciones adicionales
-
+            $table->foreignId('election_type_id')->nullable()->constrained();
+            $table->json('scope_settings')->nullable();
             $table->timestamps();
-
-            // Unique constraint mejorado
-            $table->unique(['role_id', 'user_id', 'institution_id', 'voting_table_id', 'election_type_id'],
-                        'unique_role_user_scope_composite');
-
-            // Índices para búsquedas rápidas
             $table->index(['user_id', 'election_type_id']);
             $table->index(['institution_id', 'election_type_id']);
             $table->index(['voting_table_id', 'election_type_id']);
         });
-        // Permisos directos a usuarios (sobrescriben roles)
+
+        // Global scope: no institution, no table, no election
+        DB::statement('
+            CREATE UNIQUE INDEX unique_role_user_global
+            ON role_user (role_id, user_id)
+            WHERE institution_id IS NULL
+              AND voting_table_id IS NULL
+              AND election_type_id IS NULL
+        ');
+
+        // Recinto scope: institution set, no table
+        DB::statement('
+            CREATE UNIQUE INDEX unique_role_user_recinto
+            ON role_user (role_id, user_id, institution_id, election_type_id)
+            WHERE institution_id IS NOT NULL
+              AND voting_table_id IS NULL
+        ');
+
+        // Mesa scope: specific voting table
+        DB::statement('
+            CREATE UNIQUE INDEX unique_role_user_mesa
+            ON role_user (role_id, user_id, voting_table_id, election_type_id)
+            WHERE voting_table_id IS NOT NULL
+        ');
+
         Schema::create('permission_user', function (Blueprint $table) {
             $table->id();
             $table->foreignId('permission_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-
-            // Ámbito específico
             $table->enum('scope', ['global', 'recinto', 'mesa'])->default('global');
             $table->unsignedBigInteger('scope_id')->nullable();
             $table->string('scope_type')->nullable();
-
             $table->timestamps();
             $table->unique(['permission_id', 'user_id', 'scope', 'scope_id', 'scope_type'], 'unique_permission_user_scope');
         });
@@ -84,6 +90,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('permission_user');
+        DB::statement('DROP INDEX IF EXISTS unique_role_user_global');
+        DB::statement('DROP INDEX IF EXISTS unique_role_user_recinto');
+        DB::statement('DROP INDEX IF EXISTS unique_role_user_mesa');
         Schema::dropIfExists('role_user');
         Schema::dropIfExists('permission_role');
         Schema::dropIfExists('roles');

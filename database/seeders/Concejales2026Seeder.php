@@ -19,14 +19,11 @@ class Concejales2026Seeder extends Seeder
             $this->command->error('❌ No se encontró el municipio de Quillacollo');
             return;
         }
-
-        // ✅ Match new election name from ElectionTypeSeeder
         $electionType = ElectionType::where('name', 'LIKE', '%Municipal%2026%')->first();
         if (!$electionType) {
             $this->command->error('❌ No se encontró el tipo de elección Municipal 2026');
             return;
         }
-
         $concejalCategory = ElectionCategory::where('code', 'CON')->first();
         if (!$concejalCategory) {
             $this->command->error('❌ No se encontró la categoría CON');
@@ -42,8 +39,6 @@ class Concejales2026Seeder extends Seeder
             $this->command->error('❌ No se encontró election_type_category para CON. Ejecutar ElectionTypeSeeder primero.');
             return;
         }
-
-        // ✅ Load party logos/colors from already-seeded alcaldes (reuse, don't duplicate)
         $alcaldeCategory    = ElectionCategory::where('code', 'ALC')->first();
         $alcaldeTypeCategory = ElectionTypeCategory::where([
             'election_type_id'    => $electionType->id,
@@ -63,10 +58,6 @@ class Concejales2026Seeder extends Seeder
                     ];
                 });
         }
-
-        // ⚠️  PARTY NAME MISMATCH FIX:
-        // Alcaldes uses 'Soluciones con Todos', Concejales uses 'Solucion con todos' and 'FUERZA SOCIAL' / 'ALIANZA PATRIA'.
-        // Normalize lookup so logos are actually found from the alcaldes seed.
         $logoFor = function (string $partyKey, string $fallbackName, string $fallbackLogo, string $fallbackColor) use ($alcaldesLogos): array {
             $data = $alcaldesLogos[$partyKey] ?? null;
             return [
@@ -82,16 +73,12 @@ class Concejales2026Seeder extends Seeder
             'APB-SUMATE' => 9, 'UN' => 10, 'UNIDOS' => 11, 'ALIANZA PATRIA' => 12,
             'A-UPP' => 13, 'FRI' => 14,
         ];
-
-        // ❌ REMOVED: 'type' field — no longer in Candidate schema
-        // ❌ REMOVED: BLANCO and NULO fake-candidate rows — blank/null votes tracked in voting_table_category_results
         $concejales = [
             ['name' => 'JOHNNY ROQUE OCHOA', 'party' => 'MTS',
              ...$logoFor('MTS', 'Movimiento Tercer Sistema', 'candidates/party-logos/mGvbRDLlUq31sPgBuxzTXqYcLbk7qA5hcQNuXksR.jpg', '#008040')],
             ['name' => 'KARINA AMPARO RICO MUÑOZ', 'party' => 'NGP',
              ...$logoFor('NGP', 'Nueva Generación Patriotica', 'candidates/party-logos/0m9Lrc7AzD9tEfB7XNMGtv6iRwK22ykNpR9jIquF.jpg', '#f1b603')],
             ['name' => 'CASTO RODRIGUEZ CHOQUE', 'party' => 'Solucion con todos',
-             // ✅ Lookup using the key used by alcaldes ('Soluciones con Todos')
              ...$logoFor('Soluciones con Todos', 'Soluciones con Todos', 'candidates/party-logos/cbnbf4fh7jifDeAyOOiajqeaj9pP9Fa5nZpff0c0.jpg', '#ff00ff')],
             ['name' => 'DARIO JOSE ANTEZANA VARGAS', 'party' => 'UN',
              ...$logoFor('UN', 'Unidad Nacional', 'candidates/party-logos/Zy6qsq9S8SAfcac0GnIPnTtlRjh5tFUejklru0dx.png', '#005555')],
@@ -108,12 +95,10 @@ class Concejales2026Seeder extends Seeder
             ['name' => 'REYNALDO LAFUENTE TERRAZAS', 'party' => 'A-UPP',
              ...$logoFor('A-UPP', 'Alianza por los Pueblos', 'candidates/party-logos/xvW28ABf5JU8NBrcsu2noXO1H3V9cSzWrBfMJt9j.jpg', '#ffff80')],
             ['name' => 'ROSA MAVEL PADILLA MENDIETA', 'party' => 'ALIANZA PATRIA',
-             // ✅ Alcaldes uses 'Alianza Patria', concejales uses 'ALIANZA PATRIA' — normalize lookup
              ...$logoFor('Alianza Patria', 'Alianza Patria', 'candidates/party-logos/v5g6GMqvVIOfzOs3dcB79bymsaXLRRy5n7o5gxK0.jpg', '#ff8000')],
             ['name' => 'LEYDI CARLA SANTOS ESCALERA', 'party' => 'APB-SUMATE',
              ...$logoFor('APB-SUMATE', 'APB-SUMATE', 'candidates/party-logos/MYYFy7cRnN0nMVg9IUETDJ3iB6rEfkSDcv0PpKy2.png', '#59017e')],
             ['name' => 'JOSE LUIS FERNANDEZ QUINTANA', 'party' => 'FUERZA SOCIAL',
-             // ✅ Alcaldes uses 'Fuerza Social', concejales uses 'FUERZA SOCIAL' — normalize lookup
              ...$logoFor('Fuerza Social', 'Fuerza Social', 'candidates/party-logos/JTETflAx6zWBBzXD3XuuIaLMvhsQvna7efKj0WIe.jpg', '#80ff00')],
             ['name' => 'ALVARO LIMA LOPEZ', 'party' => 'UNIDOS',
              ...$logoFor('UNIDOS', 'UNIDOS', 'candidates/party-logos/gcOMersu7GD753uCIGaj4FkPWlFcRxipOgQ2UAjV.jpg', '#ff1313')],
@@ -140,7 +125,6 @@ class Concejales2026Seeder extends Seeder
                         'municipality_id'           => $quillacollo->id,
                         'province_id'               => $quillacollo->province_id,
                         'department_id'             => $quillacollo->province->department_id ?? null,
-                        // ❌ NO 'type' field
                     ]
                 );
                 $this->command->info("  ✅ {$data['name']} ({$data['party']}) - Franja " . ($ordenFranjas[$data['party']] ?? '?'));

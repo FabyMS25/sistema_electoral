@@ -15,7 +15,7 @@ class ProvincesMunicipalitiesSeeder extends Seeder
     public function run()
     {
         $cochabamba = Department::where('name', 'Cochabamba')->first();
-        
+
         if (!$cochabamba) {
             $cochabamba = Department::create(['name' => 'Cochabamba', 'capital' => 'Cochabamba']);
         }
@@ -330,10 +330,6 @@ class ProvincesMunicipalitiesSeeder extends Seeder
             ['name' => 'Colcapirhua','province_id' => $province->id,
                 'latitude' => -17.4000,'longitude' => -66.2333],
         ];
-
-        // foreach ($municipalities as $municipality) {
-        //     Municipality::create($municipality);
-        // }
         foreach ($municipalities as $municipality) {
             Municipality::firstOrCreate(
                 ['name' => $municipality['name'], 'province_id' => $municipality['province_id']],

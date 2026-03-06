@@ -28,10 +28,6 @@ class ElectionTypeCategory extends Model
         'has_null_vote'    => 'boolean',
     ];
 
-    // =========================================================================
-    // RELATIONSHIPS
-    // =========================================================================
-
     public function electionType(): BelongsTo
     {
         return $this->belongsTo(ElectionType::class);
@@ -61,10 +57,6 @@ class ElectionTypeCategory extends Model
     {
         return $this->hasMany(ActaCategoryResult::class);
     }
-
-    // =========================================================================
-    // HELPERS
-    // =========================================================================
 
     public function allowsBlankVote(): bool
     {

@@ -11,11 +11,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('election_type_id')->constrained()->onDelete('cascade');
             $table->foreignId('election_category_id')->constrained()->onDelete('cascade');
-            $table->integer('ballot_order')->default(1)->after('election_category_id');
+            $table->integer('ballot_order')->default(1);
             $table->integer('votes_per_person')->default(1);
             $table->boolean('has_blank_vote')->default(true);
             $table->boolean('has_null_vote')->default(true);
             $table->timestamps();
+            $table->unique(['election_type_id', 'ballot_order'], 'etc_unique_ballot_order');
             $table->unique(['election_type_id', 'election_category_id'], 'unique_election_category');
         });
     }

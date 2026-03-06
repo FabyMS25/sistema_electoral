@@ -16,7 +16,7 @@ class Vote extends Model
         'voting_table_id',
         'candidate_id',
         'election_type_id',
-        'election_type_category_id',  // NEW: denormalized for query performance
+        'election_type_category_id',
         'user_id',
         'registered_at',
         'verified_at',

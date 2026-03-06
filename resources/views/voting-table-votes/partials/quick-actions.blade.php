@@ -1,43 +1,76 @@
 {{-- resources/views/voting-table-votes/partials/quick-actions.blade.php --}}
-<div class="quick-actions mt-4">
-    <div class="card bg-light border-0 shadow-sm">
-        <div class="card-body py-3">
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <h6 class="mb-1">
-                        <i class="ri-flashlight-line me-1 text-warning"></i>
-                        Acciones rápidas
-                    </h6>
-                    <small class="text-muted">
-                        {{ $votingTables->count() }} mesas visibles |
-                        <span id="pendingCount">0</span> con cambios pendientes
-                    </small>
-                </div>
-                <div class="col-md-6 text-end">
-                    <div class="btn-group" role="group">
-                        <button class="btn btn-success" id="quickSaveAllBtn" title="Guardar todas las mesas (Ctrl+S)">
-                            <i class="ri-save-line me-1"></i>
-                            Guardar todo
-                        </button>
-                        <button class="btn btn-info" id="quickRefreshBtn" title="Actualizar vista">
-                            <i class="ri-refresh-line me-1"></i>
-                            Actualizar
-                        </button>
+<div class="quick-actions">
+    <div class="card border-0 shadow">
+        <div class="card-body py-2 px-3">
+            <div class="row align-items-center g-2">
+                <div class="col-md-5 col-lg-6">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <span class="text-muted small">
+                            <i class="ri-table-line me-1"></i>
+                            <strong id="qa-visible-count">{{ $votingTables->count() }}</strong>
+                            mesa{{ $votingTables->count() !== 1 ? 's' : '' }} visibles
+                        </span>
+                        <span class="text-muted small" id="qa-pending-indicator" style="display:none;">
+                            <i class="ri-pencil-line me-1 text-warning"></i>
+                            <strong id="qa-pending-count" class="text-warning">0</strong>
+                            con cambios
+                        </span>
+                        @if($totals['expected'] > 0)
+                        <span class="text-muted small">
+                            <i class="ri-user-line me-1"></i>
+                            {{ number_format($totals['total']) }} /
+                            {{ number_format($totals['expected']) }}
+                            habilitados
+                            <span class="badge bg-{{ $totals['participation'] >= 75 ? 'success' : ($totals['participation'] >= 50 ? 'warning text-dark' : 'secondary') }} ms-1">
+                                {{ $totals['participation'] }}%
+                            </span>
+                        </span>
+                        @endif
                     </div>
                 </div>
-            </div>
 
-            <!-- Atajos de teclado -->
-            <div class="row mt-2">
-                <div class="col-12">
-                    <small class="text-muted">
-                        <i class="ri-keyboard-line me-1"></i>
-                        Atajos:
-                        <span class="badge bg-light text-dark me-2 border">Ctrl + S</span> Guardar todo
-                        <span class="badge bg-light text-dark me-2 border">Ctrl + Enter</span> Guardar mesa actual
-                        <span class="badge bg-light text-dark me-2 border">Esc</span> Cancelar
-                        <span class="badge bg-light text-dark me-2 border">F5</span> Actualizar
-                    </small>
+                {{-- ── Right: action buttons ── --}}
+                <div class="col-md-7 col-lg-6 d-flex justify-content-end align-items-center gap-2 flex-wrap">
+
+                    {{-- Save all (only if can register) --}}
+                    @if($permissions['can_register'] ?? false)
+                    <button class="btn btn-success btn-sm" id="saveAllBtn"
+                            title="Guardar todas las mesas visibles (Ctrl+S)">
+                        <i class="ri-save-line me-1"></i>
+                        <span class="d-none d-md-inline">Guardar todo</span>
+                    </button>
+                    @endif
+
+                    {{-- Close all (only if can close) --}}
+                    @if($permissions['can_close'] ?? false)
+                    <button class="btn btn-dark btn-sm" id="closeAllBtn"
+                            title="Cerrar todas las mesas válidas">
+                        <i class="ri-lock-line me-1"></i>
+                        <span class="d-none d-md-inline">Cerrar todo</span>
+                    </button>
+                    @endif
+
+                    {{-- Refresh --}}
+                    <button class="btn btn-outline-secondary btn-sm" id="qaRefreshBtn"
+                            title="Recargar página (F5)">
+                        <i class="ri-refresh-line"></i>
+                    </button>
+
+                    {{-- Keyboard shortcuts help --}}
+                    <button class="btn btn-outline-secondary btn-sm" type="button"
+                            data-bs-toggle="popover" data-bs-trigger="focus"
+                            data-bs-placement="top" data-bs-html="true"
+                            data-bs-title="Atajos de teclado"
+                            data-bs-content="
+                                <table class='table table-sm table-borderless mb-0 small'>
+                                  <tr><td><kbd>Ctrl+S</kbd></td><td>Guardar todo</td></tr>
+                                  <tr><td><kbd>Ctrl+Enter</kbd></td><td>Guardar mesa en foco</td></tr>
+                                  <tr><td><kbd>F5</kbd></td><td>Actualizar</td></tr>
+                                  <tr><td><kbd>Esc</kbd></td><td>Deseleccionar campo</td></tr>
+                                </table>">
+                        <i class="ri-keyboard-line"></i>
+                    </button>
+
                 </div>
             </div>
         </div>
@@ -47,107 +80,124 @@
 <style>
 .quick-actions {
     position: sticky;
-    bottom: 20px;
-    z-index: 1000;
-    animation: slideUp 0.3s ease;
+    bottom: 16px;
+    z-index: 900;
 }
-
-@keyframes slideUp {
-    from {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
 .quick-actions .card {
-    box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
-    border: none;
-    backdrop-filter: blur(5px);
-    background-color: rgba(248, 249, 250, 0.95) !important;
+    backdrop-filter: blur(8px);
+    background-color: rgba(255,255,255,0.96) !important;
+    border-top: 2px solid #e2e8f0 !important;
 }
-
-.quick-actions .btn-group .btn {
-    padding: 0.5rem 1rem;
-}
-
-@media (max-width: 768px) {
-    .quick-actions .btn-group {
-        display: flex;
-        width: 100%;
-        margin-top: 0.5rem;
-    }
-    .quick-actions .btn-group .btn {
-        flex: 1;
-        font-size: 0.8rem;
-        padding: 0.4rem 0.5rem;
-    }
-    .quick-actions .col-md-6.text-end {
-        text-align: left !important;
-    }
+@media (max-width: 576px) {
+    .quick-actions { bottom: 8px; }
+    .quick-actions .btn { font-size: 0.78rem; }
 }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Actualizar contador de pendientes
-    function updatePendingCount() {
-        const pendingCount = document.getElementById('pendingCount');
-        if (pendingCount && window.pendingTables) {
-            pendingCount.textContent = window.pendingTables.size;
-        }
+(function () {
+    // ── Pending-changes counter ──────────────────────────────────────────
+    window.pendingTables = window.pendingTables ?? new Set();
+
+    function updatePendingDisplay() {
+        const count = window.pendingTables.size;
+        const indicator = document.getElementById('qa-pending-indicator');
+        const badge     = document.getElementById('qa-pending-count');
+        if (!indicator || !badge) return;
+        badge.textContent = count;
+        indicator.style.display = count > 0 ? '' : 'none';
     }
 
-    // Escuchar cambios en mesas pendientes
-    setInterval(updatePendingCount, 500);
-
-    // Atajos de teclado
-    document.addEventListener('keydown', function(e) {
-        // Ctrl + S: Guardar todo
-        if (e.ctrlKey && e.key === 's') {
-            e.preventDefault();
-            document.getElementById('quickSaveAllBtn')?.click();
-        }
-
-        // Ctrl + Enter: Guardar mesa actual (la que está en foco)
-        if (e.ctrlKey && e.key === 'Enter') {
-            e.preventDefault();
-            const activeInput = document.activeElement;
-            if (activeInput && activeInput.classList.contains('candidate-vote')) {
-                const tableId = activeInput.dataset.table;
-                const saveBtn = document.querySelector(`.save-table[data-table-id="${tableId}"]`);
-                if (saveBtn) saveBtn.click();
+    // Watch for changes on any vote / blank / null input
+    document.querySelectorAll('.vote-input, .blank-votes-input, .null-votes-input').forEach(input => {
+        input.addEventListener('input', function () {
+            const tableId = this.dataset.table;
+            if (tableId) {
+                window.pendingTables.add(tableId);
+                updatePendingDisplay();
             }
-        }
+        });
+    });
 
-        // F5: Actualizar
-        if (e.key === 'F5') {
-            e.preventDefault();
-            document.getElementById('quickRefreshBtn')?.click();
-        }
-
-        // Esc: Salir de inputs
-        if (e.key === 'Escape') {
-            document.activeElement?.blur();
+    // Remove from pending after a successful save
+    document.addEventListener('tableSaved', function (e) {
+        if (e.detail?.tableId) {
+            window.pendingTables.delete(String(e.detail.tableId));
+            updatePendingDisplay();
         }
     });
 
-    // Refresh button
-    document.getElementById('quickRefreshBtn')?.addEventListener('click', function() {
+    // ── Save all ─────────────────────────────────────────────────────────
+    document.getElementById('saveAllBtn')?.addEventListener('click', function () {
+        const buttons = document.querySelectorAll('.save-table');
+        if (buttons.length === 0) return;
+
+        Swal.fire({
+            title: `¿Guardar ${buttons.length} mesa${buttons.length !== 1 ? 's' : ''}?`,
+            text: 'Se guardarán todas las mesas visibles con sus votos actuales.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, guardar todo',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#0ab39c',
+        }).then(result => {
+            if (!result.isConfirmed) return;
+            buttons.forEach(btn => btn.click());
+        });
+    });
+
+    // ── Close all ─────────────────────────────────────────────────────────
+    document.getElementById('closeAllBtn')?.addEventListener('click', function () {
+        const buttons = document.querySelectorAll('.close-table');
+        if (buttons.length === 0) {
+            Swal.fire({ icon: 'info', title: 'Sin mesas disponibles',
+                        text: 'No hay mesas abiertas para cerrar en esta vista.' });
+            return;
+        }
+
+        Swal.fire({
+            title: `¿Cerrar ${buttons.length} mesa${buttons.length !== 1 ? 's' : ''}?`,
+            text: 'Solo se cerrarán las mesas que no tengan inconsistencias.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, cerrar todo',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#405189',
+        }).then(result => {
+            if (!result.isConfirmed) return;
+            buttons.forEach(btn => btn.click());
+        });
+    });
+
+    // ── Refresh ──────────────────────────────────────────────────────────
+    document.getElementById('qaRefreshBtn')?.addEventListener('click', function () {
         location.reload();
     });
 
-    // Quick save all
-    document.getElementById('quickSaveAllBtn')?.addEventListener('click', function() {
-        document.getElementById('saveAllBtn')?.click();
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    document.addEventListener('keydown', function (e) {
+        // Ctrl+S → save all
+        if (e.ctrlKey && e.key === 's') {
+            e.preventDefault();
+            document.getElementById('saveAllBtn')?.click();
+        }
+        // Ctrl+Enter → save the table whose input is focused
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            const el = document.activeElement;
+            if (el?.dataset?.table) {
+                document.querySelector(`.save-table[data-table-id="${el.dataset.table}"]`)?.click();
+            }
+        }
+        // F5 → refresh
+        if (e.key === 'F5') { e.preventDefault(); location.reload(); }
+        // Esc → blur
+        if (e.key === 'Escape') document.activeElement?.blur();
     });
 
-    // Quick close all
-    document.getElementById('quickCloseAllBtn')?.addEventListener('click', function() {
-        document.getElementById('closeAllBtn')?.click();
+    // ── Bootstrap popover init ────────────────────────────────────────────
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
+        new bootstrap.Popover(el, { sanitize: false });
     });
-});
+})();
 </script>

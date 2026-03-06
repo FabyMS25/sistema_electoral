@@ -51,7 +51,6 @@ class ActaCategoryResult extends Model
     }
 
     // ===== HELPERS =====
-
     public function getCategoryNameAttribute(): string
     {
         return $this->electionTypeCategory?->electionCategory?->name ?? 'N/A';

@@ -1,121 +1,112 @@
 {{-- resources/views/partials/dashboard-filters.blade.php --}}
-<div class="row mb-2">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <div class="row g-3">
-                    <div class="col-md-8 d-flex gap-3">
-                        <h5 class="card-title mb-0 mt-2">Tipo de Elección: </h5>
-                        <form method="GET" action="{{ url()->current() }}">
-                            <div class="row">
-                                <div class="col-md-8">
-                                    <select name="election_type" class="form-select" onchange="this.form.submit()">
-                                        @foreach($electionTypes as $electionType)
-                                            <option value="{{ $electionType->id }}"
-                                                {{ $selectedElectionType && $selectedElectionType->id == $electionType->id ? 'selected' : '' }}>
-                                                {{ $electionType->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="d-flex justify-content-end align-items-center">
-                            <button class="btn btn-sm btn-outline-primary" onclick="refreshDashboard()">
-                                <i class="ri-refresh-line"></i> Actualizar
-                            </button>
-                            <div class="ms-2">
-                                <small class="text-muted" id="last-update-time">
-                                    {{ now()->format('H:i:s') }}
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<div class="card mb-3 shadow-sm border-0">
+    <div class="card-body py-3">
+        <div class="row g-3 align-items-end">
+
+            {{-- Election type --}}
+            <div class="col-md-3">
+                <label class="form-label form-label-sm fw-semibold mb-1">
+                    <i class="ri-vote-line me-1 text-muted"></i>Tipo de Elección
+                </label>
+                <form method="GET" action="{{ url()->current() }}" id="electionTypeForm">
+                    {{-- Keep other params --}}
+                    <input type="hidden" name="department"   value="{{ $selectedDepartment }}">
+                    <input type="hidden" name="province"     value="{{ $selectedProvince }}">
+                    <input type="hidden" name="municipality" value="{{ $selectedMunicipality }}">
+                    <select name="election_type" class="form-select form-select-sm"
+                            onchange="document.getElementById('electionTypeForm').submit()">
+                        @foreach($electionTypes as $et)
+                            <option value="{{ $et->id }}"
+                                {{ $selectedElectionType?->id == $et->id ? 'selected' : '' }}>
+                                {{ $et->name }}
+                                ({{ \Carbon\Carbon::parse($et->election_date)->format('d/m/Y') }})
+                            </option>
+                        @endforeach
+                    </select>
+                </form>
             </div>
-            <div class="card-body">
-                <form method="GET" action="{{ url()->current() }}" class="row g-3" id="locationFilterForm">
-                    <input type="hidden" name="election_type" value="{{ $selectedElectionType ? $selectedElectionType->id : '' }}">
 
-                    <div class="col-md-3">
-                        <label for="department" class="form-label">Departamento</label>
-                        <select name="department" id="department" class="form-select" onchange="updateProvinces()">
-                            @foreach($departments as $department)
-                                <option value="{{ $department->id }}"
-                                    {{ $selectedDepartment == $department->id ? 'selected' : '' }}>
-                                    {{ $department->name }}
+            {{-- Geography --}}
+            <div class="col-md-7">
+                <form method="GET" action="{{ url()->current() }}" id="locationFilterForm"
+                      class="row g-2 align-items-end">
+                    <input type="hidden" name="election_type" value="{{ $selectedElectionType?->id ?? '' }}">
+
+                    <div class="col-4">
+                        <label class="form-label form-label-sm fw-semibold mb-1">
+                            <i class="ri-map-2-line me-1 text-muted"></i>Departamento
+                        </label>
+                        <select name="department" id="dept-select" class="form-select form-select-sm">
+                            @foreach($departments as $dept)
+                                <option value="{{ $dept->id }}"
+                                    {{ $selectedDepartment == $dept->id ? 'selected' : '' }}>
+                                    {{ $dept->name }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
 
-                    <div class="col-md-3">
-                        <label for="province" class="form-label">Provincia</label>
-                        <select name="province" id="province" class="form-select" onchange="updateMunicipalities()">
-                            @foreach($provinces as $province)
-                                <option value="{{ $province->id }}"
-                                    {{ $selectedProvince == $province->id ? 'selected' : '' }}>
-                                    {{ $province->name }}
+                    <div class="col-4">
+                        <label class="form-label form-label-sm fw-semibold mb-1">
+                            <i class="ri-map-pin-2-line me-1 text-muted"></i>Provincia
+                        </label>
+                        <select name="province" id="prov-select" class="form-select form-select-sm">
+                            @foreach($provinces as $prov)
+                                <option value="{{ $prov->id }}"
+                                    {{ $selectedProvince == $prov->id ? 'selected' : '' }}>
+                                    {{ $prov->name }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
 
-                    <div class="col-md-3">
-                        <label for="municipality" class="form-label">Municipio</label>
-                        <select name="municipality" id="municipality" class="form-select" onchange="this.form.submit()">
-                            @foreach($municipalities as $municipality)
-                                <option value="{{ $municipality->id }}"
-                                    {{ $selectedMunicipality == $municipality->id ? 'selected' : '' }}>
-                                    {{ $municipality->name }}
+                    <div class="col-4">
+                        <label class="form-label form-label-sm fw-semibold mb-1">
+                            <i class="ri-community-line me-1 text-muted"></i>Municipio
+                        </label>
+                        <select name="municipality" id="muni-select" class="form-select form-select-sm"
+                                onchange="document.getElementById('locationFilterForm').submit()">
+                            @foreach($municipalities as $muni)
+                                <option value="{{ $muni->id }}"
+                                    {{ $selectedMunicipality == $muni->id ? 'selected' : '' }}>
+                                    {{ $muni->name }}
                                 </option>
                             @endforeach
                         </select>
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label d-block">&nbsp;</label>
-                        <button type="submit" class="btn btn-primary w-100">Filtrar Resultados</button>
                     </div>
                 </form>
             </div>
+
+            {{-- Refresh info --}}
+            <div class="col-md-2 text-end">
+                <button class="btn btn-sm btn-outline-primary" onclick="ElectionDashboard?.refresh()">
+                    <i class="ri-refresh-line me-1"></i>Actualizar
+                </button>
+                <div class="small text-muted mt-1" id="ds-filter-time">{{ now()->format('H:i') }}</div>
+            </div>
+
         </div>
     </div>
 </div>
 
 <script>
-function updateProvinces() {
-    const departmentId = document.getElementById('department').value;
-    const provinceSelect = document.getElementById('province');
-    const municipalitySelect = document.getElementById('municipality');
-
-    fetch(`/api/provinces/${departmentId}`)
-        .then(response => response.json())
+// Cascade: dept → province → municipality
+document.getElementById('dept-select')?.addEventListener('change', function () {
+    fetch(`/api/provinces/${this.value}`)
+        .then(r => r.json())
         .then(data => {
-            provinceSelect.innerHTML = '<option value="">Seleccione...</option>';
-            data.forEach(province => {
-                provinceSelect.innerHTML += `<option value="${province.id}">${province.name}</option>`;
-            });
-            municipalitySelect.innerHTML = '<option value="">Seleccione...</option>';
+            const sel = document.getElementById('prov-select');
+            sel.innerHTML = data.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            sel.dispatchEvent(new Event('change'));
         });
-}
+});
 
-function updateMunicipalities() {
-    const provinceId = document.getElementById('province').value;
-    const municipalitySelect = document.getElementById('municipality');
-
-    fetch(`/api/municipalities/${provinceId}`)
-        .then(response => response.json())
+document.getElementById('prov-select')?.addEventListener('change', function () {
+    fetch(`/api/municipalities/${this.value}`)
+        .then(r => r.json())
         .then(data => {
-            municipalitySelect.innerHTML = '<option value="">Seleccione...</option>';
-            data.forEach(municipality => {
-                municipalitySelect.innerHTML += `<option value="${municipality.id}">${municipality.name}</option>`;
-            });
+            const sel = document.getElementById('muni-select');
+            sel.innerHTML = data.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
         });
-}
+});
 </script>

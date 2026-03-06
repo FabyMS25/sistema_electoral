@@ -4,85 +4,61 @@ namespace App\Http\Controllers;
 use App\Models\Institution;
 use App\Models\Observation;
 use App\Models\User;
-use App\Models\UserAssignment;
 use App\Models\ValidationHistory;
 use App\Models\Vote;
 use App\Models\VotingTable;
+use App\Models\VotingTableElection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class ObservationController extends Controller
 {
-
     public function __construct()
     {
         $this->middleware('auth');
-        $this->middleware('permission:view_observations')->only(['index', 'show', 'getByTable']);
+        $this->middleware('permission:view_observations')->only(['index', 'show', 'getByTable', 'getTableObservations', 'getStats']);
         $this->middleware('permission:create_observations')->only(['store']);
-        // $this->middleware('permission:resolve_observations')->only(['resolve']);
         $this->middleware('permission:resolve_observations')->only(['resolve', 'escalate', 'reject']);
     }
 
-    private function getUserRole()
+    private function getUserRole(): string
     {
         $user = Auth::user();
-        if ($user->hasRole('revisor')) return 'revisor';
-        if ($user->hasRole('fiscal')) return 'fiscal';
-        if ($user->hasRole('notario')) return 'notario';
-        if ($user->hasRole('coordinador')) return 'coordinador';
-        return 'revisor';
+        $allowed = ["revisor","fiscal","notario","coordinador"];
+        foreach ($allowed as $role) {
+            if ($user->hasRole($role)) return $role;
+        }
+        return $user->hasRole("administrador") ? "coordinador" : "revisor";
     }
 
-    public static function getTypes(): array
+    private function tableCanBeObserved(VotingTable $table, ?int $electionTypeId): bool
     {
-        return [
-            Observation::TYPE_INCONSISTENCIA_ACTA => 'Inconsistencia en Acta',
-            Observation::TYPE_ERROR_DATOS => 'Error en Datos',
-            Observation::TYPE_FALTA_FIRMA => 'Falta Firma',
-            Observation::TYPE_ACTA_ILEGIBLE => 'Acta Ilegible',
-            Observation::TYPE_VOTOS_INCONSISTENTES => 'Votos Inconsistentes',
-            Observation::TYPE_MESA_ANULADA => 'Mesa Anulada',
-            Observation::TYPE_RECLAMO_PARTIDO => 'Reclamo de Partido',
-            Observation::TYPE_DIFERENCIA_PAPELETAS => 'Diferencia de Papeletas',
-            Observation::TYPE_CIERRE_ANTICIPADO => 'Cierre Anticipado',
-            Observation::TYPE_OTRO => 'Otro',
-        ];
-    }
+        if (!$electionTypeId) return false;
 
-    private function getStatusBadge($status)
-    {
-        return match($status) {
-            Observation::STATUS_PENDING => '<span class="badge bg-warning">Pendiente</span>',
-            Observation::STATUS_IN_REVIEW => '<span class="badge bg-info">En Revisión</span>',
-            Observation::STATUS_RESOLVED => '<span class="badge bg-success">Resuelto</span>',
-            Observation::STATUS_REJECTED => '<span class="badge bg-danger">Rechazado</span>',
-            Observation::STATUS_ESCALATED => '<span class="badge bg-primary">Escalado</span>',
-            default => '<span class="badge bg-secondary">Desconocido</span>',
-        };
-    }
-    private function getSeverityBadge($severity)
-    {
-        return match($severity) {
-            'info' => '<span class="badge bg-info">Info</span>',
-            'warning' => '<span class="badge bg-warning">Advertencia</span>',
-            'error' => '<span class="badge bg-danger">Error</span>',
-            'critical' => '<span class="badge bg-dark">Crítico</span>',
-            default => '<span class="badge bg-secondary">Desconocido</span>',
-        };
+        $te = VotingTableElection::where('voting_table_id', $table->id)
+            ->where('election_type_id', $electionTypeId)
+            ->first();
+
+        if (!$te) return false;
+
+        return in_array($te->status, [
+            VotingTableElection::STATUS_VOTACION,
+            VotingTableElection::STATUS_CERRADA,
+            VotingTableElection::STATUS_EN_ESCRUTINIO,
+            VotingTableElection::STATUS_OBSERVADA,
+        ]);
     }
 
     public function index(Request $request)
     {
         $query = Observation::with(['votingTable.institution', 'reviewer', 'resolver']);
 
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
-
-        if ($request->has('voting_table_id')) {
+        if ($request->filled('voting_table_id')) {
             $query->where('voting_table_id', $request->voting_table_id);
         }
 
@@ -90,167 +66,111 @@ class ObservationController extends Controller
         return view('observations.index', compact('observations'));
     }
 
-    private function canBeObserved($votingTable)
+    public function show(Observation $observation)
     {
-        return in_array($votingTable->status, [
-            VotingTable::STATUS_VOTACION,
-            VotingTable::STATUS_CERRADA,
-            VotingTable::STATUS_EN_ESCRUTINIO
-        ]);
+        $observation->load(['votingTable.institution', 'reviewer', 'resolver']);
+        return view('observations.show', compact('observation'));
     }
-
-    private function generateObservationCode(): string
-    {
-        $year = date('Y');
-        $month = date('m');
-        $lastObservation = Observation::whereYear('created_at', $year)
-            ->whereMonth('created_at', $month)
-            ->orderBy('id', 'desc')
-            ->first();
-
-        if ($lastObservation && preg_match('/OBS-(\d{6})-(\d{4})/', $lastObservation->code, $matches)) {
-            $lastNumber = intval($matches[2]);
-            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-        } else {
-            $newNumber = '0001';
-        }
-
-        return "OBS-{$year}{$month}-{$newNumber}";
-    }
-
-
 
     public function store(Request $request)
     {
         try {
             $validated = $request->validate([
-                'voting_table_id' => 'required|exists:voting_tables,id',
-                'type' => 'required|in:' . implode(',', array_keys($this->getTypes())),
-                'description' => 'required|string|max:1000',
-                'severity' => 'required|in:info,warning,error,critical',
-                'candidate_id' => 'nullable|exists:candidates,id',
-                'vote_ids' => 'nullable|array',
-                'vote_ids.*' => 'exists:votes,id',
-                'evidence' => 'nullable|image|max:5120', // 5MB max
+                'voting_table_id'  => 'required|exists:voting_tables,id',
+                'election_type_id' => 'required|exists:election_types,id',
+                'type'             => 'required|in:' . implode(',', array_keys(Observation::getTypes())),
+                'description'      => 'required|string|max:1000',
+                'severity'         => 'required|in:info,warning,error,critical',
+                'candidate_id'     => 'nullable|exists:candidates,id',
+                'vote_ids'         => 'nullable|array',
+                'vote_ids.*'       => 'exists:votes,id',
+                'evidence'         => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             ]);
 
             DB::beginTransaction();
 
-            $votingTable = VotingTable::findOrFail($validated['voting_table_id']);
+            $votingTable    = VotingTable::findOrFail($validated['voting_table_id']);
+            $electionTypeId = (int) $validated['election_type_id'];
 
-            // Verificar que la mesa pueda ser observada
-            if (!$this->canBeObserved($votingTable)) {
+            if (!$this->tableCanBeObserved($votingTable, $electionTypeId)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Esta mesa no puede ser observada en su estado actual'
+                    'message' => 'Esta mesa no puede ser observada en su estado actual',
                 ], 422);
             }
-
-            // Subir evidencia si existe
             $evidencePath = null;
             if ($request->hasFile('evidence')) {
-                $evidencePath = $request->file('evidence')->store('observations/' . date('Y/m/d'), 'public');
+                $evidencePath = $request->file('evidence')
+                    ->store('observations/' . date('Y/m/d'), 'public');
             }
-
-            // Crear la observación
             $observation = Observation::create([
-                'code' => $this->generateObservationCode(),
-                'type' => $validated['type'],
-                'description' => $validated['description'],
-                'severity' => $validated['severity'],
-                'status' => Observation::STATUS_PENDING,
-                'voting_table_id' => $validated['voting_table_id'],
-                'election_type_id' => $votingTable->election_type_id,
-                'candidate_id' => $validated['candidate_id'] ?? null,
-                'reviewed_by' => Auth::id(),
-                'reviewer_role' => $this->getUserRole(),
-                'evidence_photo' => $evidencePath,
+                'code'             => Observation::generateCode(),
+                'type'             => $validated['type'],
+                'description'      => $validated['description'],
+                'severity'         => $validated['severity'],
+                'status'           => Observation::STATUS_PENDING,
+                'voting_table_id'  => $validated['voting_table_id'],
+                'election_type_id' => $electionTypeId,
+                'candidate_id'     => $validated['candidate_id'] ?? null,
+                'reviewed_by'      => Auth::id(),
+                'reviewer_role'    => $this->getUserRole(),
+                'evidence_photo'   => $evidencePath,
             ]);
-
-            // Asociar votos específicos si se seleccionaron
             if (!empty($validated['vote_ids'])) {
                 foreach ($validated['vote_ids'] as $voteId) {
                     $vote = Vote::find($voteId);
-                    if ($vote) {
-                        $oldValues = [
-                            'vote_status' => $vote->vote_status,
-                            'validation_status' => $vote->validation_status,
-                        ];
-
-                        $vote->update([
-                            'observation_id' => $observation->id,
-                            'vote_status' => Vote::VOTE_STATUS_OBSERVED,
-                            'vote_status' => Vote::VOTE_STATUS_OBSERVED,
-                        ]);
-
-                        // Registrar en historial
-                        ValidationHistory::create([
-                            'vote_id' => $vote->id,
-                            'user_id' => Auth::id(),
-                            'action' => ValidationHistory::ACTION_OBSERVE,
-                            'notes' => 'Observado vía #' . $observation->code,
-                            'previous_values' => $oldValues,
-                            'new_values' => [
-                                'vote_status' => Vote::VOTE_STATUS_OBSERVED,
-                            ],
-                        ]);
+                    if ($vote && $vote->voting_table_id == $validated['voting_table_id']) {
+                        $vote->markAsObserved(Auth::id(), $observation->id, $validated['description']);
                     }
                 }
             }
-
-            // Marcar la mesa como observada
-            $votingTable->update([
-                'vote_status' => Vote::VOTE_STATUS_OBSERVED,
-                'verified_by' => Auth::id(),
-                'verified_at' => now(),
-                'verification_notes' => 'Observación creada: ' . $observation->code,
-            ]);
+            VotingTableElection::where('voting_table_id', $validated['voting_table_id'])
+                ->where('election_type_id', $electionTypeId)
+                ->first()
+                ?->markAsObserved(Auth::id(), $validated['description']);
 
             DB::commit();
 
             return response()->json([
-                'success' => true,
-                'message' => 'Observación creada exitosamente',
+                'success'     => true,
+                'message'     => 'Observación creada exitosamente',
                 'observation' => [
-                    'id' => $observation->id,
-                    'code' => $observation->code,
-                    'type' => $observation->type,
-                    'type_label' => $this->getTypes()[$observation->type] ?? $observation->type,
-                    'severity' => $observation->severity,
-                    'description' => $observation->description,
-                ]
+                    'id'         => $observation->id,
+                    'code'       => $observation->code,
+                    'type'       => $observation->type,
+                    'type_label' => Observation::getTypes()[$observation->type] ?? $observation->type,
+                    'severity'   => $observation->severity,
+                    'description'=> $observation->description,
+                ],
             ]);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Error de validación',
-                'errors' => $e->errors()
+                'errors'  => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error creating observation: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
+            Log::error('ObservationController@store: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
             ]);
             return response()->json([
                 'success' => false,
-                'message' => 'Error al crear la observación: ' . $e->getMessage()
+                'message' => 'Error al crear la observación: ' . $e->getMessage(),
             ], 500);
         }
     }
 
-    /**
-     * Resolver una observación
-     */
-    public function resolve(Request $request, $id)
+    public function resolve(Request $request, int $id)
     {
         try {
             $validated = $request->validate([
                 'resolution_type' => 'required|in:correccion,anulacion,rechazo,escalamiento',
-                'notes' => 'required|string|max:1000',
+                'notes'           => 'required|string|max:1000',
                 'corrected_votes' => 'nullable|array',
-                'corrected_votes.*' => 'integer|min:0',
-                'escalated_to' => 'required_if:resolution_type,escalamiento|exists:users,id|nullable',
+                'corrected_votes.*'=> 'integer|min:0',
+                'escalated_to'    => 'required_if:resolution_type,escalamiento|nullable|exists:users,id',
             ]);
 
             DB::beginTransaction();
@@ -260,344 +180,124 @@ class ObservationController extends Controller
             if ($observation->status !== Observation::STATUS_PENDING) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Esta observación ya no está pendiente'
+                    'message' => 'Esta observación ya no está pendiente',
                 ], 422);
             }
 
-            // Procesar según el tipo de resolución
-            switch ($validated['resolution_type']) {
-                case 'correccion':
-                    $this->processCorrection($observation, $validated);
-                    break;
-                case 'anulacion':
-                    $this->processAnnulment($observation, $validated);
-                    break;
-                case 'escalamiento':
-                    $this->processEscalation($observation, $validated);
-                    break;
-                case 'rechazo':
-                    $this->processRejection($observation, $validated);
-                    break;
-            }
+            match ($validated['resolution_type']) {
+                'correccion'   => $this->processCorrection($observation, $validated),
+                'anulacion'    => $observation->resolve(Auth::id(), Observation::RESOLUTION_ANULACION, $validated['notes']),
+                'escalamiento' => $observation->escalate(Auth::id(), $validated['escalated_to'], $validated['notes']),
+                'rechazo'      => $this->processRejection($observation, $validated),
+            };
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Observación resuelta exitosamente'
-            ]);
+            return response()->json(['success' => true, 'message' => 'Observación resuelta exitosamente']);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Error resolving observation: ' . $e->getMessage());
+            Log::error('ObservationController@resolve: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error al resolver la observación: ' . $e->getMessage()
+                'message' => 'Error al resolver: ' . $e->getMessage(),
             ], 500);
         }
     }
 
-    private function processCorrection($observation, $validated)
+    private function processCorrection(Observation $observation, array $validated): void
     {
-        $votingTable = $observation->votingTable;
-
-        // Si hay votos corregidos
         if (!empty($validated['corrected_votes'])) {
-            foreach ($validated['corrected_votes'] as $voteId => $newQuantity) {
+            foreach ($validated['corrected_votes'] as $voteId => $newQty) {
                 $vote = Vote::find($voteId);
                 if ($vote && $vote->observation_id == $observation->id) {
-                    $oldQuantity = $vote->quantity;
-
-                    $vote->update([
-                        'quantity' => $newQuantity,
-                        'vote_status' => Vote::VOTE_STATUS_CORRECTED,
-                        'corrected_by' => Auth::id(),
-                        'corrected_at' => now(),
-                        'correction_notes' => $validated['notes'],
-                        'observation_id' => null, // Desvincular observación
-                    ]);
-
-                    ValidationHistory::create([
-                        'vote_id' => $vote->id,
-                        'user_id' => Auth::id(),
-                        'action' => ValidationHistory::ACTION_CORRECT,
-                        'notes' => 'Corregido por observación #' . $observation->code,
-                        'previous_values' => ['quantity' => $oldQuantity],
-                        'new_values' => ['quantity' => $newQuantity],
-                    ]);
+                    $vote->markAsCorrected(Auth::id(), max(0, (int) $newQty), $validated['notes']);
                 }
             }
         }
-
-        // Marcar observación como resuelta
-        $observation->update([
-            'status' => Observation::STATUS_RESOLVED,
-            'resolved_by' => Auth::id(),
-            'resolved_at' => now(),
-            'resolution_type' => $validated['resolution_type'],
-            'resolution_notes' => $validated['notes'],
-        ]);
-
-        // Actualizar estado de la mesa
-        $votingTable->update([
-            'status' => VotingTable::STATUS_EN_ESCRUTINIO,
-            'corrected_by' => Auth::id(),
-            'corrected_at' => now(),
-        ]);
+        $observation->resolve(Auth::id(), Observation::RESOLUTION_CORRECCION, $validated['notes']);
     }
 
-    private function processAnnulment($observation, $validated)
+    private function processRejection(Observation $observation, array $validated): void
     {
-        $votingTable = $observation->votingTable;
-        $votingTable->update([
-            'status' => VotingTable::STATUS_ANULADA,
-            'validated_by' => Auth::id(),
-            'validated_at' => now(),
-        ]);
-        Vote::where('voting_table_id', $votingTable->id)
-            ->update([
-                'vote_status' => Vote::VOTE_STATUS_REJECTED,
-                'validated_by' => Auth::id(),
-                'validated_at' => now(),
-            ]);
-        $observation->update([
-            'status' => Observation::STATUS_RESOLVED,
-            'resolved_by' => Auth::id(),
-            'resolved_at' => now(),
-            'resolution_type' => $validated['resolution_type'],
-            'resolution_notes' => $validated['notes'],
-        ]);
-    }
-
-    private function processEscalation($observation, $validated)
-    {
-        $observation->update([
-            'status' => Observation::STATUS_ESCALATED,
-            'is_escalated' => true,
-            'escalated_to' => $validated['escalated_to'],
-            'escalated_at' => now(),
-            'resolution_notes' => $validated['notes'],
-        ]);
-    }
-
-    private function processRejection($observation, $validated)
-    {
-        // Desvincular votos
         Vote::where('observation_id', $observation->id)
             ->update([
                 'observation_id' => null,
-                'vote_status' => Vote::VOTE_STATUS_PENDING_REVIEW,
+                'vote_status'    => Vote::VOTE_STATUS_PENDING_REVIEW,
             ]);
 
-        $observation->update([
-            'status' => Observation::STATUS_REJECTED,
-            'resolved_by' => Auth::id(),
-            'resolved_at' => now(),
-            'resolution_type' => $validated['resolution_type'],
-            'resolution_notes' => $validated['notes'],
-        ]);
-
-        // Actualizar estado de la mesa
-        $observation->votingTable->updateValidationStatus();
+        $observation->reject(Auth::id(), $validated['notes']);
     }
 
-    /**
-     * Obtener observaciones de una mesa
-     */
-    public function getTableObservations($tableId)
-    {
-        try {
-            $observations = Observation::where('voting_table_id', $tableId)
-                ->with(['reviewer', 'resolver', 'votes.candidate'])
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->map(function ($obs) {
-                    return [
-                        'id' => $obs->id,
-                        'code' => $obs->code,
-                        'type' => $obs->type,
-                        'type_label' => $this->getTypes()[$obs->type] ?? $obs->type,
-                        'description' => $obs->description,
-                        'severity' => $obs->severity,
-                        'severity_badge' => $this->getSeverityBadge($obs->severity),
-                        'status' => $obs->status,
-                        'status_badge' => $this->getStatusBadge($obs->status),
-                        'reviewer_name' => $obs->reviewer->name ?? 'N/A',
-                        'reviewer_role' => $obs->reviewer_role,
-                        'created_at' => $obs->created_at->format('d/m/Y H:i'),
-                        'resolved_at' => $obs->resolved_at ? $obs->resolved_at->format('d/m/Y H:i') : null,
-                        'resolver_name' => $obs->resolver->name ?? null,
-                        'resolution_notes' => $obs->resolution_notes,
-                        'evidence_url' => $obs->evidence_photo ? asset('storage/' . $obs->evidence_photo) : null,
-                        'votes_count' => $obs->votes->count(),
-                    ];
-                });
-
-            return response()->json($observations);
-
-        } catch (\Exception $e) {
-            Log::error('Error getting observations: ' . $e->getMessage());
-            return response()->json(['error' => 'Error al cargar observaciones'], 500);
-        }
-    }
-
-    /**
-     * Obtener estadísticas de observaciones
-     */
-    public function getStats()
-    {
-        try {
-            $stats = [
-                'total' => Observation::count(),
-                'pending' => Observation::where('status', Observation::STATUS_PENDING)->count(),
-                'in_review' => Observation::where('status', Observation::STATUS_IN_REVIEW)->count(),
-                'resolved' => Observation::where('status', Observation::STATUS_RESOLVED)->count(),
-                'rejected' => Observation::where('status', Observation::STATUS_REJECTED)->count(),
-                'escalated' => Observation::where('is_escalated', true)->count(),
-                'by_severity' => [
-                    'info' => Observation::where('severity', Observation::SEVERITY_INFO)->count(),
-                    'warning' => Observation::where('severity', Observation::SEVERITY_WARNING)->count(),
-                    'error' => Observation::where('severity', Observation::SEVERITY_ERROR)->count(),
-                    'critical' => Observation::where('severity', Observation::SEVERITY_CRITICAL)->count(),
-                ],
-                'by_type' => [],
-            ];
-
-            foreach ($this->getTypes() as $type => $label) {
-                $stats['by_type'][$type] = Observation::where('type', $type)->count();
-            }
-
-            return response()->json($stats);
-
-        } catch (\Exception $e) {
-            Log::error('Error getting observation stats: ' . $e->getMessage());
-            return response()->json(['error' => 'Error al cargar estadísticas'], 500);
-        }
-    }
-
-
-
-
-
-    private function getElectionTypeId($votingTableId)
-    {
-        $votingTable = VotingTable::find($votingTableId);
-        return $votingTable ? $votingTable->election_type_id : null;
-    }
-
-    public function show(Observation $observation)
-    {
-        $observation->load(['votingTable.institution', 'reviewer', 'resolver']);
-        return view('observations.show', compact('observation'));
-    }
-
-
-    public function getByTable($tableId)
+    public function getByTable(int $tableId)
     {
         try {
             $observations = Observation::where('voting_table_id', $tableId)
                 ->with(['reviewer', 'resolver'])
                 ->orderBy('created_at', 'desc')
                 ->get()
-                ->map(function ($obs) {
-                    return [
-                        'id' => $obs->id,
-                        'code' => $obs->code,
-                        'type' => $obs->type,
-                        'description' => $obs->description,
-                        'severity' => $obs->severity,
-                        'status' => $obs->status,
-                        'created_at' => $obs->created_at->format('d/m/Y H:i'),
-                        'reviewer_name' => $obs->reviewer->name ?? 'N/A',
-                    ];
-                });
+                ->map(fn($obs) => [
+                    'id'            => $obs->id,
+                    'code'          => $obs->code,
+                    'type'          => $obs->type,
+                    'type_label'    => Observation::getTypes()[$obs->type] ?? $obs->type,
+                    'description'   => $obs->description,
+                    'severity'      => $obs->severity,
+                    'severity_badge'=> $obs->severity_badge,
+                    'status'        => $obs->status,
+                    'status_badge'  => $obs->status_badge,
+                    'reviewer_name' => $obs->reviewer?->name ?? 'N/A',
+                    'reviewer_role' => $obs->reviewer_role,
+                    'created_at'    => $obs->created_at->format('d/m/Y H:i'),
+                    'resolved_at'   => $obs->resolved_at?->format('d/m/Y H:i'),
+                    'resolver_name' => $obs->resolver?->name,
+                    'resolution_notes' => $obs->resolution_notes,
+                    'evidence_url'  => $obs->evidence_photo
+                        ? asset('storage/' . $obs->evidence_photo)
+                        : null,
+                    'votes_count'   => $obs->votes()->count(),
+                ]);
 
             return response()->json($observations);
 
         } catch (\Exception $e) {
-            Log::error('Error getting observations: ' . $e->getMessage());
+            Log::error('ObservationController@getByTable: ' . $e->getMessage());
             return response()->json(['error' => 'Error al cargar observaciones'], 500);
         }
     }
 
-    private function getSupervisorId($votingTableId = null)
+    public function getTableObservations(int $tableId)
     {
-        $user = Auth::user();
+        return $this->getByTable($tableId);
+    }
+    public function getStats()
+    {
+        try {
+            $stats = [
+                'total'      => Observation::count(),
+                'pending'    => Observation::where('status', Observation::STATUS_PENDING)->count(),
+                'in_review'  => Observation::where('status', Observation::STATUS_IN_REVIEW)->count(),
+                'resolved'   => Observation::where('status', Observation::STATUS_RESOLVED)->count(),
+                'rejected'   => Observation::where('status', Observation::STATUS_REJECTED)->count(),
+                'escalated'  => Observation::where('is_escalated', true)->count(),
+                'by_severity'=> [
+                    'info'     => Observation::where('severity', Observation::SEVERITY_INFO)->count(),
+                    'warning'  => Observation::where('severity', Observation::SEVERITY_WARNING)->count(),
+                    'error'    => Observation::where('severity', Observation::SEVERITY_ERROR)->count(),
+                    'critical' => Observation::where('severity', Observation::SEVERITY_CRITICAL)->count(),
+                ],
+                'by_type' => [],
+            ];
 
-        // Si el usuario tiene asignado un recinto, su supervisor es el coordinador municipal
-        $recintoDelegate = UserAssignment::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->first();
-
-        if ($recintoDelegate) {
-            // Buscar coordinador municipal del mismo municipio
-            $municipalityId = $recintoDelegate->institution->municipality_id;
-
-            $coordinator = User::whereHas('roles', function($q) {
-                    $q->where('name', 'coordinador_municipal');
-                })
-                ->whereHas('reviewerAssignments', function($q) use ($municipalityId) {
-                    $q->where('assignable_type', Institution::class)
-                      ->whereHasMorph('assignable', [Institution::class], function($subq) use ($municipalityId) {
-                          $subq->where('municipality_id', $municipalityId);
-                      });
-                })->first();
-
-            if ($coordinator) return $coordinator->id;
-        }
-
-        // Si el usuario tiene asignada una mesa, su supervisor es el delegado del recinto
-        $tableDelegate = UserAssignment::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->first();
-
-        if ($tableDelegate && $votingTableId) {
-            $votingTable = VotingTable::find($votingTableId);
-            if ($votingTable) {
-                $recintoDelegate = UserAssignment::where('institution_id', $votingTable->institution_id)
-                    ->where('is_active', true)
-                    ->first();
-
-                if ($recintoDelegate) return $recintoDelegate->user_id;
+            foreach (Observation::getTypes() as $type => $label) {
+                $stats['by_type'][$type] = Observation::where('type', $type)->count();
             }
+
+            return response()->json($stats);
+
+        } catch (\Exception $e) {
+            Log::error('ObservationController@getStats: ' . $e->getMessage());
+            return response()->json(['error' => 'Error al cargar estadísticas'], 500);
         }
-
-        // Si el usuario es revisor/modificador de un ámbito, escalar al coordinador correspondiente
-        $reviewer = User::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->first();
-
-        if ($reviewer) {
-            if ($reviewer->assignable_type === Institution::class) {
-                // Es revisor de recinto, escalar a coordinador municipal
-                $municipalityId = $reviewer->assignable->municipality_id;
-                $coordinator = User::whereHas('roles', function($q) {
-                        $q->where('name', 'coordinador_municipal');
-                    })
-                    ->whereHas('reviewerAssignments', function($q) use ($municipalityId) {
-                        $q->where('assignable_type', Institution::class)
-                          ->whereHasMorph('assignable', [Institution::class], function($subq) use ($municipalityId) {
-                              $subq->where('municipality_id', $municipalityId);
-                          });
-                    })->first();
-
-                if ($coordinator) return $coordinator->id;
-            } else {
-                // Es revisor de mesa, escalar a delegado de recinto
-                $institutionId = $reviewer->assignable->institution_id;
-                $recintoDelegate = UserAssignment::where('institution_id', $institutionId)
-                    ->where('is_active', true)
-                    ->first();
-
-                if ($recintoDelegate) return $recintoDelegate->user_id;
-            }
-        }
-
-        // Último recurso: buscar administrador
-        $admin = User::whereHas('roles', function($q) {
-            $q->where('name', 'administrador');
-        })->first();
-
-        return $admin?->id;
     }
 }

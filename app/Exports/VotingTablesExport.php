@@ -24,29 +24,21 @@ class VotingTablesExport
                 'vocal2',
                 'vocal3',
             ]);
-
             if (!empty($filters['selected_ids'])) {
                 $query->whereIn('id', $filters['selected_ids']);
             }
-
             if (!empty($filters['institution_id'])) {
                 $query->where('institution_id', $filters['institution_id']);
             }
-
             if (!empty($filters['status'])) {
                 $query->where('status', $filters['status']);
             }
-
             if (!empty($filters['election_type_id'])) {
                 $query->where('election_type_id', $filters['election_type_id']);
             }
-
             $votingTables = $query->orderBy('institution_id')->orderBy('number')->get();
-
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
-
-            // Headers actualizados con los nuevos campos
             $headers = [
                 'A1' => 'Código OEP',
                 'B1' => 'Código Interno',
@@ -88,12 +80,9 @@ class VotingTablesExport
                 'AL1' => 'Estado',
                 'AM1' => 'Observaciones'
             ];
-
             foreach ($headers as $cell => $value) {
                 $sheet->setCellValue($cell, $value);
             }
-
-            // Style headers
             $headerRange = 'A1:AM1';
             $sheet->getStyle($headerRange)->getFont()->setBold(true);
             $sheet->getStyle($headerRange)->getFill()
@@ -101,12 +90,10 @@ class VotingTablesExport
                   ->getStartColor()->setRGB('E3F2FD');
             $sheet->getStyle($headerRange)->getAlignment()
                   ->setHorizontal(Alignment::HORIZONTAL_CENTER);
-
             $row = 2;
             foreach ($votingTables as $table) {
                 $ballotsUsed = $table->total_voters;
                 $ballotsLeftover = $table->ballots_received - $ballotsUsed - $table->ballots_spoiled;
-
                 $sheet->setCellValue('A' . $row, $table->oep_code ?? '');
                 $sheet->setCellValue('B' . $row, $table->internal_code ?? '');
                 $sheet->setCellValue('C' . $row, $table->number ?? '');
@@ -149,15 +136,11 @@ class VotingTablesExport
 
                 $row++;
             }
-
-            // Auto-size columns
             $columns = range('A', 'M'); // A-M son 13 columnas
             $columns = array_merge($columns, ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF', 'AG', 'AH', 'AI', 'AJ', 'AK', 'AL', 'AM']);
-
             foreach ($columns as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
-
             $fileName = 'mesas_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
             $filePath = "exports/{$fileName}";
 
@@ -226,13 +209,10 @@ class VotingTablesExport
             $sheet->getStyle($headerRange)->getFill()
                   ->setFillType(Fill::FILL_SOLID)
                   ->getStartColor()->setRGB('E3F2FD');
-
-            // Sample data actualizado
             $sampleData = [
                 ['303182-1', 'REC-QUI-001-M01', '1', 'A', 'mixta', 'UNIDAD EDUCATIVA ADELA ZAMUDIO', 'REC-QUI-001', 'Cochabamba', 'Quillacollo', 'Quillacollo', 'Quillacollo (Urbano)', 'Elecciones Municipales 2026', 'ACOSTA', 'ZEBALLOS', '350', '350', '0', '305', '5', '10', '300', '4', '6', 'Juan Pérez', 'María Gómez', 'Carlos López', 'Ana Silva', 'Luis Torres', '08:00', '17:00', '22/03/2026', 'ACTA-001', 'configurada'],
                 ['303182-2', 'REC-QUI-002-M02', '2', 'B', 'mixta', 'COLEGIO NACIONAL QUILLACOLLO', 'REC-QUI-002', 'Cochabamba', 'Quillacollo', 'Quillacollo', 'Centro', 'Elecciones Municipales 2026', 'FLORES', 'PEREZ', '280', '280', '0', '240', '4', '6', '235', '5', '5', 'Pedro Rodríguez', 'Laura Fernández', 'Diego Castro', 'Sofía Méndez', 'Javier Ruiz', '08:15', '17:00', '22/03/2026', 'ACTA-002', 'configurada'],
             ];
-
             $row = 2;
             foreach ($sampleData as $data) {
                 $col = 'A';

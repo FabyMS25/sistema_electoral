@@ -1,6 +1,4 @@
 <?php
-// database/seeders/QuillacolloInstitutionsSeeder.php
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -14,7 +12,6 @@ use Illuminate\Support\Facades\DB;
 class QuillacolloInstitutionsSeeder extends Seeder
 {
     protected $recintos = [
-        // Recintos de Quillacollo (según PDF del OEP)
     [ 'name' => 'UNIDAD EDUCATIVA ADELA ZAMUDIO','code' => 'REC-QUI-001','address' => 'Av. Blanco Galindo Km 12','locality' => 'Quillacollo (Urbano)','registered_citizens' => 2350,],
     [ 'name' => 'UNIDAD EDUCATIVA ALFONSO VILLANUEVA PINTO','code' => 'REC-QUI-002','address' => 'Calle Junín esq. Sucre','locality' => 'Quillacollo (Urbano)','registered_citizens' => 1820,],
     [ 'name' => 'UNIDAD EDUCATIVA ANDRES BELLO','code' => 'REC-QUI-003','address' => 'Av. Blanco Galindo Km 13','locality' => 'Quillacollo (Urbano)','registered_citizens' => 2100,],
@@ -69,7 +66,6 @@ class QuillacolloInstitutionsSeeder extends Seeder
 
     public function run()
     {
-        $this->command->info('Cargando recintos de Quillacollo...');
         $department = Department::where('name', 'Cochabamba')->first();
         if (!$department) {
             $this->command->error('No se encontró el departamento de Cochabamba');
@@ -140,17 +136,8 @@ class QuillacolloInstitutionsSeeder extends Seeder
                     'created_by' => null,
                     'updated_by' => null,
                 ]);
-
-                $count++;
-
-                if ($count % 10 == 0) {
-                    $this->command->info("Procesados {$count} recintos...");
-                }
             }
-
             DB::commit();
-            $this->command->info("¡Éxito! Se cargaron {$count} recintos de Quillacollo.");
-
         } catch (\Exception $e) {
             DB::rollBack();
             $this->command->error('Error: ' . $e->getMessage());

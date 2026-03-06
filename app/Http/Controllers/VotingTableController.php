@@ -141,11 +141,8 @@ class VotingTableController extends Controller
             } else {
                 $query->orderBy('institution_id')->orderBy('number');
             }
-
             $perPage = $request->get('per_page', self::ITEMS_PER_PAGE);
             $votingTables = $query->paginate($perPage)->withQueryString();
-
-            // Add computed properties for each table
             $votingTables->getCollection()->transform(function($table) {
                 $latestElection = $table->tableElections()->latest()->first();
                 if ($latestElection) {
@@ -163,11 +160,9 @@ class VotingTableController extends Controller
             $institutions = Institution::where('status', 'activo')
                                        ->orderBy('name')
                                        ->get();
-
             $electionTypes = ElectionType::where('active', true)
                                         ->orderBy('name')
                                         ->get();
-
             $statusOptions = [
                 'configurada' => 'Configurada',
                 'en_espera' => 'En Espera',
@@ -179,7 +174,6 @@ class VotingTableController extends Controller
                 'transmitida' => 'Transmitida',
                 'anulada' => 'Anulada'
             ];
-
             return view('voting-tables.index', compact(
                 'votingTables',
                 'institutions',
@@ -218,8 +212,6 @@ class VotingTableController extends Controller
         try {
             $rules = $this->validationRules(null);
             $validated = $request->validate($rules, $this->validationMessages());
-
-            // Check for existing table with same number in institution
             $existingTable = VotingTable::where('institution_id', $validated['institution_id'])
                 ->where('number', $validated['number'])
                 ->first();
@@ -229,23 +221,16 @@ class VotingTableController extends Controller
                     ->withInput()
                     ->withErrors(['number' => 'Ya existe una mesa con este número en la institución seleccionada.']);
             }
-
-            // Generate codes if not provided
             $institution = Institution::find($validated['institution_id']);
-
             if (empty($validated['oep_code'])) {
                 $validated['oep_code'] = $institution->code . '-' . $validated['number'];
             }
-
             if (empty($validated['internal_code'])) {
                 $validated['internal_code'] = $institution->code . '-M' . str_pad($validated['number'], 2, '0', STR_PAD_LEFT);
             }
-
             DB::beginTransaction();
             try {
                 $votingTable = VotingTable::create($validated);
-
-                // Create table election records for all active election types
                 $activeElectionTypes = ElectionType::where('active', true)->get();
 
                 foreach ($activeElectionTypes as $electionType) {
@@ -299,14 +284,10 @@ class VotingTableController extends Controller
                 'categoryResults.electionTypeCategory.electionCategory',
                 'categoryResults.electionTypeCategory.electionType',
             ])->findOrFail($id);
-
-            // Get active election types with their categories
             $electionTypes = ElectionType::with(['typeCategories.electionCategory'])
                 ->where('active', true)
                 ->orderBy('election_date', 'desc')
                 ->get();
-
-            // Get results grouped by election type
             $resultsByElection = [];
             foreach ($votingTable->tableElections as $tableElection) {
                 $electionTypeId = $tableElection->election_type_id;
@@ -375,8 +356,6 @@ class VotingTableController extends Controller
             $votingTable = VotingTable::findOrFail($id);
             $rules = $this->validationRules($id);
             $validated = $request->validate($rules, $this->validationMessages());
-
-            // Check for existing table with same number in institution
             $existingTable = VotingTable::where('institution_id', $validated['institution_id'])
                 ->where('number', $validated['number'])
                 ->where('id', '!=', $id)
@@ -418,15 +397,11 @@ class VotingTableController extends Controller
     {
         try {
             $votingTable = VotingTable::findOrFail($id);
-
-            // Check if there are any results
             if ($votingTable->categoryResults()->count() > 0) {
                 return redirect()->back()
                     ->with('error', '❌ No se puede eliminar la mesa porque tiene resultados registrados.');
             }
-
             DB::transaction(function () use ($votingTable) {
-                // Delete related records
                 $votingTable->tableElections()->delete();
                 $votingTable->delete();
             });
@@ -450,10 +425,7 @@ class VotingTableController extends Controller
                 'ids' => 'required|array',
                 'ids.*' => 'exists:voting_tables,id'
             ]);
-
             $ids = $request->input('ids');
-
-            // Check for tables with results
             $tablesWithResults = VotingTable::whereIn('id', $ids)
                 ->whereHas('categoryResults')
                 ->count();
@@ -464,19 +436,14 @@ class VotingTableController extends Controller
                     'message' => 'No se pueden eliminar mesas que tienen resultados registrados.'
                 ], 422);
             }
-
             DB::transaction(function () use ($ids) {
-                // Delete table elections first
                 VotingTableElection::whereIn('voting_table_id', $ids)->delete();
-                // Delete tables
                 VotingTable::whereIn('id', $ids)->delete();
             });
-
             return response()->json([
                 'success' => true,
                 'message' => "✅ Se eliminaron " . count($ids) . " mesas de votación correctamente."
             ]);
-
         } catch (\Exception $e) {
             Log::error('Error deleting multiple voting tables: ' . $e->getMessage());
             return response()->json([
@@ -517,27 +484,22 @@ class VotingTableController extends Controller
                 'opening_time' => 'nullable',
                 'closing_time' => 'nullable',
             ]);
-
-            // Validation logic
             if ($validated['ballots_received'] < $validated['total_voters']) {
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['ballots_received' => 'Las papeletas recibidas no pueden ser menores al total de votantes.']);
             }
-
             if ($validated['ballots_spoiled'] > $validated['ballots_received']) {
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['ballots_spoiled' => 'Las papeletas deterioradas no pueden ser mayores a las recibidas.']);
             }
-
             $totalCalculated = $validated['ballots_used'] + $validated['ballots_leftover'] + $validated['ballots_spoiled'];
             if ($totalCalculated != $validated['ballots_received']) {
                 return redirect()->back()
                     ->withInput()
                     ->withErrors(['ballots_used' => 'La suma de usadas + sobrantes + deterioradas debe igualar las recibidas.']);
             }
-
             DB::beginTransaction();
             try {
                 $tableElection = VotingTableElection::updateOrCreate(
@@ -557,17 +519,13 @@ class VotingTableController extends Controller
                         'election_date' => now(),
                     ]
                 );
-
                 DB::commit();
-
                 return redirect()->route('voting-tables.show', $id)
                     ->with('success', '✅ Configuración de elección actualizada correctamente.');
-
             } catch (\Exception $e) {
                 DB::rollBack();
                 throw $e;
             }
-
         } catch (ValidationException $e) {
             return redirect()->back()
                 ->withErrors($e->validator)

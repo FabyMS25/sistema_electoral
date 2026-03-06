@@ -79,8 +79,6 @@ class VotingTablesImport
         if (empty(array_filter($row))) {
             return;
         }
-
-        // Column indices (0-based from Excel)
         $colOepCode = 0;           // A - Código OEP
         $colInternalCode = 1;       // B - Código Interno
         $colNumber = 2;             // C - N° Mesa
@@ -110,8 +108,6 @@ class VotingTablesImport
         $colElectionDate = 32;       // AG - Fecha Elección
         $colActaNumber = 33;         // AH - N° Acta
         $colStatus = 34;             // AI - Estado
-
-        // Validar campos requeridos
         if (empty(trim($row[$colNumber] ?? ''))) {
             throw new \Exception("El número de mesa es requerido");
         }

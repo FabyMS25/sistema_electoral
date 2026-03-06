@@ -12,17 +12,6 @@ use Illuminate\Support\Facades\DB;
 
 class QuillacolloTablesSeeder extends Seeder
 {
-    // ===== CHANGES FROM ORIGINAL =====
-    // ❌ REMOVED from VotingTable::updateOrCreate:
-    //    election_type_id, status, ballots_received/used/leftover/spoiled,
-    //    valid_votes*, blank_votes*, null_votes*, total_voters*, election_date,
-    //    opening_time, closing_time, acta_number, acta_photo, acta_uploaded_at
-    //    — ALL of these moved to VotingTableElection (one row per mesa × election)
-    //
-    // ✅ ADDED: After creating each mesa, create 2 VotingTableElection rows:
-    //    one for Departamental, one for Municipal.
-    //    This is the correct model for simultaneous elections on the same physical mesa.
-
     private $distribucionMesas = [
         'UNIDAD EDUCATIVA ADELA ZAMUDIO'               => 47,
         'UNIDAD EDUCATIVA ALFONSO VILLANUEVA PINTO'    => 36,
@@ -78,17 +67,14 @@ class QuillacolloTablesSeeder extends Seeder
 
     public function run(): void
     {
-        // ✅ Load BOTH election types — mesas participate in both on the same day
         $municipalElection = ElectionType::where('name', 'LIKE', '%Municipal%2026%')
             ->where('active', true)
             ->first()
             ?? ElectionType::where('name', 'LIKE', '%Municipal%2026%')->first();
-
         $departamentalElection = ElectionType::where('name', 'LIKE', '%Departamental%2026%')
             ->where('active', true)
             ->first()
             ?? ElectionType::where('name', 'LIKE', '%Departamental%2026%')->first();
-
         if (!$municipalElection) {
             $this->command->error('❌ No se encontró el tipo de elección Municipal 2026');
             return;
@@ -96,50 +82,39 @@ class QuillacolloTablesSeeder extends Seeder
         if (!$departamentalElection) {
             $this->command->warn('⚠️  No se encontró elección Departamental 2026 — solo se crearán entradas municipales.');
         }
-
         $this->command->info("📅 Municipal:      {$municipalElection->name}");
         if ($departamentalElection) {
             $this->command->info("📅 Departamental:  {$departamentalElection->name}");
         }
-
         $municipality = Municipality::where('name', 'Quillacollo')->first();
         if (!$municipality) {
             $this->command->error('❌ No se encontró el municipio de Quillacollo');
             return;
         }
-
         $institutions = Institution::where('municipality_id', $municipality->id)->get();
         if ($institutions->isEmpty()) {
             $this->command->error('❌ No se encontraron recintos en Quillacollo');
             return;
         }
-        $this->command->info("🏫 Recintos encontrados: {$institutions->count()}\n");
-
         DB::beginTransaction();
         try {
             $totalMesas     = 0;
             $totalPivots    = 0;
             $procesados     = 0;
             $errores        = [];
-
             foreach ($institutions as $institution) {
                 $this->command->info("📊 {$institution->name}");
-
                 $numMesas = $this->getNumeroMesas($institution);
                 if (!$numMesas || $numMesas <= 0) {
                     $numMesas = 30;
                     $this->command->warn("   ⚠️ Usando valor por defecto: {$numMesas}");
                 }
-
                 $votantesPorMesa = $institution->registered_citizens > 0
                     ? (int) ceil($institution->registered_citizens / $numMesas)
                     : 250;
-
                 $mesasCreadas = 0;
-
                 for ($i = 1; $i <= $numMesas; $i++) {
                     try {
-                        // ✅ VotingTable: physical mesa only — NO election_type_id, NO status, NO vote totals
                         $mesa = VotingTable::updateOrCreate(
                             [
                                 'institution_id' => $institution->id,
@@ -162,8 +137,6 @@ class QuillacolloTablesSeeder extends Seeder
                                 'observations'           => null,
                             ]
                         );
-
-                        // ✅ VotingTableElection: one row per (mesa × election) — status + ballots per election
                         $this->createTableElection($mesa, $municipalElection);
                         if ($departamentalElection) {
                             $this->createTableElection($mesa, $departamentalElection);
@@ -171,13 +144,11 @@ class QuillacolloTablesSeeder extends Seeder
                         } else {
                             $totalPivots++;
                         }
-
                         $mesasCreadas++;
                     } catch (\Exception $e) {
                         $errores[] = "{$institution->code} Mesa {$i}: " . $e->getMessage();
                     }
                 }
-
                 if ($mesasCreadas > 0) {
                     $institution->update(['total_voting_tables' => $mesasCreadas]);
                     $totalMesas += $mesasCreadas;
@@ -185,23 +156,13 @@ class QuillacolloTablesSeeder extends Seeder
                     $this->command->info("   ✅ {$mesasCreadas} mesas creadas");
                 }
             }
-
             DB::commit();
-
-            $this->command->info("\n========================================");
-            $this->command->info('✅ PROCESO COMPLETADO');
-            $this->command->info("========================================");
-            $this->command->info("📊 Mesas físicas:         {$totalMesas}");
-            $this->command->info("🗳️  Entradas por elección: {$totalPivots}");
-            $this->command->info("🏫 Recintos procesados:   {$procesados}");
-
             if (!empty($errores)) {
                 $this->command->warn("\n⚠️  Errores:");
                 foreach ($errores as $e) {
                     $this->command->warn("   • {$e}");
                 }
             }
-
         } catch (\Exception $e) {
             DB::rollBack();
             $this->command->error('❌ Error: ' . $e->getMessage());
@@ -209,10 +170,6 @@ class QuillacolloTablesSeeder extends Seeder
         }
     }
 
-    /**
-     * Create or update the VotingTableElection pivot row for a given mesa + election.
-     * This is where per-election status, ballot counts, and dates live.
-     */
     private function createTableElection(VotingTable $mesa, ElectionType $election): void
     {
         VotingTableElection::updateOrCreate(
@@ -221,7 +178,7 @@ class QuillacolloTablesSeeder extends Seeder
                 'election_type_id' => $election->id,
             ],
             [
-                'status'           => VotingTableElection::STATUS_CONFIGURADA,
+                'status' => 'configurada',
                 'election_date'    => $election->election_date,
                 'ballots_received' => 0,
                 'ballots_used'     => 0,

@@ -1,140 +1,192 @@
-{{-- resources/views/voting-table-votes/partials/table-rows.blade.php --}}
+{{-- resources/views/voting-table-votes/partials/table-rows.blade.php--}}
 @php
     if (empty($candidatesByCategory)) {
-        echo '<tr><td colspan="' . (2 + (count($candidatesByCategory) * 3)) . '" class="text-center text-muted py-3">No hay candidatos disponibles</td></tr>';
         return;
     }
-
-    // Organizar candidatos por categoría
     $regularCandidates = [];
-    $categoryTotals = [];
+    $voteMap           = [];  // [candidateId => Vote]
 
     foreach ($candidatesByCategory as $categoryCode => $categoryCandidates) {
-        $regularCandidates[$categoryCode] = $categoryCandidates
-            ->filter(function($c) {
-                return true; // Ya no hay tipo en el modelo
-            })
-            ->values();
-
-        $categoryTotals[$categoryCode] = 0;
+        $regularCandidates[$categoryCode] = $categoryCandidates->values();
     }
 
-    $maxRows = !empty($regularCandidates) ? max(array_map(function($cats) {
-        return $cats->count();
-    }, $regularCandidates)) : 0;
+    if (isset($table->votes)) {
+        foreach ($table->votes as $vote) {
+            $voteMap[$vote->candidate_id] = $vote;
+        }
+    }
+
+    $maxRows = empty($regularCandidates)
+        ? 0
+        : max(array_map(fn($c) => $c->count(), $regularCandidates));
+
+    $canObserve = ($permissions['can_observe'] ?? false) && !$isDisabled;
 @endphp
 
-{{-- Filas de candidatos --}}
+{{-- ── Candidate rows ── --}}
 @for($i = 0; $i < $maxRows; $i++)
-    <tr>
-        <td class="text-center fw-bold">{{ $i + 1 }}</td>
+<tr>
+    <td class="text-center fw-bold small">{{ $i + 1 }}</td>
 
-        {{-- Partido (tomado del primer candidato disponible) --}}
-        <td>
-            @php $firstCandidate = null; @endphp
-            @foreach($candidatesByCategory as $categoryCode => $categoryCandidates)
-                @php
-                    $candidate = $regularCandidates[$categoryCode][$i] ?? null;
-                    if ($candidate && !$firstCandidate) $firstCandidate = $candidate;
-                @endphp
-            @endforeach
+    {{-- Party (from first available candidate in this row) --}}
+    <td>
+        @php $firstCandidate = null; @endphp
+        @foreach($candidatesByCategory as $categoryCode => $_)
+            @php $c = $regularCandidates[$categoryCode][$i] ?? null; @endphp
+            @if($c && !$firstCandidate) @php $firstCandidate = $c; @endphp @endif
+        @endforeach
 
-            @if($firstCandidate)
-                <div class="d-flex align-items-center">
-                    @if($firstCandidate->party_logo)
-                        <img src="{{ $firstCandidate->party_logo_url }}"
-                             width="20" height="20" class="me-1 rounded" style="object-fit: contain;">
-                    @else
-                        <span class="candidate-color"
-                              style="background-color: {{ $firstCandidate->color ?? '#0ab39c' }};
-                                     width: 16px; height: 16px; border-radius: 4px; display: inline-block; margin-right: 4px;"></span>
+        @if($firstCandidate)
+            <div class="d-flex align-items-center gap-1">
+                @if($firstCandidate->party_logo)
+                    <img src="{{ $firstCandidate->party_logo_url }}"
+                         width="20" height="20" class="rounded" style="object-fit:contain;">
+                @else
+                    <span style="background:{{ $firstCandidate->color ?? '#0ab39c' }};
+                                 width:14px;height:14px;border-radius:3px;display:inline-block;flex-shrink:0;"></span>
+                @endif
+                <span class="small">{{ $firstCandidate->party }}</span>
+            </div>
+        @endif
+    </td>
+
+    {{-- Per-category cells --}}
+    @foreach($candidatesByCategory as $categoryCode => $_)
+        @php
+            $candidate  = $regularCandidates[$categoryCode][$i] ?? null;
+            $vote       = $candidate ? ($voteMap[$candidate->id] ?? null) : null;
+            $quantity   = $vote?->quantity ?? 0;
+            // FIX: compare to the constant value ('observed'), NOT VotingTable::STATUS_*
+            $isObserved = $vote && $vote->vote_status === \App\Models\Vote::VOTE_STATUS_OBSERVED;
+            $colClass   = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
+        @endphp
+
+        {{-- Candidate name --}}
+        <td class="{{ $colClass }} col-{{ Str::slug($categoryCode) }}">
+            @if($candidate)
+                <div class="d-flex align-items-center gap-1">
+                    @if($candidate->photo)
+                        <img src="{{ $candidate->photo_url }}"
+                             class="rounded-circle" width="20" height="20" style="object-fit:cover;">
                     @endif
-                    <span class="small">{{ $firstCandidate->party }}</span>
+                    <span class="small">{{ Str::limit($candidate->name, 25) }}</span>
+                    @if($isObserved)
+                        <i class="ri-alert-line text-danger" title="Observado"></i>
+                    @endif
                 </div>
+            @else
+                <span class="text-muted fst-italic small">---</span>
             @endif
         </td>
 
-        {{-- Celdas para cada categoría --}}
-        @foreach($candidatesByCategory as $categoryCode => $categoryCandidates)
-            @php
-                $candidate = $regularCandidates[$categoryCode][$i] ?? null;
-                if ($candidate) {
-                    // Get vote from the votes collection
-                    $vote = null;
-                    if (isset($table->votes)) {
-                        $vote = $table->votes->firstWhere('candidate_id', $candidate->id);
-                    }
-                    $quantity = $vote ? $vote->quantity : 0;
-                    $categoryTotals[$categoryCode] += $quantity;
-                    $isObserved = $vote && $vote->vote_status === 'observed';
-                } else {
-                    $quantity = 0;
-                    $isObserved = false;
-                }
-            @endphp
+        {{-- Vote quantity input --}}
+        <td class="{{ $colClass }} col-{{ Str::slug($categoryCode) }} text-center">
+            @if($candidate)
+                <input type="number"
+                       class="form-control form-control-sm vote-input text-center"
+                       data-table="{{ $table->id }}"
+                       data-candidate="{{ $candidate->id }}"
+                       data-category="{{ $categoryCode }}"
+                       value="{{ $quantity }}"
+                       min="0"
+                       max="{{ $table->expected_voters ?? 9999 }}"
+                       step="1"
+                       {{ $isDisabled ? 'disabled' : '' }}
+                       style="width:70px;margin:0 auto;{{ $isObserved ? 'border-color:#f06548;' : '' }}">
+            @endif
+        </td>
 
-            {{-- Nombre del candidato --}}
-            <td class="table-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }}">
-                @if($candidate)
-                    <div class="d-flex align-items-center">
-                        @if($candidate->photo)
-                            <img src="{{ $candidate->photo_url }}"
-                                 class="rounded-circle me-1" width="20" height="20" style="object-fit: cover;">
-                        @endif
-                        <span class="small">{{ Str::limit($candidate->name, 25) }}</span>
-                        @if($isObserved)
-                            <i class="ri-alert-line text-danger ms-1" title="Observado"></i>
-                        @endif
-                    </div>
-                @else
-                    <span class="text-muted fst-italic small">---</span>
-                @endif
-            </td>
-
-            {{-- Input de votos --}}
-            <td class="table-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }} text-center">
-                @if($candidate)
-                    <input type="number"
-                           class="form-control form-control-sm vote-input text-center"
-                           data-table="{{ $table->id }}"
-                           data-candidate="{{ $candidate->id }}"
-                           data-category="{{ $categoryCode }}"
-                           value="{{ $quantity }}"
-                           min="0"
-                           max="{{ $table->expected_voters ?? 9999 }}"
-                           step="1"
-                           {{ $isDisabled ? 'disabled' : '' }}
-                           style="width: 70px; margin: 0 auto; {{ $isObserved ? 'border-color: #f06548;' : '' }}">
-                @endif
-            </td>
-
-            {{-- Checkbox de observación --}}
-            <td class="table-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }} text-center">
-                @if($candidate && ($permissions['can_observe'] ?? false) && !$isDisabled)
+        {{-- Observe checkbox --}}
+        <td class="{{ $colClass }} col-{{ Str::slug($categoryCode) }} text-center">
+            @if($candidate)
+                @if($canObserve)
                     <input type="checkbox"
                            class="form-check-input observe-checkbox"
                            data-table="{{ $table->id }}"
+                           data-vote-id="{{ $vote?->id ?? '' }}"
                            data-candidate="{{ $candidate->id }}"
                            data-category="{{ $categoryCode }}"
                            data-candidate-name="{{ $candidate->name }}"
-                           {{ $isObserved ? 'checked' : '' }}
-                           {{ $isObserved ? 'disabled' : '' }}
-                           title="Marcar como observado">
+                           {{ $isObserved ? 'checked disabled' : '' }}
+                           title="{{ $isObserved ? 'Ya observado' : 'Marcar como observado' }}">
                 @elseif($isObserved)
-                    <i class="ri-checkbox-circle-fill text-warning"></i>
+                    <i class="ri-checkbox-circle-fill text-warning" title="Observado"></i>
                 @endif
-            </td>
-        @endforeach
-    </tr>
+            @endif
+        </td>
+    @endforeach
+</tr>
 @endfor
 
-{{-- Fila de totales --}}
-<tr class="table-info fw-bold">
-    <td colspan="2" class="text-end">TOTALES:</td>
-    @foreach($candidatesByCategory as $categoryCode => $categoryCandidates)
-        <td class="table-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }} text-center" colspan="2">
-            <span id="total-{{ $categoryCode }}-{{ $table->id }}">{{ $categoryTotals[$categoryCode] }}</span>
+{{-- ── Blank votes row ── --}}
+<tr class="table-light">
+    <td colspan="2" class="text-end small fw-semibold text-muted">
+        <i class="ri-subtract-line me-1"></i>Votos en Blanco
+    </td>
+    @foreach($candidatesByCategory as $categoryCode => $_)
+        @php
+            $blankQty = $table->results_by_category[$categoryCode]['blank_votes'] ?? 0;
+            $colClass = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
+        @endphp
+        <td class="{{ $colClass }}" colspan="2">
+            @if(!$isDisabled && ($permissions['can_register'] ?? false))
+                <input type="number"
+                       class="form-control form-control-sm blank-votes-input text-center"
+                       data-table="{{ $table->id }}"
+                       data-category="{{ $categoryCode }}"
+                       value="{{ $blankQty }}"
+                       min="0"
+                       step="1"
+                       style="width:70px;margin:0 auto;"
+                       title="Votos en blanco — {{ $categoryCode }}">
+            @else
+                <span class="small fw-bold">{{ $blankQty }}</span>
+            @endif
         </td>
-        <td class="table-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }}"></td>
+        <td class="{{ $colClass }}"></td>
+    @endforeach
+</tr>
+
+{{-- ── Null votes row ── --}}
+<tr class="table-light">
+    <td colspan="2" class="text-end small fw-semibold text-muted">
+        <i class="ri-close-line me-1"></i>Votos Nulos
+    </td>
+    @foreach($candidatesByCategory as $categoryCode => $_)
+        @php
+            $nullQty  = $table->results_by_category[$categoryCode]['null_votes'] ?? 0;
+            $colClass = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
+        @endphp
+        <td class="{{ $colClass }}" colspan="2">
+            @if(!$isDisabled && ($permissions['can_register'] ?? false))
+                <input type="number"
+                       class="form-control form-control-sm null-votes-input text-center"
+                       data-table="{{ $table->id }}"
+                       data-category="{{ $categoryCode }}"
+                       value="{{ $nullQty }}"
+                       min="0"
+                       step="1"
+                       style="width:70px;margin:0 auto;"
+                       title="Votos nulos — {{ $categoryCode }}">
+            @else
+                <span class="small fw-bold">{{ $nullQty }}</span>
+            @endif
+        </td>
+        <td class="{{ $colClass }}"></td>
+    @endforeach
+</tr>
+
+{{-- ── Totals row ── --}}
+<tr class="table-info fw-bold">
+    <td colspan="2" class="text-end small">TOTALES</td>
+    @foreach($candidatesByCategory as $categoryCode => $_)
+        @php
+            $catTotal = $table->results_by_category[$categoryCode]['total_votes'] ?? 0;
+            $colClass = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
+        @endphp
+        <td class="{{ $colClass }} text-center" colspan="2">
+            <span id="total-{{ $categoryCode }}-{{ $table->id }}">{{ $catTotal }}</span>
+        </td>
+        <td class="{{ $colClass }}"></td>
     @endforeach
 </tr>

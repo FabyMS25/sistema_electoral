@@ -1,6 +1,4 @@
 <?php
-// app/Http/Controllers/UserController.php - VERSIÓN SIMPLIFICADA
-
 namespace App\Http\Controllers;
 
 use App\Models\User;
@@ -34,9 +32,6 @@ class UserController extends Controller
         ]);
     }
 
-    /**
-     * Verificar email único
-     */
     public function checkEmail(Request $request)
     {
         $exists = User::where('email', $request->email)
@@ -48,16 +43,11 @@ class UserController extends Controller
         return response()->json(['exists' => $exists]);
     }
 
-    /**
-     * Listado de usuarios
-     */
     public function index(Request $request)
     {
         $query = User::with(['roles', 'createdBy', 'assignments' => function($q) {
             $q->where('status', 'activo')->with('institution', 'votingTable');
         }]);
-
-        // Filtros de búsqueda
         if ($request->filled('search')) {
             $query->where(function($q) use ($request) {
                 $q->where('name', 'ilike', "%{$request->search}%")
@@ -66,7 +56,6 @@ class UserController extends Controller
                   ->orWhere('id_card', 'ilike', "%{$request->search}%");
             });
         }
-
         if ($request->filled('role')) {
             $query->whereHas('roles', function($q) use ($request) {
                 $q->where('name', $request->role);
@@ -83,15 +72,10 @@ class UserController extends Controller
                   ->where('status', 'activo');
             });
         }
-
-        // Ordenamiento
         $sort = $request->get('sort', 'created_at');
         $order = $request->get('order', 'desc');
         $query->orderBy($sort, $order);
-
         $users = $query->paginate(15)->withQueryString();
-
-        // Estadísticas
         $stats = [
             'total' => User::count(),
             'active' => User::where('is_active', true)->count(),
@@ -99,34 +83,23 @@ class UserController extends Controller
             'online_today' => User::whereDate('last_login_at', today())->count(),
             'delegates' => UserAssignment::where('status', 'activo')->count(),
         ];
-
         $roles = Role::all();
         $delegateTypes = UserAssignment::getDelegateTypes();
-
         return view('users.index', compact('users', 'stats', 'roles', 'delegateTypes'));
     }
 
-    /**
-     * Formulario de creación
-     */
     public function create()
     {
         $this->authorize('create_users');
-
         $roles = Role::with('permissions')->get();
         $permissions = Permission::all()->groupBy('group');
         $electionTypes = ElectionType::where('active', true)->get();
-
         return view('users.create', compact('roles', 'permissions', 'electionTypes'));
     }
 
-    /**
-     * Guardar nuevo usuario
-     */
     public function store(Request $request)
     {
         $this->authorize('create_users');
-
         $request->validate([
             'name' => 'required|string|max:255',
             'last_name' => 'nullable|string|max:255',
@@ -140,7 +113,6 @@ class UserController extends Controller
             'permissions' => 'array',
             'permissions.*' => 'exists:permissions,id',
         ]);
-
         DB::transaction(function() use ($request) {
             $user = User::create([
                 'name' => $request->name,
@@ -153,8 +125,6 @@ class UserController extends Controller
                 'is_active' => true,
                 'created_by' => Auth::id(),
             ]);
-
-            // Asignar roles
             if ($request->has('roles')) {
                 $roleData = [];
                 foreach ($request->roles as $roleId) {
@@ -166,13 +136,10 @@ class UserController extends Controller
                 }
                 $user->roles()->attach($roleData);
             }
-
-            // Asignar permisos directos
             if ($request->has('permissions')) {
                 $user->permissions()->attach($request->permissions);
             }
         });
-
         return redirect()->route('users.index')
             ->with('success', 'Usuario creado exitosamente.');
     }
@@ -439,8 +406,6 @@ class UserController extends Controller
             'credential_number' => 'nullable|string|max:50',
             'observations' => 'nullable|string|max:500',
         ]);
-
-        // Verificar si ya tiene una asignación activa
         $existing = UserAssignment::where('user_id', $user->id)
             ->where('institution_id', $request->institution_id)
             ->where('election_type_id', $request->election_type_id)
@@ -474,10 +439,7 @@ class UserController extends Controller
     public function assignTableForm(User $user)
     {
         $this->authorize('assign_delegates');
-
         $electionTypes = ElectionType::where('active', true)->get();
-
-        // Obtener mesas disponibles (sin delegado activo)
         $assignedTableIds = UserAssignment::where('status', 'activo')
             ->whereNotNull('voting_table_id')
             ->pluck('voting_table_id')
@@ -522,16 +484,12 @@ class UserController extends Controller
             'credential_number' => 'nullable|string|max:50',
             'observations' => 'nullable|string|max:500',
         ]);
-
-        // Verificar si la mesa ya tiene un delegado activo
         $existing = UserAssignment::where('voting_table_id', $request->voting_table_id)
             ->where('status', 'activo')
             ->first();
-
         if ($existing && $existing->user_id != $user->id) {
             return back()->with('error', 'Esta mesa ya tiene un delegado asignado.');
         }
-
         if ($existing && $existing->user_id == $user->id) {
             $existing->update([
                 'delegate_type' => $request->delegate_type,
@@ -540,7 +498,6 @@ class UserController extends Controller
                 'observations' => $request->observations,
                 'assigned_by' => Auth::id(),
             ]);
-
             $message = 'Asignación actualizada exitosamente.';
         } else {
             UserAssignment::create([
@@ -555,10 +512,8 @@ class UserController extends Controller
                 'assigned_by' => Auth::id(),
                 'observations' => $request->observations,
             ]);
-
             $message = 'Asignación de mesa guardada exitosamente.';
         }
-
         return redirect()->route('users.show', $user)
             ->with('success', $message);
     }

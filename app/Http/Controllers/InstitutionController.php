@@ -1,6 +1,4 @@
 <?php
-// app/Http/Controllers/InstitutionController.php
-
 namespace App\Http\Controllers;
 
 use App\Models\Institution;
@@ -127,8 +125,6 @@ class InstitutionController extends Controller
                 'zone',
                 'votingTables'
             ])->withCount('votingTables');
-
-            // Filtros
             if ($request->filled('search')) {
                 $search = $request->search;
                 $query->where(function($q) use ($search) {
@@ -144,21 +140,15 @@ class InstitutionController extends Controller
                     $q->where('department_id', $request->department_id);
                 });
             }
-
             if ($request->filled('status')) {
                 $query->where('status', $request->status);
             }
-
             if ($request->filled('operative')) {
                 $query->where('is_operative', $request->operative === 'true');
             }
-
-            // Sorting
             $sortField = $request->get('sort', 'name');
             $sortDirection = $request->get('direction', 'asc');
-
             $allowedSortFields = ['name', 'code', 'registered_citizens', 'status'];
-
             if (in_array($sortField, $allowedSortFields)) {
                 $query->orderBy($sortField, $sortDirection);
             } else {
@@ -212,13 +202,9 @@ class InstitutionController extends Controller
                 $this->validationRules(),
                 $this->validationMessages()
             );
-
-            // Generar código si está vacío
             if (empty($validated['code'])) {
                 $validated['code'] = $this->generateInstitutionCode($validated['name']);
             }
-
-            // Valores por defecto
             $validated['is_operative'] = $request->has('is_operative');
             $validated['status'] = $validated['status'] ?? 'activo';
             $validated['created_by'] = Auth::id();
@@ -310,37 +296,26 @@ class InstitutionController extends Controller
     {
         try {
             $institution = Institution::findOrFail($id);
-
             Log::info('=== UPDATE: Datos completos del formulario ===', $request->all());
-
             $validated = $request->validate(
                 $this->validationRules($id),
                 $this->validationMessages()
             );
-
-            // Generar código si está vacío
             if (empty($validated['code'])) {
                 $validated['code'] = $this->generateInstitutionCode($validated['name'], $id);
             }
-
             $validated['is_operative'] = $request->has('is_operative');
             $validated['updated_by'] = Auth::id();
-
             DB::beginTransaction();
-
             try {
                 $institution->update($validated);
                 DB::commit();
-
-                Log::info('=== UPDATE: Recinto actualizado exitosamente ===');
-
                 return redirect()->route('institutions.show', $id)
                                 ->with('success', '✅ El recinto fue actualizado exitosamente.');
             } catch (\Exception $e) {
                 DB::rollBack();
                 throw $e;
             }
-
         } catch (ValidationException $e) {
             Log::error('=== UPDATE: Errores de validación ===', $e->errors());
             return redirect()->back()
@@ -351,7 +326,6 @@ class InstitutionController extends Controller
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-
             return redirect()->back()
                             ->withInput()
                             ->with('error', '❌ Error al actualizar el recinto: ' . $e->getMessage());

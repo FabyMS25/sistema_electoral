@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Sistema de Conteo'),
+    'name' => env('sistema_electoral', 'Sistema de Conteo'),
 
     /*
     |--------------------------------------------------------------------------
