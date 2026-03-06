@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -17,12 +18,9 @@ return new class extends Migration
             $table->string('color')->nullable();
 
             $table->foreignId('election_type_category_id')->constrained()->onDelete('cascade');
-
             $table->integer('list_order')->nullable();
             $table->string('list_name')->nullable();
-
-            $table->enum('type', ['candidato', 'blank_votes', 'null_votes'])->default('candidato');
-
+            // $table->enum('type', ['candidato', 'blank_votes', 'null_votes'])->default('candidato');
             $table->foreignId('municipality_id')->nullable()->constrained();
             $table->foreignId('province_id')->nullable()->constrained();
             $table->foreignId('department_id')->nullable()->constrained();
@@ -30,7 +28,7 @@ return new class extends Migration
             $table->boolean('active')->default(true);
             $table->timestamps();
 
-            $table->index(['election_type_category_id', 'type']);
+            $table->index('election_type_category_id');
         });
     }
 

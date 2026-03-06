@@ -8,13 +8,13 @@
                     </div>
                 </th>
                 <th>
-                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'photo', 'direction' => request('sort') == 'photo' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" 
+                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'photo', 'direction' => request('sort') == 'photo' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}"
                        class="text-dark text-decoration-none">
                         Foto
                     </a>
                 </th>
                 <th>
-                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'name', 'direction' => request('sort') == 'name' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" 
+                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'name', 'direction' => request('sort') == 'name' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}"
                        class="text-dark text-decoration-none">
                         Nombre
                         @if(request('sort') == 'name')
@@ -23,7 +23,7 @@
                     </a>
                 </th>
                 <th>
-                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'party', 'direction' => request('sort') == 'party' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" 
+                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'party', 'direction' => request('sort') == 'party' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}"
                        class="text-dark text-decoration-none">
                         Partido
                         @if(request('sort') == 'party')
@@ -33,19 +33,19 @@
                 </th>
                 <th>Color</th>
                 <th>
-                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'election_type_category_id', 'direction' => request('sort') == 'election_type_category_id' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" 
+                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'election_type', 'direction' => request('sort') == 'election_type' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}"
                        class="text-dark text-decoration-none">
-                        Elección / Categoría
-                        @if(request('sort') == 'election_type_category_id')
+                        Tipo Elección
+                        @if(request('sort') == 'election_type')
                             <i class="ri-arrow-{{ request('direction') == 'asc' ? 'up' : 'down' }}-line"></i>
                         @endif
                     </a>
                 </th>
                 <th>
-                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'type', 'direction' => request('sort') == 'type' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}" 
+                    <a href="{{ route('candidates.index', array_merge(request()->query(), ['sort' => 'election_category', 'direction' => request('sort') == 'election_category' && request('direction') == 'asc' ? 'desc' : 'asc'])) }}"
                        class="text-dark text-decoration-none">
-                        Tipo
-                        @if(request('sort') == 'type')
+                        Categoría
+                        @if(request('sort') == 'election_category')
                             <i class="ri-arrow-{{ request('direction') == 'asc' ? 'up' : 'down' }}-line"></i>
                         @endif
                     </a>
@@ -91,39 +91,40 @@
                     </td>
                     <td class="color">
                         @if($candidate->color)
-                            <div class="color-preview" style="background-color: {{ $candidate->color }}" 
+                            <div class="color-preview" style="background-color: {{ $candidate->color }}"
                                  title="{{ $candidate->color }}"></div>
                         @else
                             <span class="text-muted">-</span>
+                        @endif
+                    </td>
+                    <td class="election_type">
+                        @if($candidate->electionTypeCategory)
+                            <span class="fw-semibold">
+                                {{ $candidate->electionTypeCategory->electionType->name ?? 'N/A' }}
+                            </span>
+                        @else
+                            <span class="text-muted">N/A</span>
                         @endif
                     </td>
                     <td class="election_category">
                         @if($candidate->electionTypeCategory)
                             <span class="badge bg-primary-subtle text-primary">
                                 {{ $candidate->electionTypeCategory->electionCategory->name ?? 'N/A' }}
+                                ({{ $candidate->electionTypeCategory->electionCategory->code ?? '' }})
                             </span>
                             <br>
                             <small class="text-muted">
-                                {{ $candidate->electionTypeCategory->electionType->name ?? '' }}
+                                Franja {{ $candidate->electionTypeCategory->ballot_order ?? '' }}
                             </small>
                         @else
                             <span class="text-muted">N/A</span>
                         @endif
                     </td>
-                    <td class="type">
-                        <span class="badge 
-                            @if($candidate->type === 'candidato') bg-success
-                            @elseif($candidate->type === 'blank_votes') bg-warning
-                            @elseif($candidate->type === 'null_votes') bg-danger
-                            @else bg-secondary @endif">
-                            {{ $typeOptions[$candidate->type] ?? $candidate->type }}
-                        </span>
-                    </td>
                     <td>
                         <div class="d-flex gap-2">
                             @can('view_candidatos')
                             <button type="button" class="btn btn-sm btn-info view-item-btn"
-                                data-bs-toggle="modal" 
+                                data-bs-toggle="modal"
                                 data-bs-target="#viewCandidateModal"
                                 data-id="{{ $candidate->id }}"
                                 data-name="{{ $candidate->name }}"
@@ -133,7 +134,9 @@
                                 data-election_type_category_id="{{ $candidate->election_type_category_id }}"
                                 data-election_type="{{ $candidate->electionTypeCategory->electionType->name ?? 'N/A' }}"
                                 data-election_category="{{ $candidate->electionTypeCategory->electionCategory->name ?? 'N/A' }}"
-                                data-type="{{ $candidate->type }}"
+                                data-election_category_code="{{ $candidate->electionTypeCategory->electionCategory->code ?? '' }}"
+                                data-ballot_order="{{ $candidate->electionTypeCategory->ballot_order ?? '' }}"
+                                data-votes_per_person="{{ $candidate->electionTypeCategory->votes_per_person ?? 1 }}"
                                 data-list_order="{{ $candidate->list_order }}"
                                 data-list_name="{{ $candidate->list_name }}"
                                 data-department_id="{{ $candidate->department_id }}"
@@ -151,7 +154,7 @@
                             @endcan
                             @can('edit_candidatos')
                             <button type="button" class="btn btn-sm btn-warning edit-item-btn"
-                                data-bs-toggle="modal" 
+                                data-bs-toggle="modal"
                                 data-bs-target="#candidateModal"
                                 data-id="{{ $candidate->id }}"
                                 data-update-url="{{ route('candidates.update', $candidate->id) }}"
@@ -160,7 +163,6 @@
                                 data-party_full_name="{{ $candidate->party_full_name }}"
                                 data-color="{{ $candidate->color }}"
                                 data-election_type_category_id="{{ $candidate->election_type_category_id }}"
-                                data-type="{{ $candidate->type }}"
                                 data-list_order="{{ $candidate->list_order }}"
                                 data-list_name="{{ $candidate->list_name }}"
                                 data-department_id="{{ $candidate->department_id }}"

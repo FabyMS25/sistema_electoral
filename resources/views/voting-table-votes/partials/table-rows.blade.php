@@ -7,21 +7,14 @@
 
     // Organizar candidatos por categoría
     $regularCandidates = [];
-    $specialCandidates = ['null_votes' => [], 'blank_votes' => []];
     $categoryTotals = [];
 
     foreach ($candidatesByCategory as $categoryCode => $categoryCandidates) {
         $regularCandidates[$categoryCode] = $categoryCandidates
             ->filter(function($c) {
-                return !in_array($c->type, ['null_votes', 'blank_votes']);
+                return true; // Ya no hay tipo en el modelo
             })
             ->values();
-
-        $specialCandidates['null_votes'][$categoryCode] = $categoryCandidates
-            ->firstWhere('type', 'null_votes');
-
-        $specialCandidates['blank_votes'][$categoryCode] = $categoryCandidates
-            ->firstWhere('type', 'blank_votes');
 
         $categoryTotals[$categoryCode] = 0;
     }
@@ -31,7 +24,7 @@
     }, $regularCandidates)) : 0;
 @endphp
 
-{{-- Filas de candidatos regulares --}}
+{{-- Filas de candidatos --}}
 @for($i = 0; $i < $maxRows; $i++)
     <tr>
         <td class="text-center fw-bold">{{ $i + 1 }}</td>
@@ -49,7 +42,7 @@
             @if($firstCandidate)
                 <div class="d-flex align-items-center">
                     @if($firstCandidate->party_logo)
-                        <img src="{{ asset('storage/' . $firstCandidate->party_logo) }}"
+                        <img src="{{ $firstCandidate->party_logo_url }}"
                              width="20" height="20" class="me-1 rounded" style="object-fit: contain;">
                     @else
                         <span class="candidate-color"
@@ -66,7 +59,11 @@
             @php
                 $candidate = $regularCandidates[$categoryCode][$i] ?? null;
                 if ($candidate) {
-                    $vote = $table->votes->firstWhere('candidate_id', $candidate->id);
+                    // Get vote from the votes collection
+                    $vote = null;
+                    if (isset($table->votes)) {
+                        $vote = $table->votes->firstWhere('candidate_id', $candidate->id);
+                    }
                     $quantity = $vote ? $vote->quantity : 0;
                     $categoryTotals[$categoryCode] += $quantity;
                     $isObserved = $vote && $vote->vote_status === 'observed';
@@ -81,7 +78,7 @@
                 @if($candidate)
                     <div class="d-flex align-items-center">
                         @if($candidate->photo)
-                            <img src="{{ asset('storage/' . $candidate->photo) }}"
+                            <img src="{{ $candidate->photo_url }}"
                                  class="rounded-circle me-1" width="20" height="20" style="object-fit: cover;">
                         @endif
                         <span class="small">{{ Str::limit($candidate->name, 25) }}</span>
@@ -113,7 +110,7 @@
 
             {{-- Checkbox de observación --}}
             <td class="table-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }} text-center">
-                @if($candidate && ($userCan['observe'] ?? false) && !$isDisabled)
+                @if($candidate && ($permissions['can_observe'] ?? false) && !$isDisabled)
                     <input type="checkbox"
                            class="form-check-input observe-checkbox"
                            data-table="{{ $table->id }}"
@@ -130,76 +127,6 @@
         @endforeach
     </tr>
 @endfor
-
-{{-- Filas para NULO y BLANCO --}}
-@foreach(['null_votes' => 'NULO', 'blank_votes' => 'BLANCO'] as $type => $label)
-    @php
-        $hasAny = false;
-        $rowCandidates = [];
-    @endphp
-
-    @foreach($candidatesByCategory as $categoryCode => $categoryCandidates)
-        @if(isset($specialCandidates[$type][$categoryCode]) && $specialCandidates[$type][$categoryCode])
-            @php
-                $hasAny = true;
-                $rowCandidates[$categoryCode] = $specialCandidates[$type][$categoryCode];
-            @endphp
-        @endif
-    @endforeach
-
-    @if($hasAny)
-        <tr class="table-secondary">
-            <td class="text-center">{{ $maxRows + $loop->index + 1 }}</td>
-            <td>-</td>
-
-            @foreach($candidatesByCategory as $categoryCode => $categoryCandidates)
-                @php
-                    $candidate = $rowCandidates[$categoryCode] ?? null;
-                    if ($candidate) {
-                        $vote = $table->votes->firstWhere('candidate_id', $candidate->id);
-                        $quantity = $vote ? $vote->quantity : 0;
-                        $categoryTotals[$categoryCode] += $quantity;
-                        $isObserved = $vote && $vote->vote_status === 'observed';
-                    } else {
-                        $quantity = 0;
-                        $isObserved = false;
-                    }
-                @endphp
-
-                <td class="table-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }} fw-bold">
-                    {{ $candidate ? $label : '---' }}
-                </td>
-                <td class="table-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }} text-center">
-                    @if($candidate)
-                        <input type="number"
-                               class="form-control form-control-sm vote-input text-center"
-                               data-table="{{ $table->id }}"
-                               data-candidate="{{ $candidate->id }}"
-                               data-category="{{ $categoryCode }}"
-                               value="{{ $quantity }}"
-                               min="0"
-                               {{ $isDisabled ? 'disabled' : '' }}
-                               style="width: 70px; margin: 0 auto; {{ $isObserved ? 'border-color: #f06548;' : '' }}">
-                    @endif
-                </td>
-                <td class="table-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }} text-center">
-                    @if($candidate && ($userCan['observe'] ?? false) && !$isDisabled)
-                        <input type="checkbox"
-                               class="form-check-input observe-checkbox"
-                               data-table="{{ $table->id }}"
-                               data-candidate="{{ $candidate->id }}"
-                               data-category="{{ $categoryCode }}"
-                               data-candidate-name="{{ $label }}"
-                               {{ $isObserved ? 'checked' : '' }}
-                               {{ $isObserved ? 'disabled' : '' }}>
-                    @elseif($isObserved)
-                        <i class="ri-checkbox-circle-fill text-warning"></i>
-                    @endif
-                </td>
-            @endforeach
-        </tr>
-    @endif
-@endforeach
 
 {{-- Fila de totales --}}
 <tr class="table-info fw-bold">

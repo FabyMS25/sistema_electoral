@@ -24,19 +24,13 @@ class Role extends Model
             ->withTimestamps();
     }
 
-    // AÑADIR estos métodos útiles
     public function getUsersByScope($scope, $scopeId = null)
     {
         $query = $this->users()->wherePivot('scope', $scope);
-
         if ($scopeId) {
-            if ($scope === 'institution') {
-                $query->wherePivot('institution_id', $scopeId);
-            } elseif ($scope === 'voting_table') {
-                $query->wherePivot('voting_table_id', $scopeId);
-            }
+            $column = $scope === 'recinto' ? 'institution_id' : 'voting_table_id';
+            $query->wherePivot($column, $scopeId);
         }
-
         return $query->get();
     }
 

@@ -1,9 +1,11 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Acta extends Model
@@ -21,10 +23,8 @@ class Acta extends Model
         'photo_path',
         'pdf_path',
         'original_filename',
-        'total_votes',
-        'blank_votes',
-        'null_votes',
-        'valid_votes',
+        'is_consistent',
+        'inconsistencies',
         'status',
         'metadata',
         'hash',
@@ -37,167 +37,235 @@ class Acta extends Model
         'is_signed',
         'signed_at',
         'signed_by',
-        'is_consistent',
-        'inconsistencies',
     ];
 
     protected $casts = [
-        'total_votes' => 'integer',
-        'blank_votes' => 'integer',
-        'null_votes' => 'integer',
-        'valid_votes' => 'integer',
-        'file_size' => 'integer',
-        'metadata' => 'array',
-        'ocr_data' => 'array',
-        'inconsistencies' => 'array',
-        'ocr_processed' => 'boolean',
-        'is_signed' => 'boolean',
-        'is_consistent' => 'boolean',
+        'file_size'        => 'integer',
+        'metadata'         => 'array',
+        'ocr_data'         => 'array',
+        'inconsistencies'  => 'array',
+        'ocr_processed'    => 'boolean',
+        'is_signed'        => 'boolean',
+        'is_consistent'    => 'boolean',
         'ocr_processed_at' => 'datetime',
-        'signed_at' => 'datetime',
+        'signed_at'        => 'datetime',
     ];
 
-    const STATUS_UPLOADED = 'uploaded';
-    const STATUS_VERIFIED = 'verified';
-    const STATUS_OBSERVED = 'observed';
-    const STATUS_CORRECTED = 'corrected';
-    const STATUS_APPROVED = 'approved';
-    const STATUS_REJECTED = 'rejected';
+    public const STATUS_UPLOADED  = 'uploaded';
+    public const STATUS_VERIFIED  = 'verified';
+    public const STATUS_OBSERVED  = 'observed';
+    public const STATUS_CORRECTED = 'corrected';
+    public const STATUS_APPROVED  = 'approved';
+    public const STATUS_REJECTED  = 'rejected';
 
     public static function getStatuses(): array
     {
         return [
-            self::STATUS_UPLOADED => 'Subida',
-            self::STATUS_VERIFIED => 'Verificada',
-            self::STATUS_OBSERVED => 'Observada',
+            self::STATUS_UPLOADED  => 'Subida',
+            self::STATUS_VERIFIED  => 'Verificada',
+            self::STATUS_OBSERVED  => 'Observada',
             self::STATUS_CORRECTED => 'Corregida',
-            self::STATUS_APPROVED => 'Aprobada',
-            self::STATUS_REJECTED => 'Rechazada',
+            self::STATUS_APPROVED  => 'Aprobada',
+            self::STATUS_REJECTED  => 'Rechazada',
         ];
     }
-    public function getStatusBadgeAttribute(): string
-    {
-        return match($this->status) {
-            self::STATUS_UPLOADED => '<span class="badge bg-info">Subida</span>',
-            self::STATUS_VERIFIED => '<span class="badge bg-success">Verificada</span>',
-            self::STATUS_OBSERVED => '<span class="badge bg-warning">Observada</span>',
-            self::STATUS_CORRECTED => '<span class="badge bg-primary">Corregida</span>',
-            self::STATUS_APPROVED => '<span class="badge bg-success">Aprobada</span>',
-            self::STATUS_REJECTED => '<span class="badge bg-danger">Rechazada</span>',
-            default => '<span class="badge bg-secondary">Desconocido</span>',
-        };
-    }
+
+    // =========================================================================
+    // RELATIONSHIPS
+    // =========================================================================
 
     public function votingTable(): BelongsTo
     {
         return $this->belongsTo(VotingTable::class);
     }
+
     public function electionType(): BelongsTo
     {
         return $this->belongsTo(ElectionType::class);
     }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
+
     public function signedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'signed_by');
     }
 
-    // ===== MÉTODOS DE ACCIÓN =====
-    public function verifyConsistency(VotingTable $votingTable)
+    /**
+     * Per-franja totals as written on the physical acta.
+     * One row per franja (ALC, CON for municipal; GOB, AST, ASP for departamental).
+     */
+    public function categoryResults(): HasMany
+    {
+        return $this->hasMany(ActaCategoryResult::class);
+    }
+
+    // =========================================================================
+    // CONSISTENCY
+    // =========================================================================
+
+    /**
+     * Compare each franja result on this acta against the digital tally.
+     * Sets is_consistent and persists. Call after all categoryResults are saved.
+     */
+    public function verifyConsistency(): bool
     {
         $inconsistencies = [];
-        $isConsistent = true;
 
-        // Verificar total de votos
-        if ($this->total_votes !== $votingTable->total_voters) {
-            $inconsistencies[] = "Total de votos: Acta {$this->total_votes} vs Mesa {$votingTable->total_voters}";
-            $isConsistent = false;
+        foreach ($this->categoryResults as $actaResult) {
+            $digitalResult = VotingTableCategoryResult::where('voting_table_id', $this->voting_table_id)
+                ->where('election_type_category_id', $actaResult->election_type_category_id)
+                ->first();
+
+            if (!$digitalResult) {
+                $inconsistencies[] = "Sin datos digitales para franja ID {$actaResult->election_type_category_id}";
+                $actaResult->update(['matches_digital' => false]);
+                continue;
+            }
+
+            $match = $actaResult->valid_votes === $digitalResult->valid_votes
+                && $actaResult->blank_votes   === $digitalResult->blank_votes
+                && $actaResult->null_votes    === $digitalResult->null_votes;
+
+            if (!$match) {
+                $categoryName = $actaResult->electionTypeCategory?->electionCategory?->name
+                    ?? "Franja {$actaResult->election_type_category_id}";
+
+                $inconsistencies[] = "{$categoryName}: "
+                    . "Acta [V:{$actaResult->valid_votes} B:{$actaResult->blank_votes} N:{$actaResult->null_votes}] "
+                    . "≠ Digital [V:{$digitalResult->valid_votes} B:{$digitalResult->blank_votes} N:{$digitalResult->null_votes}]";
+            }
+
+            $actaResult->update([
+                'matches_digital' => $match,
+                'discrepancies'   => $match ? null : [$inconsistencies[array_key_last($inconsistencies)]],
+            ]);
         }
 
-        // Verificar votos válidos
-        if ($this->valid_votes !== $votingTable->valid_votes) {
-            $inconsistencies[] = "Votos válidos: Acta {$this->valid_votes} vs Mesa {$votingTable->valid_votes}";
-            $isConsistent = false;
-        }
+        $isConsistent = empty($inconsistencies);
 
-        // Verificar votos en blanco
-        if ($this->blank_votes !== $votingTable->blank_votes) {
-            $inconsistencies[] = "Votos en blanco: Acta {$this->blank_votes} vs Mesa {$votingTable->blank_votes}";
-            $isConsistent = false;
-        }
-
-        // Verificar votos nulos
-        if ($this->null_votes !== $votingTable->null_votes) {
-            $inconsistencies[] = "Votos nulos: Acta {$this->null_votes} vs Mesa {$votingTable->null_votes}";
-            $isConsistent = false;
-        }
-
-        $this->is_consistent = $isConsistent;
-        $this->inconsistencies = $inconsistencies;
-        $this->save();
+        $this->update([
+            'is_consistent'   => $isConsistent,
+            'inconsistencies' => $isConsistent ? null : $inconsistencies,
+        ]);
 
         return $isConsistent;
     }
 
-    public function markAsVerified($userId)
-    {
-        $this->update([
-            'status' => self::STATUS_VERIFIED,
-        ]);
+    // =========================================================================
+    // ACTIONS
+    // =========================================================================
 
-        // Crear observación si hay inconsistencias
+    /**
+     * Verify the acta against digital data.
+     * If inconsistencies are found, creates an Observation and marks the
+     * VotingTableElection as observed — NOT the whole VotingTable.
+     *
+     * @param int $userId  The reviewer's user ID. Nullable since reviewed_by is nullable in DB.
+     */
+    public function markAsVerified(int $userId): void
+    {
+        $this->verifyConsistency();
+        $this->update(['status' => self::STATUS_VERIFIED]);
+
         if (!$this->is_consistent && !empty($this->inconsistencies)) {
-            $observation = Observation::create([
-                'code' => Observation::generateCode(),
-                'type' => Observation::TYPE_INCONSISTENCIA_ACTA,
-                'description' => 'Inconsistencias detectadas en el acta: ' . implode(', ', $this->inconsistencies),
-                'severity' => Observation::SEVERITY_ERROR,
-                'status' => Observation::STATUS_PENDING,
-                'voting_table_id' => $this->voting_table_id,
+            // ✅ reviewed_by is nullable in the DB — pass $userId normally
+            Observation::create([
+                'code'             => Observation::generateCode(),
+                'type'             => Observation::TYPE_INCONSISTENCIA_ACTA,
+                'description'      => 'Inconsistencias en acta: ' . implode('; ', $this->inconsistencies),
+                'severity'         => Observation::SEVERITY_ERROR,
+                'status'           => Observation::STATUS_PENDING,
+                'voting_table_id'  => $this->voting_table_id,
                 'election_type_id' => $this->election_type_id,
-                'reviewed_by' => $userId,
-                'reviewer_role' => 'revisor',
+                'reviewed_by'      => $userId,  // nullable — fine to pass null if system-triggered
+                'reviewer_role'    => 'revisor',
             ]);
 
-            $this->votingTable->markAsObserved($userId, $observation->id, 'Acta con inconsistencias');
+            // ✅ Target only this mesa × election pivot, not the physical mesa
+            VotingTableElection::where('voting_table_id', $this->voting_table_id)
+                ->where('election_type_id', $this->election_type_id)
+                ->first()
+                ?->markAsObserved($userId, 'Inconsistencias detectadas al verificar acta');
         }
     }
 
-    public function markAsObserved($userId, $notes = null)
+    /**
+     * Manually observe this acta (e.g. illegible photo).
+     */
+    public function markAsObserved(int $userId, ?string $notes = null): void
     {
-        $this->update([
-            'status' => self::STATUS_OBSERVED,
-        ]);
+        $this->update(['status' => self::STATUS_OBSERVED]);
 
         Observation::create([
-            'code' => Observation::generateCode(),
-            'type' => Observation::TYPE_ACTA_ILEGIBLE,
-            'description' => $notes ?? 'Acta observada durante revisión',
-            'severity' => Observation::SEVERITY_WARNING,
-            'status' => Observation::STATUS_PENDING,
-            'voting_table_id' => $this->voting_table_id,
+            'code'             => Observation::generateCode(),
+            'type'             => Observation::TYPE_ACTA_ILEGIBLE,
+            'description'      => $notes ?? 'Acta observada durante revisión',
+            'severity'         => Observation::SEVERITY_WARNING,
+            'status'           => Observation::STATUS_PENDING,
+            'voting_table_id'  => $this->voting_table_id,
             'election_type_id' => $this->election_type_id,
-            'reviewed_by' => $userId,
-            'reviewer_role' => 'revisor',
+            'reviewed_by'      => $userId,
+            'reviewer_role'    => 'revisor',
         ]);
     }
 
-    public function markAsApproved($userId)
+    /**
+     * Approve this acta — finalizes the VotingTableElection for this election.
+     */
+    public function markAsApproved(int $userId): void
     {
         $this->update([
-            'status' => self::STATUS_APPROVED,
+            'status'    => self::STATUS_APPROVED,
             'is_signed' => true,
             'signed_by' => $userId,
             'signed_at' => now(),
         ]);
 
-        $this->votingTable->markAsApproved($userId, 'Acta aprobada');
+        // ✅ Use the model action method — keeps status logic in one place
+        VotingTableElection::where('voting_table_id', $this->voting_table_id)
+            ->where('election_type_id', $this->election_type_id)
+            ->first()
+            ?->markAsEscrutada($userId);
     }
 
-    // ===== MÉTODOS DE CONSULTA =====
+    public function markAsRejected(int $userId, ?string $notes = null): void
+    {
+        $this->update(['status' => self::STATUS_REJECTED]);
+
+        Observation::create([
+            'code'             => Observation::generateCode(),
+            'type'             => Observation::TYPE_ERROR_DATOS,
+            'description'      => $notes ?? 'Acta rechazada',
+            'severity'         => Observation::SEVERITY_CRITICAL,
+            'status'           => Observation::STATUS_PENDING,
+            'voting_table_id'  => $this->voting_table_id,
+            'election_type_id' => $this->election_type_id,
+            'reviewed_by'      => $userId,
+            'reviewer_role'    => 'revisor',
+        ]);
+    }
+
+    // =========================================================================
+    // DISPLAY HELPERS
+    // =========================================================================
+
+    public function getStatusBadgeAttribute(): string
+    {
+        return match ($this->status) {
+            self::STATUS_UPLOADED  => '<span class="badge bg-info">Subida</span>',
+            self::STATUS_VERIFIED  => '<span class="badge bg-success">Verificada</span>',
+            self::STATUS_OBSERVED  => '<span class="badge bg-warning">Observada</span>',
+            self::STATUS_CORRECTED => '<span class="badge bg-primary">Corregida</span>',
+            self::STATUS_APPROVED  => '<span class="badge bg-success">Aprobada</span>',
+            self::STATUS_REJECTED  => '<span class="badge bg-danger">Rechazada</span>',
+            default                => '<span class="badge bg-secondary">Desconocido</span>',
+        };
+    }
+
     public function getFileSizeFormattedAttribute(): string
     {
         $bytes = $this->file_size;
@@ -213,17 +281,10 @@ class Acta extends Model
     public static function generateCode(): string
     {
         $date = date('Ymd');
-        $lastActa = self::whereDate('created_at', today())
-            ->orderBy('id', 'desc')
-            ->first();
-
-        if ($lastActa) {
-            $lastNumber = intval(substr($lastActa->code, -4));
-            $newNumber = str_pad($lastNumber + 1, 4, '0', STR_PAD_LEFT);
-        } else {
-            $newNumber = '0001';
-        }
-
-        return "ACTA-{$date}-{$newNumber}";
+        $last = self::whereDate('created_at', today())->orderBy('id', 'desc')->first();
+        $n    = $last
+            ? str_pad(intval(substr($last->code, -4)) + 1, 4, '0', STR_PAD_LEFT)
+            : '0001';
+        return "ACTA-{$date}-{$n}";
     }
 }

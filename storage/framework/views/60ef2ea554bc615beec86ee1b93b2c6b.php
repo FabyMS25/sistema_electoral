@@ -43,7 +43,7 @@
             return;
         }
 
-        // Validación DINÁMICA: Todas las categorías deben tener el mismo total
+        // Validación: Todas las categorías deben tener el mismo total
         const totals = Object.values(categoryTotals);
         if (totals.length > 1 && new Set(totals).size > 1) {
             let errorHtml = 'El número de votantes debe ser el mismo en todas las categorías:<br><br>';
@@ -70,6 +70,16 @@
                 html: `Los votos registrados (${totalVoters}) exceden<br>
                        los votantes habilitados (${expectedVoters})`,
                 confirmButtonColor: '#f06548'
+            });
+            return;
+        }
+
+        // Validar que hay election_type_id
+        if (!window.electionTypeId) {
+            Swal.fire({
+                icon: 'error',
+                title: '❌ Error',
+                text: 'No se ha seleccionado un tipo de elección'
             });
             return;
         }
@@ -324,6 +334,14 @@
                         window.saveTable(tableId, true);
                     }
                 });
+            });
+        });
+
+        // Listener para botones validar
+        document.querySelectorAll('.validate-table').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tableId = this.dataset.tableId;
+                window.showValidationModal(tableId);
             });
         });
 

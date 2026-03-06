@@ -34,7 +34,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('vote_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained();
-            $table->enum('action', ['review', 'observe', 'correct', 'validate', 'approve', 'reject']);
+            $table->enum('action', ['review', 'observe', 'correct', 'validate', 'approve', 'reject', 'update']);
             $table->text('notes')->nullable();
             $table->json('previous_values')->nullable();
             $table->json('new_values')->nullable();

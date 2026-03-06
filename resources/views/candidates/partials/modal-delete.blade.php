@@ -2,7 +2,10 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">Confirmar Eliminación</h5>
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="ri-delete-bin-line text-danger me-1"></i>
+                    Confirmar Eliminación
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -14,14 +17,22 @@
                         <p class="text-muted mx-4 mb-0" id="deleteMessage">
                             ¿Está seguro de que desea eliminar este candidato?
                         </p>
+                        <p class="text-warning mt-2 small">
+                            <i class="ri-information-line me-1"></i>
+                            Esta acción desactivará el candidato (borrado lógico)
+                        </p>
                     </div>
                 </div>
                 <div class="d-flex gap-2 justify-content-center mt-4 mb-2">
-                    <button type="button" class="btn w-sm btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn w-sm btn-light" data-bs-dismiss="modal">
+                        <i class="ri-close-line me-1"></i> Cancelar
+                    </button>
                     <form id="deleteForm" method="POST" style="display: inline;">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn w-sm btn-danger">Sí, eliminar</button>
+                        <button type="submit" class="btn w-sm btn-danger">
+                            <i class="ri-delete-bin-line me-1"></i> Sí, eliminar
+                        </button>
                     </form>
                 </div>
             </div>

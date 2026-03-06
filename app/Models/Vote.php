@@ -1,6 +1,5 @@
 <?php
 namespace App\Models;
-
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,16 +8,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Vote extends Model
 {
     use HasFactory, SoftDeletes;
-
     protected $table = 'votes';
 
     protected $fillable = [
         'quantity',
-        'percentage',
         'vote_status',
         'voting_table_id',
         'candidate_id',
         'election_type_id',
+        'election_type_category_id',  // NEW: denormalized for query performance
         'user_id',
         'registered_at',
         'verified_at',
@@ -28,9 +26,6 @@ class Vote extends Model
         'corrected_at',
         'correction_notes',
         'observation_id',
-        'acta_photo',
-        'acta_pdf',
-        'has_physical_acta',
         'validated_at',
         'validated_by',
         'validation_notes',
@@ -40,42 +35,38 @@ class Vote extends Model
         'reopened_by',
         'reopen_count',
     ];
-
     protected $casts = [
-        'quantity' => 'integer',
-        'percentage' => 'float',
+        'quantity'      => 'integer',
+        'reopen_count'  => 'integer',
         'registered_at' => 'datetime',
-        'verified_at' => 'datetime',
-        'corrected_at' => 'datetime',
-        'validated_at' => 'datetime',
-        'closed_at' => 'datetime',
-        'reopened_at' => 'datetime',
-        'reopen_count' => 'integer',
-        'has_physical_acta' => 'boolean',
+        'verified_at'   => 'datetime',
+        'corrected_at'  => 'datetime',
+        'validated_at'  => 'datetime',
+        'closed_at'     => 'datetime',
+        'reopened_at'   => 'datetime',
     ];
 
-    const VOTE_STATUS_PENDING_REVIEW = 'pending_review';
-    const VOTE_STATUS_REVIEWED = 'reviewed';
-    const VOTE_STATUS_OBSERVED = 'observed';
-    const VOTE_STATUS_CORRECTED = 'corrected';
-    const VOTE_STATUS_VALIDATED = 'validated';
-    const VOTE_STATUS_APPROVED = 'approved';
-    const VOTE_STATUS_REJECTED = 'rejected';
+    public const VOTE_STATUS_PENDING_REVIEW = 'pending_review';
+    public const VOTE_STATUS_REVIEWED       = 'reviewed';
+    public const VOTE_STATUS_OBSERVED       = 'observed';
+    public const VOTE_STATUS_CORRECTED      = 'corrected';
+    public const VOTE_STATUS_VALIDATED      = 'validated';
+    public const VOTE_STATUS_APPROVED       = 'approved';
+    public const VOTE_STATUS_REJECTED       = 'rejected';
 
     public static function getVoteStatuses(): array
     {
         return [
             self::VOTE_STATUS_PENDING_REVIEW => 'Pendiente de Revisión',
-            self::VOTE_STATUS_REVIEWED => 'Revisado',
-            self::VOTE_STATUS_OBSERVED => 'Observado',
-            self::VOTE_STATUS_CORRECTED => 'Corregido',
-            self::VOTE_STATUS_VALIDATED => 'Validado',
-            self::VOTE_STATUS_APPROVED => 'Aprobado',
-            self::VOTE_STATUS_REJECTED => 'Rechazado',
+            self::VOTE_STATUS_REVIEWED       => 'Revisado',
+            self::VOTE_STATUS_OBSERVED       => 'Observado',
+            self::VOTE_STATUS_CORRECTED      => 'Corregido',
+            self::VOTE_STATUS_VALIDATED      => 'Validado',
+            self::VOTE_STATUS_APPROVED       => 'Aprobado',
+            self::VOTE_STATUS_REJECTED       => 'Rechazado',
         ];
     }
 
-    // ===== RELACIONES =====
     public function votingTable(): BelongsTo
     {
         return $this->belongsTo(VotingTable::class);
@@ -87,6 +78,10 @@ class Vote extends Model
     public function electionType(): BelongsTo
     {
         return $this->belongsTo(ElectionType::class);
+    }
+    public function electionTypeCategory(): BelongsTo
+    {
+        return $this->belongsTo(ElectionTypeCategory::class);
     }
     public function user(): BelongsTo
     {
@@ -121,315 +116,194 @@ class Vote extends Model
         return $this->hasMany(ValidationHistory::class);
     }
 
-    // ===== MÉTODOS DE ESTADO =====
-    public function isPendingReview(): bool
-    {
-        return $this->vote_status === self::VOTE_STATUS_PENDING_REVIEW;
-    }
-    public function isReviewed(): bool
-    {
-        return $this->vote_status === self::VOTE_STATUS_REVIEWED;
-    }
-    public function isObserved(): bool
-    {
-        return $this->vote_status === self::VOTE_STATUS_OBSERVED;
-    }
-    public function isCorrected(): bool
-    {
-        return $this->vote_status === self::VOTE_STATUS_CORRECTED;
-    }
-    public function isValidated(): bool
-    {
-        return $this->vote_status === self::VOTE_STATUS_VALIDATED;
-    }
-    public function isApproved(): bool
-    {
-        return $this->vote_status === self::VOTE_STATUS_APPROVED;
-    }
-    public function isRejected(): bool
-    {
-        return $this->vote_status === self::VOTE_STATUS_REJECTED;
-    }
+    public function isPendingReview(): bool  { return $this->vote_status === self::VOTE_STATUS_PENDING_REVIEW; }
+    public function isReviewed(): bool       { return $this->vote_status === self::VOTE_STATUS_REVIEWED; }
+    public function isObserved(): bool       { return $this->vote_status === self::VOTE_STATUS_OBSERVED; }
+    public function isCorrected(): bool      { return $this->vote_status === self::VOTE_STATUS_CORRECTED; }
+    public function isValidated(): bool      { return $this->vote_status === self::VOTE_STATUS_VALIDATED; }
+    public function isApproved(): bool       { return $this->vote_status === self::VOTE_STATUS_APPROVED; }
+    public function isRejected(): bool       { return $this->vote_status === self::VOTE_STATUS_REJECTED; }
+
     public function canBeCorrected(): bool
     {
         return in_array($this->vote_status, [
             self::VOTE_STATUS_OBSERVED,
-            self::VOTE_STATUS_PENDING_REVIEW
+            self::VOTE_STATUS_PENDING_REVIEW,
         ]);
     }
 
-    // ===== SCOPES =====
-    public function scopePendingReview($query)
-    {
-        return $query->where('vote_status', self::VOTE_STATUS_PENDING_REVIEW);
-    }
-    public function scopeReviewed($query)
-    {
-        return $query->where('vote_status', self::VOTE_STATUS_REVIEWED);
-    }
-    public function scopeObserved($query)
-    {
-        return $query->where('vote_status', self::VOTE_STATUS_OBSERVED);
-    }
-    public function scopeCorrected($query)
-    {
-        return $query->where('vote_status', self::VOTE_STATUS_CORRECTED);
-    }
-    public function scopeValidated($query)
-    {
-        return $query->where('vote_status', self::VOTE_STATUS_VALIDATED);
-    }
-    public function scopeApproved($query)
-    {
-        return $query->where('vote_status', self::VOTE_STATUS_APPROVED);
-    }
-    public function scopeRejected($query)
-    {
-        return $query->where('vote_status', self::VOTE_STATUS_REJECTED);
-    }
-    public function scopeByElectionType($query, $electionTypeId)
-    {
-        return $query->where('election_type_id', $electionTypeId);
-    }
-    public function scopeByVotingTable($query, $votingTableId)
-    {
-        return $query->where('voting_table_id', $votingTableId);
-    }
-    public function scopeByCandidate($query, $candidateId)
-    {
-        return $query->where('candidate_id', $candidateId);
-    }
-    public function scopeWithVoteStatus($query, $status)
-    {
-        return $query->where('vote_status', $status);
-    }
-    public function scopeWithValidationStatus($query, $status)
-    {
-        return $query->where('validation_status', $status);
-    }
+    public function scopePendingReview($query)   { return $query->where('vote_status', self::VOTE_STATUS_PENDING_REVIEW); }
+    public function scopeReviewed($query)        { return $query->where('vote_status', self::VOTE_STATUS_REVIEWED); }
+    public function scopeObserved($query)        { return $query->where('vote_status', self::VOTE_STATUS_OBSERVED); }
+    public function scopeCorrected($query)       { return $query->where('vote_status', self::VOTE_STATUS_CORRECTED); }
+    public function scopeValidated($query)       { return $query->where('vote_status', self::VOTE_STATUS_VALIDATED); }
+    public function scopeApproved($query)        { return $query->where('vote_status', self::VOTE_STATUS_APPROVED); }
+    public function scopeRejected($query)        { return $query->where('vote_status', self::VOTE_STATUS_REJECTED); }
 
-    // ===== MÉTODOS DE ACCIÓN =====
-    public function markAsObserved($userId, $observationId, $notes = null)
+    public function scopeByElectionType($query, $id)  { return $query->where('election_type_id', $id); }
+    public function scopeByVotingTable($query, $id)   { return $query->where('voting_table_id', $id); }
+    public function scopeByCandidate($query, $id)     { return $query->where('candidate_id', $id); }
+    public function scopeByCategory($query, $id)      { return $query->where('election_type_category_id', $id); }
+    public function scopeWithVoteStatus($query, $s)   { return $query->where('vote_status', $s); }
+
+    // ===== ACTIONS =====
+    public function markAsObserved(int $userId, int $observationId, ?string $notes = null): void
     {
-        $oldStatus = $this->vote_status;
+        $old = $this->vote_status;
         $this->update([
-            'vote_status' => self::VOTE_STATUS_OBSERVED,
-            'observation_id' => $observationId,
+            'vote_status'        => self::VOTE_STATUS_OBSERVED,
+            'observation_id'     => $observationId,
             'verification_notes' => $notes,
-            'verified_by' => $userId,
-            'verified_at' => now(),
+            'verified_by'        => $userId,
+            'verified_at'        => now(),
         ]);
-
         ValidationHistory::create([
-            'vote_id' => $this->id,
-            'user_id' => $userId,
-            'action' => 'observe',
-            'notes' => $notes,
-            'previous_values' => ['status' => $oldStatus],
-            'new_values' => ['status' => self::VOTE_STATUS_OBSERVED],
+            'vote_id'         => $this->id,
+            'user_id'         => $userId,
+            'action'          => 'observe',
+            'notes'           => $notes,
+            'previous_values' => ['status' => $old],
+            'new_values'      => ['status' => self::VOTE_STATUS_OBSERVED],
         ]);
-
-        if ($this->votingTable) {
-            $this->votingTable->updateValidationStatus();
-        }
     }
-
-    public function markAsCorrected($userId, $newQuantity, $notes = null)
+    public function markAsCorrected(int $userId, int $newQuantity, ?string $notes = null): void
     {
-        $oldQuantity = $this->quantity;
+        $oldQty = $this->quantity;
         $oldStatus = $this->vote_status;
-
         $this->update([
-            'quantity' => $newQuantity,
-            'vote_status' => self::VOTE_STATUS_CORRECTED,
-            'corrected_by' => $userId,
-            'corrected_at' => now(),
+            'quantity'         => $newQuantity,
+            'vote_status'      => self::VOTE_STATUS_CORRECTED,
+            'corrected_by'     => $userId,
+            'corrected_at'     => now(),
             'correction_notes' => $notes,
         ]);
-
         ValidationHistory::create([
-            'vote_id' => $this->id,
-            'user_id' => $userId,
-            'action' => 'correct',
-            'notes' => $notes,
-            'previous_values' => ['quantity' => $oldQuantity, 'status' => $oldStatus],
-            'new_values' => ['quantity' => $newQuantity, 'status' => self::VOTE_STATUS_CORRECTED],
+            'vote_id'         => $this->id,
+            'user_id'         => $userId,
+            'action'          => 'correct',
+            'notes'           => $notes,
+            'previous_values' => ['quantity' => $oldQty, 'status' => $oldStatus],
+            'new_values'      => ['quantity' => $newQuantity, 'status' => self::VOTE_STATUS_CORRECTED],
         ]);
-
-        if ($this->votingTable) {
-            $this->votingTable->updateValidationStatus();
-        }
+        $this->refreshCategoryResult();
     }
 
-    public function markAsValidated($userId, $notes = null)
-    {
-        $oldStatus = $this->vote_status;
-        $this->update([
-            'vote_status' => self::VOTE_STATUS_VALIDATED,
-            'validated_by' => $userId,
-            'validated_at' => now(),
-            'validation_notes' => $notes,
-        ]);
-
-        ValidationHistory::create([
-            'vote_id' => $this->id,
-            'user_id' => $userId,
-            'action' => 'validate',
-            'notes' => $notes,
-            'previous_values' => ['status' => $oldStatus],
-            'new_values' => ['status' => self::VOTE_STATUS_VALIDATED],
-        ]);
-
-        if ($this->votingTable) {
-            $this->votingTable->updateValidationStatus();
-        }
-    }
-
-    public function markAsApproved($userId, $notes = null)
+    public function markAsReviewed(int $userId, ?string $notes = null): void
     {
         $this->update([
-            'vote_status' => self::VOTE_STATUS_APPROVED,
-            'validated_by' => $userId,
-            'validated_at' => now(),
-            'validation_notes' => $notes,
-        ]);
-
-        ValidationHistory::create([
-            'vote_id' => $this->id,
-            'user_id' => $userId,
-            'action' => 'approve',
-            'notes' => $notes,
-        ]);
-
-        if ($this->votingTable) {
-            $this->votingTable->updateValidationStatus();
-        }
-    }
-
-    public function markAsRejected($userId, $notes = null)
-    {
-        $this->update([
-            'vote_status' => self::VOTE_STATUS_REJECTED,
-            'validated_by' => $userId,
-            'validated_at' => now(),
-            'validation_notes' => $notes,
-        ]);
-
-        ValidationHistory::create([
-            'vote_id' => $this->id,
-            'user_id' => $userId,
-            'action' => 'reject',
-            'notes' => $notes,
-        ]);
-
-        if ($this->votingTable) {
-            $this->votingTable->updateValidationStatus();
-        }
-    }
-
-    public function markAsReviewed($userId, $notes = null)
-    {
-        $this->update([
-            'vote_status' => self::VOTE_STATUS_REVIEWED,
-            'verified_by' => $userId,
-            'verified_at' => now(),
+            'vote_status'        => self::VOTE_STATUS_REVIEWED,
+            'verified_by'        => $userId,
+            'verified_at'        => now(),
             'verification_notes' => $notes,
         ]);
     }
 
-    public function markAsVerified($userId, $notes = null)
+    public function markAsValidated(int $userId, ?string $notes = null): void
     {
+        $old = $this->vote_status;
         $this->update([
-            'vote_status' => self::VOTE_STATUS_REVIEWED,
-            'verified_by' => $userId,
-            'verified_at' => now(),
-            'verification_notes' => $notes,
+            'vote_status'      => self::VOTE_STATUS_VALIDATED,
+            'validated_by'     => $userId,
+            'validated_at'     => now(),
+            'validation_notes' => $notes,
+        ]);
+        ValidationHistory::create([
+            'vote_id'         => $this->id,
+            'user_id'         => $userId,
+            'action'          => 'validate',
+            'notes'           => $notes,
+            'previous_values' => ['status' => $old],
+            'new_values'      => ['status' => self::VOTE_STATUS_VALIDATED],
         ]);
     }
 
-    // ===== MÉTODOS DE AUDITORÍA =====
-    public function close($userId)
+    public function markAsApproved(int $userId, ?string $notes = null): void
     {
         $this->update([
-            'closed_at' => now(),
-            'closed_by' => $userId,
+            'vote_status'      => self::VOTE_STATUS_APPROVED,
+            'validated_by'     => $userId,
+            'validated_at'     => now(),
+            'validation_notes' => $notes,
+        ]);
+        ValidationHistory::create([
+            'vote_id' => $this->id, 'user_id' => $userId, 'action' => 'approve', 'notes' => $notes,
         ]);
     }
-    public function reopen($userId)
+
+    public function markAsRejected(int $userId, ?string $notes = null): void
     {
         $this->update([
-            'reopened_at' => now(),
-            'reopened_by' => $userId,
+            'vote_status'      => self::VOTE_STATUS_REJECTED,
+            'validated_by'     => $userId,
+            'validated_at'     => now(),
+            'validation_notes' => $notes,
+        ]);
+        ValidationHistory::create([
+            'vote_id' => $this->id, 'user_id' => $userId, 'action' => 'reject', 'notes' => $notes,
+        ]);
+    }
+
+    public function close(int $userId): void
+    {
+        $this->update(['closed_at' => now(), 'closed_by' => $userId]);
+    }
+
+    public function reopen(int $userId): void
+    {
+        $this->update([
+            'reopened_at'  => now(),
+            'reopened_by'  => $userId,
             'reopen_count' => $this->reopen_count + 1,
         ]);
     }
 
-    // ===== MÉTODOS DE UTILIDAD =====
-    public function getTallyAttribute(): string
+    // ===== HELPERS =====
+    private function refreshCategoryResult(): void
     {
-        $quantity = $this->quantity;
-        $groups = floor($quantity / 5);
-        $remaining = $quantity % 5;
-
-        $tally = '';
-        for ($i = 0; $i < $groups; $i++) {
-            $tally .= '卌 ';
-        }
-        if ($remaining > 0) {
-            $tally .= str_repeat('| ', $remaining);
-        }
-        return trim($tally);
+        $result = VotingTableCategoryResult::where('voting_table_id', $this->voting_table_id)
+            ->where('election_type_category_id', $this->election_type_category_id)
+            ->first();
+        $result?->checkConsistency();
     }
-    public function getVisualTallyAttribute(): string
-    {
-        $quantity = $this->quantity;
-        $groups = floor($quantity / 5);
-        $remaining = $quantity % 5;
-
-        $visual = '';
-        for ($i = 0; $i < $groups; $i++) {
-            $visual .= '<span class="tally-group bg-light p-1 rounded me-1">||||</span> ';
-        }
-        if ($remaining > 0) {
-            $visual .= '<span class="tally-remaining">' . str_repeat('|', $remaining) . '</span>';
-        }
-        return trim($visual);
-    }
-
-    // ===== MÉTODOS DE UTILIDAD (se mantienen) =====
     public function getElectionCategoryAttribute()
     {
         return $this->candidate?->electionCategory;
     }
-
     public function getElectionCategoryCodeAttribute(): ?string
     {
         return $this->getElectionCategoryAttribute()?->code;
     }
-
-    public function isForMayor(): bool
+    public function isForCategory(string $code): bool
     {
-        $category = $this->getElectionCategoryAttribute();
-        return $category && $category->code === 'ALC';
+        return $this->getElectionCategoryCodeAttribute() === $code;
     }
-
-    public function isForCouncil(): bool
-    {
-        $category = $this->getElectionCategoryAttribute();
-        return $category && $category->code === 'CON';
-    }
-
     public function getStatusBadgeAttribute(): string
     {
-        return match($this->vote_status) {
+        return match ($this->vote_status) {
             self::VOTE_STATUS_PENDING_REVIEW => '<span class="badge bg-warning">Pendiente</span>',
-            self::VOTE_STATUS_REVIEWED => '<span class="badge bg-info">Revisado</span>',
-            self::VOTE_STATUS_OBSERVED => '<span class="badge bg-danger">Observado</span>',
-            self::VOTE_STATUS_CORRECTED => '<span class="badge bg-primary">Corregido</span>',
-            self::VOTE_STATUS_VALIDATED => '<span class="badge bg-success">Validado</span>',
-            self::VOTE_STATUS_APPROVED => '<span class="badge bg-success">Aprobado</span>',
-            self::VOTE_STATUS_REJECTED => '<span class="badge bg-dark">Rechazado</span>',
-            default => '<span class="badge bg-secondary">Desconocido</span>',
+            self::VOTE_STATUS_REVIEWED       => '<span class="badge bg-info">Revisado</span>',
+            self::VOTE_STATUS_OBSERVED       => '<span class="badge bg-danger">Observado</span>',
+            self::VOTE_STATUS_CORRECTED      => '<span class="badge bg-primary">Corregido</span>',
+            self::VOTE_STATUS_VALIDATED      => '<span class="badge bg-success">Validado</span>',
+            self::VOTE_STATUS_APPROVED       => '<span class="badge bg-success">Aprobado</span>',
+            self::VOTE_STATUS_REJECTED       => '<span class="badge bg-dark">Rechazado</span>',
+            default                          => '<span class="badge bg-secondary">Desconocido</span>',
         };
+    }
+    public function getTallyAttribute(): string
+    {
+        $groups    = floor($this->quantity / 5);
+        $remaining = $this->quantity % 5;
+        return trim(str_repeat('卌 ', $groups) . str_repeat('| ', $remaining));
+    }
+    public function getVisualTallyAttribute(): string
+    {
+        $groups    = floor($this->quantity / 5);
+        $remaining = $this->quantity % 5;
+        $visual    = str_repeat('<span class="tally-group bg-light p-1 rounded me-1">||||</span> ', $groups);
+        if ($remaining > 0) {
+            $visual .= '<span class="tally-remaining">' . str_repeat('|', $remaining) . '</span>';
+        }
+        return trim($visual);
     }
 }

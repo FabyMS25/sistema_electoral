@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -40,18 +41,15 @@ class Institution extends Model
     ];
 
     protected $casts = [
-        'is_operative' => 'boolean',
-        'registered_citizens' => 'integer',
-        'total_voting_tables' => 'integer',
+        'is_operative'           => 'boolean',
+        'registered_citizens'    => 'integer',
+        'total_voting_tables'    => 'integer',
         'total_computed_records' => 'integer',
         'total_annulled_records' => 'integer',
-        'total_enabled_records' => 'integer',
-        'total_pending_records' => 'integer',
-        'latitude' => 'decimal:7',
-        'longitude' => 'decimal:7',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'deleted_at' => 'datetime',
+        'total_enabled_records'  => 'integer',
+        'total_pending_records'  => 'integer',
+        'latitude'               => 'decimal:7',
+        'longitude'              => 'decimal:7',
     ];
 
     protected static function boot()
@@ -65,25 +63,16 @@ class Institution extends Model
         });
     }
 
-    public static function generateUniqueCode()
+    public static function generateUniqueCode(): string
     {
-        $prefix = 'INST';
-        $maxId = static::withTrashed()->max('id') ?? 0;
+        $maxId  = static::withTrashed()->max('id') ?? 0;
         $nextId = $maxId + 1;
-        return $prefix . str_pad($nextId, 4, '0', STR_PAD_LEFT);
+        return 'INST' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
     }
 
-    // ===== RELACIONES =====
-
-    public function department(): BelongsTo
-    {
-        return $this->belongsTo(Department::class);
-    }
-
-    public function province(): BelongsTo
-    {
-        return $this->belongsTo(Province::class);
-    }
+    // =========================================================================
+    // RELATIONSHIPS
+    // =========================================================================
 
     public function municipality(): BelongsTo
     {
@@ -105,6 +94,22 @@ class Institution extends Model
         return $this->belongsTo(Zone::class);
     }
 
+    /**
+     * Province and Department are reached through Municipality, not stored directly
+     * on Institution. Use $institution->municipality->province->department.
+     * Keeping these as convenience pass-throughs via municipality relationship.
+     */
+    public function province(): BelongsTo
+    {
+        return $this->municipality->province()
+            ?? $this->belongsTo(Province::class); // fallback — won't resolve without province_id
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class); // fallback only — no department_id on institutions
+    }
+
     public function votingTables(): HasMany
     {
         return $this->hasMany(VotingTable::class);
@@ -120,7 +125,9 @@ class Institution extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-    // ===== SCOPES =====
+    // =========================================================================
+    // SCOPES
+    // =========================================================================
 
     public function scopeActive($query)
     {
@@ -137,38 +144,92 @@ class Institution extends Model
         return $query->where('municipality_id', $municipalityId);
     }
 
-    // ===== MÉTODOS =====
+    // =========================================================================
+    // BUSINESS LOGIC
+    // =========================================================================
 
-    public function updateTotals()
+    /**
+     * Recomputes the institution's aggregate counters from its voting tables
+     * and their VotingTableElection pivot rows.
+     *
+     * ✅ FIXED from original: voting_tables has no computed_records, annulled_records,
+     *    enabled_records, or registered_citizens columns — those aggregate counts
+     *    come from VotingTableElection status and expected_voters on VotingTable.
+     */
+    public function updateTotals(): void
     {
+        $tables = $this->votingTables()->withCount([])->get();
+
+        $totalTables = $tables->count();
+
+        // Computed = tables where ALL their elections are escrutada or transmitida
+        $computed = $tables->filter(function ($table) {
+            return $table->tableElections->every(
+                fn($te) => in_array($te->status, [
+                    VotingTableElection::STATUS_ESCRUTADA,
+                    VotingTableElection::STATUS_TRANSMITIDA,
+                ])
+            );
+        })->count();
+
+        // Annulled = tables where any election is anulada
+        $annulled = $tables->filter(function ($table) {
+            return $table->tableElections->contains(
+                fn($te) => $te->status === VotingTableElection::STATUS_ANULADA
+            );
+        })->count();
+
+        // Pending = tables where any election is still configurada or en_espera
+        $pending = $tables->filter(function ($table) {
+            return $table->tableElections->contains(
+                fn($te) => in_array($te->status, [
+                    VotingTableElection::STATUS_CONFIGURADA,
+                    VotingTableElection::STATUS_EN_ESPERA,
+                ])
+            );
+        })->count();
+
         $this->update([
-            'total_computed_records' => $this->votingTables()->sum('computed_records'),
-            'total_annulled_records' => $this->votingTables()->sum('annulled_records'),
-            'total_enabled_records' => $this->votingTables()->sum('enabled_records'),
-            'total_voting_tables' => $this->votingTables()->count(),
-            'registered_citizens' => $this->votingTables()->sum('registered_citizens'),
+            'total_voting_tables'    => $totalTables,
+            'total_computed_records' => $computed,
+            'total_annulled_records' => $annulled,
+            'total_enabled_records'  => $totalTables - $annulled,
+            'total_pending_records'  => $pending,
         ]);
     }
 
+    /**
+     * Total expected voters across all voting tables in this institution.
+     */
+    public function getTotalExpectedVotersAttribute(): int
+    {
+        return $this->votingTables()->sum('expected_voters');
+    }
+
+    // =========================================================================
+    // DISPLAY HELPERS
+    // =========================================================================
+
     public function getFullAddressAttribute(): string
     {
-        $parts = [];
-        if ($this->address) $parts[] = $this->address;
-        if ($this->locality) $parts[] = $this->locality->name;
-        if ($this->municipality) $parts[] = $this->municipality->name;
-        if ($this->province) $parts[] = $this->province->name;
-        if ($this->department) $parts[] = $this->department->name;
+        $parts = array_filter([
+            $this->address,
+            $this->locality?->name,
+            $this->municipality?->name,
+            $this->municipality?->province?->name,
+            $this->municipality?->province?->department?->name,
+        ]);
 
         return implode(', ', $parts);
     }
 
     public function getStatusBadgeAttribute(): string
     {
-        return match($this->status) {
-            'activo' => '<span class="badge bg-success">Activo</span>',
-            'inactivo' => '<span class="badge bg-danger">Inactivo</span>',
+        return match ($this->status) {
+            'activo'           => '<span class="badge bg-success">Activo</span>',
+            'inactivo'         => '<span class="badge bg-danger">Inactivo</span>',
             'en_mantenimiento' => '<span class="badge bg-warning">Mantenimiento</span>',
-            default => '<span class="badge bg-secondary">Desconocido</span>',
+            default            => '<span class="badge bg-secondary">Desconocido</span>',
         };
     }
 }

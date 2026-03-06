@@ -1,5 +1,4 @@
 <?php
-// app/Models/ElectionType.php
 
 namespace App\Models;
 
@@ -7,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ElectionType extends Model
@@ -16,61 +16,53 @@ class ElectionType extends Model
     protected $fillable = [
         'name',
         'short_name',
+        'level',
+        'geographic_scope_type',
+        'geographic_scope_id',
         'election_date',
         'start_time',
         'end_time',
-        'registration_start',
-        'registration_end',
-        'campaign_start',
-        'campaign_end',
-        'total_voters',
-        'total_tables',
-        'total_recintos',
-        'status',
         'active',
         'description',
-        'created_by',
-        'updated_by',
     ];
 
     protected $casts = [
         'election_date' => 'date',
-        'registration_start' => 'date',
-        'registration_end' => 'date',
-        'campaign_start' => 'date',
-        'campaign_end' => 'date',
-        'active' => 'boolean',
-        'total_voters' => 'integer',
-        'total_tables' => 'integer',
-        'total_recintos' => 'integer',
-        'start_time' => 'datetime',
-        'end_time' => 'datetime',
+        'active'        => 'boolean',
     ];
 
-    public const STATUS_PREPARACION = 'preparacion';
-    public const STATUS_INSCRIPCION = 'inscripcion';
-    public const STATUS_CAMPANA = 'campana';
-    public const STATUS_VOTACION = 'votacion';
-    public const STATUS_COMPUTO = 'computo';
-    public const STATUS_FINALIZADO = 'finalizado';
+    public const LEVEL_NACIONAL      = 'nacional';
+    public const LEVEL_DEPARTAMENTAL = 'departamental';  // 3-franja ballot
+    public const LEVEL_MUNICIPAL     = 'municipal';       // 2-franja ballot
+    public const LEVEL_REGIONAL      = 'regional';
+    public const LEVEL_INDIGENA_IOC  = 'indigena_ioc';
 
-    public static function getStatuses(): array
+    public static function getLevels(): array
     {
         return [
-            self::STATUS_PREPARACION => 'Preparación',
-            self::STATUS_INSCRIPCION => 'Inscripción',
-            self::STATUS_CAMPANA => 'Campaña',
-            self::STATUS_VOTACION => 'Votación',
-            self::STATUS_COMPUTO => 'Cómputo',
-            self::STATUS_FINALIZADO => 'Finalizado',
+            self::LEVEL_NACIONAL      => 'Nacional',
+            self::LEVEL_DEPARTAMENTAL => 'Departamental',
+            self::LEVEL_MUNICIPAL     => 'Municipal',
+            self::LEVEL_REGIONAL      => 'Regional',
+            self::LEVEL_INDIGENA_IOC  => 'Indígena IOC',
         ];
     }
 
-    // Relación con categorías a través de la tabla pivot
+
+    public function geographicScope(): MorphTo
+    {
+        return $this->morphTo('geographic_scope');
+    }
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(ElectionCategory::class, 'election_type_categories')
-            ->withPivot('votes_per_person', 'has_blank_vote', 'has_null_vote')
+            ->withPivot([
+                'ballot_order',
+                'votes_per_person',
+                'has_blank_vote',
+                'has_null_vote',
+            ])
+            ->orderByPivot('ballot_order')
             ->withTimestamps();
     }
 
@@ -79,14 +71,34 @@ class ElectionType extends Model
         return $this->hasMany(ElectionTypeCategory::class);
     }
 
-    public function votingTables(): HasMany
+    public function votingTableElections(): HasMany
     {
-        return $this->hasMany(VotingTable::class);
+        return $this->hasMany(VotingTableElection::class);
     }
 
-    public function candidates(): HasMany
+    /**
+     * Physical voting tables participating in this election via pivot.
+     */
+    public function votingTables()
     {
-        return $this->hasMany(Candidate::class);
+        return $this->hasManyThrough(
+            VotingTable::class,
+            VotingTableElection::class,
+            'election_type_id',  // FK on voting_table_elections
+            'id',                // PK on voting_tables
+            'id',                // PK on election_types
+            'voting_table_id'    // FK on voting_table_elections
+        );
+    }
+
+    public function candidates()
+    {
+        return $this->hasManyThrough(
+            Candidate::class,
+            ElectionTypeCategory::class,
+            'election_type_id',
+            'election_type_category_id'
+        );
     }
 
     public function votes(): HasMany
@@ -104,54 +116,56 @@ class ElectionType extends Model
         return $this->hasMany(Observation::class);
     }
 
-    public function getStatusBadgeAttribute(): string
-    {
-        $colors = [
-            self::STATUS_PREPARACION => 'secondary',
-            self::STATUS_INSCRIPCION => 'info',
-            self::STATUS_CAMPANA => 'primary',
-            self::STATUS_VOTACION => 'warning',
-            self::STATUS_COMPUTO => 'dark',
-            self::STATUS_FINALIZADO => 'success',
-        ];
+    // =========================================================================
+    // SCOPES
+    // =========================================================================
 
-        $color = $colors[$this->status] ?? 'secondary';
-        $label = self::getStatuses()[$this->status] ?? $this->status;
-
-        return "<span class='badge bg-{$color}'>{$label}</span>";
-    }
-
-    // Scope para tipos activos
     public function scopeActive($query)
     {
         return $query->where('active', true);
     }
 
-    // Scope para tipos por fecha
+    public function scopeByLevel($query, string $level)
+    {
+        return $query->where('level', $level);
+    }
+
     public function scopeByDate($query, $date)
     {
         return $query->where('election_date', $date);
     }
 
-    // Scope para tipos actuales (fecha >= hoy)
-    public function scopeCurrent($query)
+    public function scopeMunicipal($query)
     {
-        return $query->where('election_date', '>=', now()->format('Y-m-d'));
+        return $query->where('level', self::LEVEL_MUNICIPAL);
     }
 
-    // Scope para tipos pasados
-    public function scopePast($query)
+    public function scopeDepartamental($query)
     {
-        return $query->where('election_date', '<', now()->format('Y-m-d'));
+        return $query->where('level', self::LEVEL_DEPARTAMENTAL);
     }
 
-    // Actualizar totales
-    public function updateTotals()
+    // =========================================================================
+    // HELPERS
+    // =========================================================================
+
+    public function isMunicipal(): bool
     {
-        $this->update([
-            'total_voters' => $this->votingTables()->sum('expected_voters'),
-            'total_tables' => $this->votingTables()->count(),
-            'total_recintos' => $this->votingTables()->distinct('institution_id')->count('institution_id'),
-        ]);
+        return $this->level === self::LEVEL_MUNICIPAL;
+    }
+
+    public function isDepartamental(): bool
+    {
+        return $this->level === self::LEVEL_DEPARTAMENTAL;
+    }
+
+    public function getFranjaCountAttribute(): int
+    {
+        return $this->typeCategories()->count();
+    }
+
+    public function getLevelLabelAttribute(): string
+    {
+        return self::getLevels()[$this->level] ?? $this->level;
     }
 }

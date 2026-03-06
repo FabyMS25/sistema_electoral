@@ -39,6 +39,12 @@
             font-size: 0.875rem;
             color: #6c757d;
         }
+        .color-preview {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            border: 1px solid #e9e9ef;
+        }
     </style>
 @endsection
 
@@ -67,19 +73,19 @@
                         </span>
                     </div>
                 </div>
-                
+
                 <div class="card-body">
                     @include('components.alerts')
-                    
+
                     <div id="statsContainer" class="mb-2">
                         @include('candidates.partials.stats-cards', ['candidates' => $candidates])
                     </div>
-                    
+
                     @include('candidates.partials.actions-bar')
-                    
+
                     <div id="candidateList">
                         @include('candidates.partials.table')
-                        
+
                         <div class="d-flex justify-content-between align-items-center mt-1">
                             <select class="form-select form-select-sm" style="width: auto;" onchange="window.location.href=this.value">
                                 <option value="{{ route('candidates.index', ['per_page' => 20] + request()->except('per_page', 'page')) }}" {{ request('per_page', 20) == 20 ? 'selected' : '' }}>20</option>
@@ -89,7 +95,7 @@
                             </select>
                             <div class="pagination-info">
                                 Mostrando {{ $candidates->firstItem() }} a {{ $candidates->lastItem() }} de {{ $candidates->total() }} resultados
-                            </div>                            
+                            </div>
                             <div class="pagination-wrap">
                                 {{ $candidates->onEachSide(1)->appends(request()->query())->links('pagination::bootstrap-5') }}
                             </div>
@@ -119,22 +125,22 @@
         function toggleStats() {
             const statsContainer = document.getElementById('statsContainer');
             const toggleBtn = document.getElementById('statsToggle');
-            const icon = toggleBtn.querySelector('i');            
+            const icon = toggleBtn.querySelector('i');
             statsContainer.classList.toggle('collapsed');
-            toggleBtn.classList.toggle('collapsed');            
+            toggleBtn.classList.toggle('collapsed');
             if (statsContainer.classList.contains('collapsed')) {
                 icon.classList.remove('ri-arrow-down-s-line');
                 icon.classList.add('ri-arrow-right-s-line');
             } else {
                 icon.classList.remove('ri-arrow-right-s-line');
                 icon.classList.add('ri-arrow-down-s-line');
-            }   
+            }
             localStorage.setItem('showStats', !statsContainer.classList.contains('collapsed'));
-        }        
+        }
         document.addEventListener('DOMContentLoaded', function() {
             const showStats = localStorage.getItem('showStats');
             const statsContainer = document.getElementById('statsContainer');
-            const toggleBtn = document.getElementById('statsToggle');            
+            const toggleBtn = document.getElementById('statsToggle');
             if (statsContainer && toggleBtn && showStats === 'false') {
                 const icon = toggleBtn.querySelector('i');
                 statsContainer.classList.add('collapsed');

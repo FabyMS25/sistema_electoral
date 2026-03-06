@@ -4,6 +4,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ElectionTypeCategory extends Model
 {
@@ -14,19 +15,23 @@ class ElectionTypeCategory extends Model
     protected $fillable = [
         'election_type_id',
         'election_category_id',
+        'ballot_order',
         'votes_per_person',
         'has_blank_vote',
         'has_null_vote',
     ];
 
     protected $casts = [
+        'ballot_order'     => 'integer',
         'votes_per_person' => 'integer',
-        'has_blank_vote' => 'boolean',
-        'has_null_vote' => 'boolean',
+        'has_blank_vote'   => 'boolean',
+        'has_null_vote'    => 'boolean',
     ];
 
-    // ===== RELACIONES =====
-    
+    // =========================================================================
+    // RELATIONSHIPS
+    // =========================================================================
+
     public function electionType(): BelongsTo
     {
         return $this->belongsTo(ElectionType::class);
@@ -37,29 +42,47 @@ class ElectionTypeCategory extends Model
         return $this->belongsTo(ElectionCategory::class);
     }
 
-    // ===== MÉTODOS DE AYUDA =====
-    
-    /**
-     * Verifica si esta categoría permite voto en blanco
-     */
+    public function candidates(): HasMany
+    {
+        return $this->hasMany(Candidate::class);
+    }
+
+    public function votes(): HasMany
+    {
+        return $this->hasMany(Vote::class);
+    }
+
+    public function categoryResults(): HasMany
+    {
+        return $this->hasMany(VotingTableCategoryResult::class);
+    }
+
+    public function actaCategoryResults(): HasMany
+    {
+        return $this->hasMany(ActaCategoryResult::class);
+    }
+
+    // =========================================================================
+    // HELPERS
+    // =========================================================================
+
     public function allowsBlankVote(): bool
     {
         return $this->has_blank_vote;
     }
 
-    /**
-     * Verifica si esta categoría permite voto nulo
-     */
     public function allowsNullVote(): bool
     {
         return $this->has_null_vote;
     }
 
-    /**
-     * Obtiene el nombre de la categoría con el tipo de elección
-     */
     public function getFullNameAttribute(): string
     {
-        return "{$this->electionType->name} - {$this->electionCategory->name}";
+        return "{$this->electionType?->name} — {$this->electionCategory?->name}";
+    }
+
+    public function getFranjaLabelAttribute(): string
+    {
+        return "Franja {$this->ballot_order}: {$this->electionCategory?->name}";
     }
 }

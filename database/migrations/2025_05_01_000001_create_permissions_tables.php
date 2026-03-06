@@ -44,9 +44,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('role_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-
-            // Ámbito específico para esta asignación
-            $table->enum('scope', ['global', 'institution', 'voting_table'])->default('global');
+            $table->enum('scope', ['global', 'recinto', 'mesa'])->default('global');
 
             // ID del recinto o mesa si el ámbito es específico
             $table->foreignId('institution_id')->nullable()->constrained();

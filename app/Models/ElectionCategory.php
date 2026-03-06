@@ -1,8 +1,12 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class ElectionCategory extends Model
 {
@@ -12,41 +16,104 @@ class ElectionCategory extends Model
         'name',
         'code',
         'description',
-        'order',
-        'ballot_position',
+        'default_order',
+        'geographic_scope',
+        'allows_list',
         'active',
     ];
 
     protected $casts = [
-        'active' => 'boolean',
-        'order' => 'integer',
+        'active'        => 'boolean',
+        'allows_list'   => 'boolean',
+        'default_order' => 'integer',
     ];
 
-    public const POSITION_UNICA = 'unica';
-    public const POSITION_SUPERIOR = 'superior';
-    public const POSITION_INFERIOR = 'inferior';
+    public const SCOPE_NACIONAL      = 'nacional';
+    public const SCOPE_DEPARTAMENTAL = 'departamental';
+    public const SCOPE_PROVINCIAL    = 'provincial';
+    public const SCOPE_MUNICIPAL     = 'municipal';
+    public const SCOPE_INDIGENA_IOC  = 'indigena_ioc';
 
-    public static function getPositions(): array
+    // Category codes — match what's in your seeder
+    public const CODE_GOBERNADOR = 'GOB';
+    public const CODE_ASM_TERRITORIO = 'AST';
+    public const CODE_ASM_POBLACION  = 'ASP';
+    public const CODE_ALCALDE    = 'ALC';
+    public const CODE_CONCEJAL   = 'CON';
+
+    public static function getScopes(): array
     {
         return [
-            self::POSITION_UNICA => 'Única',
-            self::POSITION_SUPERIOR => 'Superior',
-            self::POSITION_INFERIOR => 'Inferior',
+            self::SCOPE_NACIONAL      => 'Nacional',
+            self::SCOPE_DEPARTAMENTAL => 'Departamental',
+            self::SCOPE_PROVINCIAL    => 'Provincial',
+            self::SCOPE_MUNICIPAL     => 'Municipal',
+            self::SCOPE_INDIGENA_IOC  => 'Indígena IOC',
         ];
     }
-    
-    public function electionTypes()
+
+    // =========================================================================
+    // RELATIONSHIPS
+    // =========================================================================
+
+    /**
+     * ⚠️  withPivot columns must match election_type_categories migration.
+     *     ballot_order, min/max_votes_per_person are NOT in the current migration.
+     *     Only include columns that actually exist until migration is updated.
+     */
+    public function electionTypes(): BelongsToMany
     {
         return $this->belongsToMany(ElectionType::class, 'election_type_categories')
-            ->withPivot('votes_per_person', 'has_blank_vote', 'has_null_vote')
+            ->withPivot([
+                'ballot_order',
+                'votes_per_person',
+                'has_blank_vote',
+                'has_null_vote',
+            ])
             ->withTimestamps();
     }
-    public function typeCategories()
+
+    public function typeCategories(): HasMany
     {
         return $this->hasMany(ElectionTypeCategory::class);
     }
-    public function candidates()
+
+    public function candidates(): HasManyThrough
     {
-        return $this->hasMany(Candidate::class);
+        return $this->hasManyThrough(
+            Candidate::class,
+            ElectionTypeCategory::class,
+            'election_category_id',
+            'election_type_category_id'
+        );
+    }
+
+    // =========================================================================
+    // HELPERS
+    // =========================================================================
+
+    public function isMunicipal(): bool
+    {
+        return $this->geographic_scope === self::SCOPE_MUNICIPAL;
+    }
+
+    public function isDepartamental(): bool
+    {
+        return $this->geographic_scope === self::SCOPE_DEPARTAMENTAL;
+    }
+
+    public function isListBased(): bool
+    {
+        return $this->allows_list;
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('active', true);
+    }
+
+    public function scopeByScope($query, string $scope)
+    {
+        return $query->where('geographic_scope', $scope);
     }
 }

@@ -1,8 +1,7 @@
 {{-- resources/views/voting-table-votes/partials/table.blade.php --}}
 @php
-    $isDisabled = in_array($table->status, ['cerrada', 'escrutada', 'transmitida', 'anulada']) ||
-                  ($table->validation_status === 'validated' && !($userCan['correct'] ?? false)) ||
-                  ($table->validation_status === 'approved');
+    $isDisabled = in_array($table->current_status, ['cerrada', 'escrutada', 'transmitida', 'anulada']) ||
+                  !($permissions['can_register'] ?? false);
 
     // Colores para las categorías (cíclico)
     $categoryColors = ['primary', 'success', 'warning', 'info', 'danger', 'secondary', 'dark'];
@@ -14,28 +13,43 @@
         $categoryColorMap[$code] = $categoryColors[$index % count($categoryColors)];
         $index++;
     }
+
+    // Verificar inconsistencias
+    $hasInconsistencies = false;
+    if (isset($table->results_by_category)) {
+        foreach ($table->results_by_category as $result) {
+            if (!$result['is_consistent']) {
+                $hasInconsistencies = true;
+                break;
+            }
+        }
+    }
 @endphp
 
-<div class="card mb-3 table-card status-{{ $table->status }}"
+<div class="card mb-3 table-card status-{{ $table->current_status }}"
      id="table-{{ $table->id }}"
      data-table-id="{{ $table->id }}"
      data-expected-voters="{{ $table->expected_voters }}">
 
     {{-- Header de la mesa --}}
     <div class="card-header bg-light position-relative">
-        @if($table->validation_status === 'observed' || $table->status === 'observada')
+        @if($hasInconsistencies)
+            <span class="badge bg-danger role-badge" title="Tiene inconsistencias">
+                <i class="ri-alert-line me-1"></i>Inconsistente
+            </span>
+        @elseif($table->current_status === 'observada')
             <span class="badge bg-danger role-badge" title="Tiene observaciones">
-                <i class="ri-alert-line me-1"></i>Observada
+                <i class="ri-chat-1-line me-1"></i>Observada
             </span>
-        @elseif($table->validation_status === 'validated')
+        @elseif($table->current_status === 'escrutada')
             <span class="badge bg-success role-badge">
-                <i class="ri-check-line me-1"></i>Validada
+                <i class="ri-check-line me-1"></i>Escrutada
             </span>
-        @elseif($table->validation_status === 'approved')
+        @elseif($table->current_status === 'transmitida')
             <span class="badge bg-primary role-badge">
-                <i class="ri-check-double-line me-1"></i>Aprobada
+                <i class="ri-check-double-line me-1"></i>Transmitida
             </span>
-        @elseif($table->status === 'cerrada')
+        @elseif($table->current_status === 'cerrada')
             <span class="badge bg-secondary role-badge">
                 <i class="ri-lock-line me-1"></i>Cerrada
             </span>
@@ -55,16 +69,17 @@
                         'configurada' => 'secondary',
                         'en_espera' => 'info',
                         'votacion' => 'primary',
-                        'cerrada' => 'danger',
+                        'cerrada' => 'secondary',
                         'en_escrutinio' => 'warning',
                         'escrutada' => 'success',
                         'observada' => 'danger',
                         'transmitida' => 'success',
-                        'anulada' => 'dark'
+                        'anulada' => 'dark',
+                        'sin_configurar' => 'light'
                     ];
                 @endphp
-                <span class="badge bg-{{ $statusClasses[$table->status] ?? 'secondary' }}">
-                    {{ $statusLabels[$table->status] ?? $table->status }}
+                <span class="badge bg-{{ $statusClasses[$table->current_status] ?? 'secondary' }}">
+                    {{ $statusLabels[$table->current_status] ?? $table->current_status }}
                 </span>
             </div>
             <div class="col-md-2">
@@ -76,7 +91,7 @@
             <div class="col-md-2">
                 <span class="text-muted">
                     <i class="ri-bar-chart-line me-1"></i>
-                    Votos: <span class="total-votes fw-bold" id="total-{{ $table->id }}">{{ $table->votes->sum('quantity') }}</span>
+                    Votos: <span class="total-votes fw-bold" id="total-{{ $table->id }}">{{ $table->total_voters }}</span>
                 </span>
             </div>
             <div class="col-md-3 text-end">
@@ -87,24 +102,27 @@
         {{-- Totales por categoría --}}
         <div class="row mt-2">
             <div class="col-12">
-                <div class="d-flex gap-3 flex-wrap">
+                <div class="d-flex gap-3 flex-wrap align-items-center">
                     @forelse($candidatesByCategory as $categoryCode => $candidates)
                         @php
-                            $categoryTotal = 0;
-                            foreach ($table->votes as $vote) {
-                                if ($vote->candidate && $vote->candidate->electionTypeCategory &&
-                                    $vote->candidate->electionTypeCategory->electionCategory &&
-                                    $vote->candidate->electionTypeCategory->electionCategory->code == $categoryCode) {
-                                    $categoryTotal += $vote->quantity;
-                                }
-                            }
+                            $categoryTotal = $table->results_by_category[$categoryCode]['total_votes'] ?? 0;
+                            $isConsistent = $table->results_by_category[$categoryCode]['is_consistent'] ?? true;
                         @endphp
-                        <span class="badge bg-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }}">
+                        <span class="badge bg-{{ $categoryColorMap[$categoryCode] ?? 'secondary' }} category-badge">
                             {{ $categoryCode }}: <span id="total-{{ $categoryCode }}-{{ $table->id }}">{{ $categoryTotal }}</span>
+                            @if(!$isConsistent)
+                                <i class="ri-alert-line text-warning ms-1" title="Inconsistente"></i>
+                            @endif
                         </span>
                     @empty
                         <span class="text-muted">No hay categorías disponibles</span>
                     @endforelse
+
+                    @if($hasInconsistencies)
+                        <span class="inconsistency-warning">
+                            <i class="ri-alert-line me-1"></i>Inconsistencias detectadas
+                        </span>
+                    @endif
                 </div>
             </div>
         </div>
@@ -143,7 +161,7 @@
                         @include('voting-table-votes.partials.table-rows', [
                             'table' => $table,
                             'candidatesByCategory' => $candidatesByCategory,
-                            'userCan' => $userCan,
+                            'permissions' => $permissions,
                             'isDisabled' => $isDisabled,
                             'categoryColorMap' => $categoryColorMap
                         ])
@@ -153,7 +171,7 @@
         @endif
 
         {{-- Footer con selección de observaciones --}}
-        @if(($userCan['observe'] ?? false) && !$isDisabled && !empty($candidatesByCategory))
+        @if(($permissions['can_observe'] ?? false) && !$isDisabled && !empty($candidatesByCategory))
         <div class="p-2 bg-light border-top">
             <div class="row align-items-center">
                 <div class="col-md-8">
@@ -178,20 +196,37 @@
         <div class="row g-0 bg-light p-2 border-top small">
             <div class="col-md-3">
                 <span class="text-muted">Votos Válidos:</span>
-                <span class="fw-bold ms-1">{{ $table->valid_votes ?? 0 }}</span>
+                <span class="fw-bold ms-1">{{ array_sum(array_column($table->results_by_category ?? [], 'valid_votes')) }}</span>
             </div>
             <div class="col-md-3">
                 <span class="text-muted">Votos en Blanco:</span>
-                <span class="fw-bold ms-1">{{ $table->blank_votes ?? 0 }}</span>
+                <span class="fw-bold ms-1">{{ array_sum(array_column($table->results_by_category ?? [], 'blank_votes')) }}</span>
             </div>
             <div class="col-md-3">
                 <span class="text-muted">Votos Nulos:</span>
-                <span class="fw-bold ms-1">{{ $table->null_votes ?? 0 }}</span>
+                <span class="fw-bold ms-1">{{ array_sum(array_column($table->results_by_category ?? [], 'null_votes')) }}</span>
             </div>
             <div class="col-md-3">
                 <span class="text-muted">Papeletas Sobrantes:</span>
                 <span class="fw-bold ms-1">{{ $table->ballots_leftover ?? 0 }}</span>
             </div>
         </div>
+
+        {{-- Detalle de inconsistencias si las hay --}}
+        @if($hasInconsistencies && isset($table->results_by_category))
+            <div class="p-2 border-top bg-warning bg-opacity-10">
+                @foreach($table->results_by_category as $categoryCode => $result)
+                    @if(!$result['is_consistent'])
+                        <small class="text-warning d-block">
+                            <i class="ri-information-line me-1"></i>
+                            {{ $categoryCode }}: {{ $result['valid_votes'] }} válidos +
+                            {{ $result['blank_votes'] }} blancos + {{ $result['null_votes'] }} nulos =
+                            {{ $result['valid_votes'] + $result['blank_votes'] + $result['null_votes'] }}
+                            (total: {{ $result['total_votes'] }})
+                        </small>
+                    @endif
+                @endforeach
+            </div>
+        @endif
     </div>
 </div>

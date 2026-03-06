@@ -9,7 +9,6 @@
             border-color: #0ab39c;
             box-shadow: 0 0 0 0.2rem rgba(10, 179, 156, 0.25);
         }
-
         .filter-section {
             background: white;
             padding: 20px;
@@ -29,6 +28,32 @@
         .pagination-info {
             padding: 8px 0;
             color: #6c757d;
+        }
+        .table-card.status-observada {
+            border-left: 4px solid #f06548;
+        }
+        .table-card.status-cerrada {
+            border-left: 4px solid #8590a5;
+            opacity: 0.9;
+        }
+        .table-card.status-escrutada {
+            border-left: 4px solid #0ab39c;
+        }
+        .table-card.status-transmitida {
+            border-left: 4px solid #405189;
+        }
+        .category-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+        .inconsistency-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffe69c;
+            color: #664d03;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
         }
     </style>
 <?php $__env->stopSection(); ?>
@@ -104,15 +129,8 @@
                     'candidatesByCategory' => $candidatesByCategory,
                     'statusLabels' => $statusLabels,
                     'validationLabels' => $validationLabels,
-                    'userCan' => [
-                        'register' => auth()->user()->can('register_votes'),
-                        'review' => auth()->user()->can('review_votes'),
-                        'correct' => auth()->user()->can('correct_votes'),
-                        'validate' => auth()->user()->can('validate_votes'),
-                        'observe' => auth()->user()->can('create_observations'),
-                        'upload_acta' => auth()->user()->can('upload_actas'),
-                        'close' => auth()->user()->can('close_tables')
-                    ]
+                    'permissions' => $permissions,
+                    'categoryColorMap' => $categoryColorMap ?? []
                 ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                 <div class="text-center py-5">
@@ -127,8 +145,8 @@
     </div>
 
     <?php if($votingTables->hasPages()): ?>
-    <div class="pagination-wrapper">
-        <div class="d-flex justify-content-between">
+    <div class="pagination-wrapper mt-3">
+        <div class="d-flex justify-content-between align-items-center">
             <div class="pagination-info">
                 Mostrando <?php echo e($votingTables->firstItem() ?? 0); ?> - <?php echo e($votingTables->lastItem() ?? 0); ?> de <?php echo e($votingTables->total()); ?> mesas
             </div>
@@ -137,7 +155,7 @@
     </div>
     <?php endif; ?>
 
-    <?php if($votingTables->total() > 0): ?>
+    <?php if($votingTables->total() > 0 && ($permissions['can_register'] ?? false)): ?>
         <div class="quick-actions">
             <div class="btn-group-vertical">
                 <button class="btn btn-success" id="saveAllBtn" title="Guardar todas (Ctrl+S)">
@@ -163,67 +181,79 @@
         var currentValidationTable = null;
         var pendingTables = new Set();
         var saveTimeouts = {};
+        var electionTypeId = <?php echo e($electionTypeId ?? 'null'); ?>;
 
-window.updateTableTotals = function(tableId) {
-    console.log('🔄 Actualizando totales para mesa:', tableId);
+        var userPermissions = {
+            register: <?php echo e(($permissions['can_register'] ?? false) ? 'true' : 'false'); ?>,
+            review: <?php echo e(($permissions['can_review'] ?? false) ? 'true' : 'false'); ?>,
+            correct: <?php echo e(($permissions['can_correct'] ?? false) ? 'true' : 'false'); ?>,
+            validate: <?php echo e(($permissions['can_validate'] ?? false) ? 'true' : 'true'); ?>,
+            observe: <?php echo e(($permissions['can_observe'] ?? false) ? 'true' : 'false'); ?>,
+            uploadActa: <?php echo e(($permissions['can_upload_acta'] ?? false) ? 'true' : 'false'); ?>,
+            close: <?php echo e(($permissions['can_close'] ?? false) ? 'true' : 'false'); ?>
 
-    const inputs = document.querySelectorAll(`#table-${tableId} .vote-input`);
-    const categoryTotals = {};
+        };
 
-    inputs.forEach(input => {
-        const value = parseInt(input.value) || 0;
-        const category = input.dataset.category;
+        window.updateTableTotals = function(tableId) {
+            console.log('🔄 Actualizando totales para mesa:', tableId);
 
-        if (!categoryTotals[category]) {
-            categoryTotals[category] = 0;
+            const inputs = document.querySelectorAll(`#table-${tableId} .vote-input`);
+            const categoryTotals = {};
+
+            inputs.forEach(input => {
+                const value = parseInt(input.value) || 0;
+                const category = input.dataset.category;
+
+                if (!categoryTotals[category]) {
+                    categoryTotals[category] = 0;
+                }
+                categoryTotals[category] += value;
+            });
+
+            console.log(`📊 Mesa ${tableId} - Totales por categoría:`, categoryTotals);
+
+            // Actualizar totales por categoría
+            Object.entries(categoryTotals).forEach(([category, total]) => {
+                const el = document.getElementById(`total-${category}-${tableId}`);
+                if (el) {
+                    el.textContent = total;
+                }
+            });
+
+            // Calcular total general (todas las categorías deberían tener el mismo total)
+            const totals = Object.values(categoryTotals);
+            const totalVotes = totals.length > 0 ? totals[0] : 0;
+
+            const totalEl = document.getElementById(`total-${tableId}`);
+            if (totalEl) {
+                totalEl.textContent = totalVotes;
+            }
+
+            // Actualizar contadores de selección
+            updateSelectedCounts(tableId);
+
+            return categoryTotals;
+        };
+
+        function updateSelectedCounts(tableId) {
+            const checkboxes = document.querySelectorAll(`#table-${tableId} .observe-checkbox:checked`);
+            const categoryCounts = {};
+
+            checkboxes.forEach(cb => {
+                const category = cb.dataset.category;
+                if (!categoryCounts[category]) categoryCounts[category] = 0;
+                categoryCounts[category]++;
+            });
+
+            const totalSelected = checkboxes.length;
+            const selectedCountEl = document.getElementById(`selected-count-${tableId}`);
+            if (selectedCountEl) selectedCountEl.textContent = totalSelected;
+
+            Object.entries(categoryCounts).forEach(([category, count]) => {
+                const el = document.getElementById(`selected-${category}-${tableId}`);
+                if (el) el.textContent = count;
+            });
         }
-        categoryTotals[category] += value;
-    });
-
-    console.log(`📊 Mesa ${tableId} - Totales por categoría:`, categoryTotals);
-
-    // Actualizar totales por categoría
-    Object.entries(categoryTotals).forEach(([category, total]) => {
-        const el = document.getElementById(`total-${category}-${tableId}`);
-        if (el) {
-            el.textContent = total;
-        }
-    });
-
-    // Calcular total general (todas las categorías deberían tener el mismo total)
-    const totals = Object.values(categoryTotals);
-    const totalVotes = totals.length > 0 ? totals[0] : 0;
-
-    const totalEl = document.getElementById(`total-${tableId}`);
-    if (totalEl) {
-        totalEl.textContent = totalVotes;
-    }
-
-    // Actualizar contadores de selección
-    updateSelectedCounts(tableId);
-
-    return categoryTotals;
-};
-
-function updateSelectedCounts(tableId) {
-    const checkboxes = document.querySelectorAll(`#table-${tableId} .observe-checkbox:checked`);
-    const categoryCounts = {};
-
-    checkboxes.forEach(cb => {
-        const category = cb.dataset.category;
-        if (!categoryCounts[category]) categoryCounts[category] = 0;
-        categoryCounts[category]++;
-    });
-
-    const totalSelected = checkboxes.length;
-    const selectedCountEl = document.getElementById(`selected-count-${tableId}`);
-    if (selectedCountEl) selectedCountEl.textContent = totalSelected;
-
-    Object.entries(categoryCounts).forEach(([category, count]) => {
-        const el = document.getElementById(`selected-${category}-${tableId}`);
-        if (el) el.textContent = count;
-    });
-}
     </script>
 
     <?php echo $__env->make('voting-table-votes.scripts.votes-table-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
@@ -234,19 +264,7 @@ function updateSelectedCounts(tableId) {
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Inicializando variables...');
-
-            window.electionTypeId = <?php echo e($electionTypeId ?? 'null'); ?>;
-            window.userPermissions = {
-                register: <?php echo e(auth()->user()->can('register_votes') ? 'true' : 'false'); ?>,
-                review: <?php echo e(auth()->user()->can('review_votes') ? 'true' : 'false'); ?>,
-                correct: <?php echo e(auth()->user()->can('correct_votes') ? 'true' : 'false'); ?>,
-                validate: <?php echo e(auth()->user()->can('validate_votes') ? 'true' : 'false'); ?>,
-                observe: <?php echo e(auth()->user()->can('create_observations') ? 'true' : 'false'); ?>,
-                uploadActa: <?php echo e(auth()->user()->can('upload_actas') ? 'true' : 'false'); ?>
-
-            };
-
-            console.log('✅ Variables inicializadas:', window.userPermissions);
+            console.log('✅ Variables inicializadas:', userPermissions);
 
             if (typeof window.initVoteListeners === 'function') {
                 window.initVoteListeners();

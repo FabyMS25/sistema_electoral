@@ -1,13 +1,10 @@
 <?php
 namespace App\Http\Controllers;
 
-use App\Models\ActivityLog;
 use App\Models\Institution;
 use App\Models\Observation;
-use App\Models\RecintoDelegate;
-use App\Models\Reviewer;
-use App\Models\TableDelegate;
 use App\Models\User;
+use App\Models\UserAssignment;
 use App\Models\ValidationHistory;
 use App\Models\Vote;
 use App\Models\VotingTable;
@@ -93,14 +90,13 @@ class ObservationController extends Controller
         return view('observations.index', compact('observations'));
     }
 
-
     private function canBeObserved($votingTable)
     {
         return in_array($votingTable->status, [
             VotingTable::STATUS_VOTACION,
             VotingTable::STATUS_CERRADA,
             VotingTable::STATUS_EN_ESCRUTINIO
-        ]) && $votingTable->validation_status !== VotingTable::VALIDATION_APPROVED;
+        ]);
     }
 
     private function generateObservationCode(): string
@@ -184,7 +180,7 @@ class ObservationController extends Controller
                         $vote->update([
                             'observation_id' => $observation->id,
                             'vote_status' => Vote::VOTE_STATUS_OBSERVED,
-                            'validation_status' => Vote::VALIDATION_STATUS_OBSERVED,
+                            'vote_status' => Vote::VOTE_STATUS_OBSERVED,
                         ]);
 
                         // Registrar en historial
@@ -196,7 +192,6 @@ class ObservationController extends Controller
                             'previous_values' => $oldValues,
                             'new_values' => [
                                 'vote_status' => Vote::VOTE_STATUS_OBSERVED,
-                                'validation_status' => Vote::VALIDATION_STATUS_OBSERVED,
                             ],
                         ]);
                     }
@@ -205,8 +200,7 @@ class ObservationController extends Controller
 
             // Marcar la mesa como observada
             $votingTable->update([
-                'status' => VotingTable::STATUS_OBSERVADA,
-                'validation_status' => VotingTable::VALIDATION_OBSERVED,
+                'vote_status' => Vote::VOTE_STATUS_OBSERVED,
                 'verified_by' => Auth::id(),
                 'verified_at' => now(),
                 'verification_notes' => 'Observación creada: ' . $observation->code,
@@ -317,7 +311,6 @@ class ObservationController extends Controller
                     $vote->update([
                         'quantity' => $newQuantity,
                         'vote_status' => Vote::VOTE_STATUS_CORRECTED,
-                        'validation_status' => Vote::VALIDATION_STATUS_CORRECTED,
                         'corrected_by' => Auth::id(),
                         'corrected_at' => now(),
                         'correction_notes' => $validated['notes'],
@@ -348,7 +341,6 @@ class ObservationController extends Controller
         // Actualizar estado de la mesa
         $votingTable->update([
             'status' => VotingTable::STATUS_EN_ESCRUTINIO,
-            'validation_status' => VotingTable::VALIDATION_CORRECTED,
             'corrected_by' => Auth::id(),
             'corrected_at' => now(),
         ]);
@@ -357,24 +349,17 @@ class ObservationController extends Controller
     private function processAnnulment($observation, $validated)
     {
         $votingTable = $observation->votingTable;
-
-        // Anular la mesa
         $votingTable->update([
             'status' => VotingTable::STATUS_ANULADA,
-            'validation_status' => VotingTable::VALIDATION_REJECTED,
             'validated_by' => Auth::id(),
             'validated_at' => now(),
         ]);
-
-        // Anular todos los votos de la mesa
         Vote::where('voting_table_id', $votingTable->id)
             ->update([
                 'vote_status' => Vote::VOTE_STATUS_REJECTED,
-                'validation_status' => Vote::VALIDATION_STATUS_REJECTED,
                 'validated_by' => Auth::id(),
                 'validated_at' => now(),
             ]);
-
         $observation->update([
             'status' => Observation::STATUS_RESOLVED,
             'resolved_by' => Auth::id(),
@@ -401,8 +386,7 @@ class ObservationController extends Controller
         Vote::where('observation_id', $observation->id)
             ->update([
                 'observation_id' => null,
-                'vote_status' => Vote::VOTE_STATUS_PENDING,
-                'validation_status' => Vote::VALIDATION_STATUS_PENDING,
+                'vote_status' => Vote::VOTE_STATUS_PENDING_REVIEW,
             ]);
 
         $observation->update([
@@ -541,7 +525,7 @@ class ObservationController extends Controller
         $user = Auth::user();
 
         // Si el usuario tiene asignado un recinto, su supervisor es el coordinador municipal
-        $recintoDelegate = RecintoDelegate::where('user_id', $user->id)
+        $recintoDelegate = UserAssignment::where('user_id', $user->id)
             ->where('is_active', true)
             ->first();
 
@@ -563,14 +547,14 @@ class ObservationController extends Controller
         }
 
         // Si el usuario tiene asignada una mesa, su supervisor es el delegado del recinto
-        $tableDelegate = TableDelegate::where('user_id', $user->id)
+        $tableDelegate = UserAssignment::where('user_id', $user->id)
             ->where('is_active', true)
             ->first();
 
         if ($tableDelegate && $votingTableId) {
             $votingTable = VotingTable::find($votingTableId);
             if ($votingTable) {
-                $recintoDelegate = RecintoDelegate::where('institution_id', $votingTable->institution_id)
+                $recintoDelegate = UserAssignment::where('institution_id', $votingTable->institution_id)
                     ->where('is_active', true)
                     ->first();
 
@@ -579,7 +563,7 @@ class ObservationController extends Controller
         }
 
         // Si el usuario es revisor/modificador de un ámbito, escalar al coordinador correspondiente
-        $reviewer = Reviewer::where('user_id', $user->id)
+        $reviewer = User::where('user_id', $user->id)
             ->where('is_active', true)
             ->first();
 
@@ -601,7 +585,7 @@ class ObservationController extends Controller
             } else {
                 // Es revisor de mesa, escalar a delegado de recinto
                 $institutionId = $reviewer->assignable->institution_id;
-                $recintoDelegate = RecintoDelegate::where('institution_id', $institutionId)
+                $recintoDelegate = UserAssignment::where('institution_id', $institutionId)
                     ->where('is_active', true)
                     ->first();
 

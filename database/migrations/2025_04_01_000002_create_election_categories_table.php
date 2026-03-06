@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -9,14 +10,24 @@ return new class extends Migration
     {
         Schema::create('election_categories', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // Ej: "Alcalde", "Concejal", "Presidente"
-            $table->string('code', 20)->unique(); // Ej: "ALC", "CON", "PRE"
+            $table->string('name');             // e.g. "Alcalde", "Concejal", "Gobernador"
+            $table->string('code', 20)->unique(); // e.g. "ALC", "CON", "GOB", "AST", "ASP"
             $table->text('description')->nullable();
-            $table->integer('order')->default(0); 
-            $table->enum('ballot_position', ['superior', 'inferior', 'unica'])->default('unica');
-            
+            $table->integer('default_order')->default(0);
+
+            $table->enum('geographic_scope', [
+                'nacional',
+                'departamental',  // e.g. Gobernador, Asambleísta por Población
+                'provincial',     // e.g. Asambleísta por Territorio
+                'municipal',      // e.g. Alcalde, Concejal
+                'indigena_ioc',
+            ])->default('municipal');
+
+            // Concejales = true (list), Alcalde = false (single), Gobernador = false (single)
+            $table->boolean('allows_list')->default(false);
             $table->boolean('active')->default(true);
             $table->timestamps();
+            $table->index('geographic_scope');
         });
     }
 
