@@ -38,8 +38,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{user}/assign-table', [UserController::class, 'assignTableForm'])->name('assign-table.form');
         Route::post('/{user}/assign-table', [UserController::class, 'assignTable'])->name('assign-table');
         Route::delete('/{user}/assignment/{assignment}', [UserController::class, 'removeAssignment'])->name('remove-assignment');
-        Route::get('/check-email', [UserController::class, 'checkEmail'])->name('users.check-email');
+        // Route::get('/check-email', [UserController::class, 'checkEmail'])->name('users.check-email');
+        Route::get('check-email', [UserController::class, 'checkEmail'])->name('check-email');
     });
+
     // ===== INSTITUCIONES (RECINTOS) =====
     Route::prefix('institutions')->name('institutions.')->group(function () {
         // Export/Import

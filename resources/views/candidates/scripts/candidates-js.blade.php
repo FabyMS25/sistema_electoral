@@ -1,819 +1,498 @@
 <script>
-function initializeChoices() {
-    // Initialize election type category select
-    if (document.getElementById('election_type_category_id-field')) {
-        const electionTypeCategorySelect = new Choices('#election_type_category_id-field', {
-            searchEnabled: true,
-            shouldSort: false,
-            placeholder: true,
-            placeholderValue: 'Seleccione una combinación',
-            itemSelectText: '',
-            removeItemButton: false,
-            allowHTML: true,
-        });
-        window.electionTypeCategoryChoices = electionTypeCategorySelect;
-    }
-
-    // Initialize department select
-    const departmentField = document.getElementById('department_id-field');
-    if (departmentField) {
-        if (window.departmentChoices) {
-            window.departmentChoices.destroy();
-        }
-        const departmentSelect = new Choices('#department_id-field', {
-            searchEnabled: true,
-            shouldSort: false,
-            placeholder: true,
-            placeholderValue: 'Seleccione un departamento',
-            itemSelectText: '',
-            removeItemButton: false,
-            allowHTML: true,
-        });
-        window.departmentChoices = departmentSelect;
-    }
-
-    // Initialize province select (initially disabled)
-    const provinceField = document.getElementById('province_id-field');
-    if (provinceField) {
-        if (window.provinceChoices) {
-            window.provinceChoices.destroy();
-        }
-        const provinceSelect = new Choices('#province_id-field', {
-            searchEnabled: true,
-            shouldSort: false,
-            placeholder: true,
-            placeholderValue: 'Primero seleccione departamento',
-            itemSelectText: '',
-            allowHTML: true,
-        });
-        window.provinceChoices = provinceSelect;
-    }
-
-    // Initialize municipality select (initially disabled)
-    const municipalityField = document.getElementById('municipality_id-field');
-    if (municipalityField) {
-        if (window.municipalityChoices) {
-            window.municipalityChoices.destroy();
-        }
-        const municipalitySelect = new Choices('#municipality_id-field', {
-            searchEnabled: true,
-            shouldSort: false,
-            placeholder: true,
-            placeholderValue: 'Primero seleccione provincia',
-            itemSelectText: '',
-            allowHTML: true,
-        });
-        window.municipalityChoices = municipalitySelect;
-    }
+// ══════════════════════════════════════════════════
+//  CHOICES.JS HELPERS
+// ══════════════════════════════════════════════════
+function makeChoices(selector, placeholder) {
+    const el = document.querySelector(selector);
+    if (!el) return null;
+    return new Choices(el, {
+        searchEnabled: true,
+        shouldSort: false,
+        placeholder: true,
+        placeholderValue: placeholder,
+        itemSelectText: '',
+        allowHTML: false,
+    });
 }
 
+function destroyChoices(instance) {
+    try { if (instance) instance.destroy(); } catch (_) {}
+    return null;
+}
+
+// ══════════════════════════════════════════════════
+//  INIT — called on DOMContentLoaded
+// ══════════════════════════════════════════════════
+function initializeForms() {
+    window.choicesETC  = makeChoices('#election_type_category_id-field', 'Seleccione categoría');
+    setupGeographicSelectsModal();
+    setupColorPicker();
+    setupImagePreviews();
+    setupCreateButton();
+    setupEditButton();
+    setupViewButton();
+    setupDeleteButton();
+    setupCheckAll();
+}
+
+// ══════════════════════════════════════════════════
+//  COLOR PICKER
+// ══════════════════════════════════════════════════
 function setupColorPicker() {
-    const colorPicker = document.getElementById('color-field');
-    const colorHex = document.getElementById('color-hex');
+    const picker = document.getElementById('color-field');
+    const hex    = document.getElementById('color-hex');
+    if (!picker || !hex) return;
 
-    if (colorPicker && colorHex) {
-        colorPicker.addEventListener('input', function() {
-            colorHex.value = this.value;
-        });
-
-        colorHex.addEventListener('input', function() {
-            if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
-                colorPicker.value = this.value;
-            }
-        });
-    }
+    picker.addEventListener('input', () => hex.value = picker.value);
+    hex.addEventListener('input', function () {
+        if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) picker.value = this.value;
+    });
 }
 
-function setupGeographicSelects() {
-    const departmentSelect = document.getElementById('department_id-field');
-    const provinceSelect = document.getElementById('province_id-field');
-    const municipalitySelect = document.getElementById('municipality_id-field');
+// ══════════════════════════════════════════════════
+//  GEOGRAPHIC SELECTS (inside the modal form)
+// ══════════════════════════════════════════════════
+function setupGeographicSelectsModal() {
+    const deptSel = document.getElementById('department_id-field');
+    const provSel = document.getElementById('province_id-field');
+    const munSel  = document.getElementById('municipality_id-field');
+    if (!deptSel || !provSel || !munSel) return;
 
-    if (!departmentSelect || !provinceSelect || !municipalitySelect) {
-        console.error('No se encontraron los selectores geográficos en el DOM');
+    window.choicesDept = destroyChoices(window.choicesDept);
+    window.choicesProv = destroyChoices(window.choicesProv);
+    window.choicesMun  = destroyChoices(window.choicesMun);
+
+    window.choicesDept = makeChoices('#department_id-field', 'Seleccione departamento');
+    window.choicesProv = makeChoices('#province_id-field',  'Primero seleccione departamento');
+    window.choicesMun  = makeChoices('#municipality_id-field', 'Primero seleccione provincia');
+
+    deptSel.addEventListener('change', function () {
+        loadProvinces(this.value);
+    });
+
+    provSel.addEventListener('change', function () {
+        loadMunicipalities(this.value);
+    });
+}
+
+function loadProvinces(departmentId) {
+    const provSel = document.getElementById('province_id-field');
+    const munSel  = document.getElementById('municipality_id-field');
+
+    window.choicesProv = destroyChoices(window.choicesProv);
+    window.choicesMun  = destroyChoices(window.choicesMun);
+
+    // Reset municipality first
+    munSel.innerHTML = '<option value="">Primero seleccione provincia</option>';
+    munSel.disabled  = true;
+    window.choicesMun = makeChoices('#municipality_id-field', 'Primero seleccione provincia');
+
+    if (!departmentId) {
+        provSel.innerHTML = '<option value="">Primero seleccione departamento</option>';
+        provSel.disabled  = true;
+        window.choicesProv = makeChoices('#province_id-field', 'Primero seleccione departamento');
         return;
     }
 
-    // Destroy existing Choices instances if they exist
-    if (window.departmentChoices) window.departmentChoices.destroy();
-    if (window.provinceChoices) window.provinceChoices.destroy();
-    if (window.municipalityChoices) window.municipalityChoices.destroy();
-
-    // Reinitialize with proper configuration
-    window.departmentChoices = new Choices(departmentSelect, {
-        searchEnabled: true,
-        shouldSort: false,
-        placeholder: true,
-        placeholderValue: 'Seleccione un departamento',
-        itemSelectText: '',
-        removeItemButton: false,
-        allowHTML: true,
-    });
-
-    window.provinceChoices = new Choices(provinceSelect, {
-        searchEnabled: true,
-        shouldSort: false,
-        placeholder: true,
-        placeholderValue: 'Primero seleccione departamento',
-        itemSelectText: '',
-        allowHTML: true,
-    });
-
-    window.municipalityChoices = new Choices(municipalitySelect, {
-        searchEnabled: true,
-        shouldSort: false,
-        placeholder: true,
-        placeholderValue: 'Primero seleccione provincia',
-        itemSelectText: '',
-        allowHTML: true,
-    });
-
-    // Department change handler
-    departmentSelect.addEventListener('change', function() {
-        const departmentId = this.value;
-
-        // Clear and disable dependent selects
-        if (window.provinceChoices) {
-            window.provinceChoices.destroy();
-        }
-        if (window.municipalityChoices) {
-            window.municipalityChoices.destroy();
-        }
-
-        if (!departmentId) {
-            // Reset province select
-            provinceSelect.innerHTML = '<option value="">Primero seleccione departamento</option>';
-            provinceSelect.disabled = true;
-
-            // Reset municipality select
-            municipalitySelect.innerHTML = '<option value="">Primero seleccione provincia</option>';
-            municipalitySelect.disabled = true;
-
-            // Reinitialize with disabled state
-            window.provinceChoices = new Choices(provinceSelect, {
-                searchEnabled: true,
-                shouldSort: false,
-                placeholder: true,
-                placeholderValue: 'Primero seleccione departamento',
-                itemSelectText: '',
-                allowHTML: true,
+    fetch(`/candidates/provinces/${departmentId}`)
+        .then(r => { if (!r.ok) throw new Error('Network error'); return r.json(); })
+        .then(provinces => {
+            provSel.innerHTML = '<option value="">Seleccione una provincia</option>';
+            provinces.forEach(p => {
+                provSel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.name}</option>`);
             });
+            provSel.disabled = false;
+            window.choicesProv = makeChoices('#province_id-field', 'Seleccione una provincia');
 
-            window.municipalityChoices = new Choices(municipalitySelect, {
-                searchEnabled: true,
-                shouldSort: false,
-                placeholder: true,
-                placeholderValue: 'Primero seleccione provincia',
-                itemSelectText: '',
-                allowHTML: true,
-            });
-            return;
-        }
-
-        // Load provinces
-        fetch(`/candidates/provinces/${departmentId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(provinces => {
-                let options = '<option value="">Seleccione una provincia</option>';
-                provinces.forEach(province => {
-                    options += `<option value="${province.id}">${province.name}</option>`;
-                });
-                provinceSelect.innerHTML = options;
-                provinceSelect.disabled = false;
-
-                window.provinceChoices = new Choices(provinceSelect, {
-                    searchEnabled: true,
-                    shouldSort: false,
-                    placeholder: true,
-                    placeholderValue: 'Seleccione una provincia',
-                    itemSelectText: '',
-                    allowHTML: true,
-                });
-
-                // If we have a selected province ID from edit mode, set it
-                if (window.selectedProvinceId) {
-                    setTimeout(() => {
-                        window.provinceChoices.setChoiceByValue(window.selectedProvinceId);
-                        // Trigger change event to load municipalities
-                        const event = new Event('change', { bubbles: true });
-                        provinceSelect.dispatchEvent(event);
-                        window.selectedProvinceId = null;
-                    }, 200);
-                }
-            })
-            .catch(error => {
-                console.error('Error loading provinces:', error);
-                provinceSelect.innerHTML = '<option value="">Error al cargar provincias</option>';
-                provinceSelect.disabled = false;
-
-                window.provinceChoices = new Choices(provinceSelect, {
-                    searchEnabled: true,
-                    shouldSort: false,
-                    placeholder: true,
-                    placeholderValue: 'Error al cargar',
-                    itemSelectText: '',
-                    allowHTML: true,
-                });
-            });
-    });
-
-    // Province change handler
-    provinceSelect.addEventListener('change', function() {
-        const provinceId = this.value;
-
-        if (window.municipalityChoices) {
-            window.municipalityChoices.destroy();
-        }
-
-        if (!provinceId) {
-            municipalitySelect.innerHTML = '<option value="">Primero seleccione provincia</option>';
-            municipalitySelect.disabled = true;
-
-            window.municipalityChoices = new Choices(municipalitySelect, {
-                searchEnabled: true,
-                shouldSort: false,
-                placeholder: true,
-                placeholderValue: 'Primero seleccione provincia',
-                itemSelectText: '',
-                allowHTML: true,
-            });
-            return;
-        }
-
-        // Load municipalities
-        fetch(`/candidates/municipalities/${provinceId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(municipalities => {
-                let options = '<option value="">Seleccione un municipio</option>';
-                municipalities.forEach(municipality => {
-                    options += `<option value="${municipality.id}">${municipality.name}</option>`;
-                });
-                municipalitySelect.innerHTML = options;
-                municipalitySelect.disabled = false;
-
-                window.municipalityChoices = new Choices(municipalitySelect, {
-                    searchEnabled: true,
-                    shouldSort: false,
-                    placeholder: true,
-                    placeholderValue: 'Seleccione un municipio',
-                    itemSelectText: '',
-                    allowHTML: true,
-                });
-
-                // If we have a selected municipality ID from edit mode, set it
-                if (window.selectedMunicipalityId) {
-                    setTimeout(() => {
-                        window.municipalityChoices.setChoiceByValue(window.selectedMunicipalityId);
-                        window.selectedMunicipalityId = null;
-                    }, 200);
-                }
-            })
-            .catch(error => {
-                console.error('Error loading municipalities:', error);
-                municipalitySelect.innerHTML = '<option value="">Error al cargar municipios</option>';
-                municipalitySelect.disabled = false;
-
-                window.municipalityChoices = new Choices(municipalitySelect, {
-                    searchEnabled: true,
-                    shouldSort: false,
-                    placeholder: true,
-                    placeholderValue: 'Error al cargar',
-                    itemSelectText: '',
-                    allowHTML: true,
-                });
-            });
-    });
+            // Restore saved province (for edit)
+            if (window._pendingProvinceId) {
+                setTimeout(() => {
+                    window.choicesProv?.setChoiceByValue(String(window._pendingProvinceId));
+                    provSel.dispatchEvent(new Event('change', { bubbles: true }));
+                    window._pendingProvinceId = null;
+                }, 150);
+            }
+        })
+        .catch(() => {
+            provSel.innerHTML = '<option value="">Error al cargar provincias</option>';
+            provSel.disabled  = false;
+            window.choicesProv = makeChoices('#province_id-field', 'Error al cargar');
+        });
 }
 
+function loadMunicipalities(provinceId) {
+    const munSel = document.getElementById('municipality_id-field');
+    window.choicesMun = destroyChoices(window.choicesMun);
+
+    if (!provinceId) {
+        munSel.innerHTML = '<option value="">Primero seleccione provincia</option>';
+        munSel.disabled  = true;
+        window.choicesMun = makeChoices('#municipality_id-field', 'Primero seleccione provincia');
+        return;
+    }
+
+    fetch(`/candidates/municipalities/${provinceId}`)
+        .then(r => { if (!r.ok) throw new Error('Network error'); return r.json(); })
+        .then(municipalities => {
+            munSel.innerHTML = '<option value="">Seleccione un municipio</option>';
+            municipalities.forEach(m => {
+                munSel.insertAdjacentHTML('beforeend', `<option value="${m.id}">${m.name}</option>`);
+            });
+            munSel.disabled = false;
+            window.choicesMun = makeChoices('#municipality_id-field', 'Seleccione un municipio');
+
+            if (window._pendingMunicipalityId) {
+                setTimeout(() => {
+                    window.choicesMun?.setChoiceByValue(String(window._pendingMunicipalityId));
+                    window._pendingMunicipalityId = null;
+                }, 150);
+            }
+        })
+        .catch(() => {
+            munSel.innerHTML = '<option value="">Error al cargar municipios</option>';
+            munSel.disabled  = false;
+            window.choicesMun = makeChoices('#municipality_id-field', 'Error al cargar');
+        });
+}
+
+// ══════════════════════════════════════════════════
+//  IMAGE PREVIEWS
+// ══════════════════════════════════════════════════
 function setupImagePreviews() {
-    const photoField = document.getElementById('photo-field');
-    const partyLogoField = document.getElementById('party_logo-field');
-    const photoPreview = document.getElementById('photo-preview');
-    const partyLogoPreview = document.getElementById('party-logo-preview');
-
-    if (photoField && photoPreview) {
-        photoField.addEventListener('change', function(e) {
-            previewImage(this, photoPreview);
-        });
-    }
-
-    if (partyLogoField && partyLogoPreview) {
-        partyLogoField.addEventListener('change', function(e) {
-            previewImage(this, partyLogoPreview);
-        });
-    }
+    bindPreview('photo-field',      'photo-preview');
+    bindPreview('party_logo-field', 'party-logo-preview');
 }
 
-function previewImage(input, previewElement) {
-    if (input.files && input.files[0] && previewElement) {
+function bindPreview(inputId, previewId) {
+    const input   = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    if (!input || !preview) return;
+    input.addEventListener('change', function () {
+        if (!this.files?.[0]) return;
         const reader = new FileReader();
-        reader.onload = function(e) {
-            previewElement.src = e.target.result;
-            previewElement.style.display = 'block';
-        }
-        reader.readAsDataURL(input.files[0]);
-    }
-}
-
-function setupViewButton() {
-    const viewButtons = document.querySelectorAll('.view-item-btn');
-    const modalElement = document.getElementById('viewCandidateModal');
-
-    if (!modalElement) {
-        console.error('ERROR: Modal viewCandidateModal no encontrado en el DOM');
-        return;
-    }
-
-    if (viewButtons.length === 0) {
-        console.warn('No se encontraron botones con clase .view-item-btn');
-        return;
-    }
-
-    viewButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            // Check for required elements
-            const requiredElements = [
-                'view-name', 'view-party', 'view-party-full-name',
-                'view-list', 'view-election-type', 'view-election-category',
-                'view-election-code', 'view-ballot-order', 'view-votes-per-person',
-                'view-location', 'view-active', 'view-photo', 'view-party-logo',
-                'view-color-preview'
-            ];
-
-            let missingElements = [];
-            requiredElements.forEach(id => {
-                if (!document.getElementById(id)) {
-                    missingElements.push(id);
-                }
-            });
-
-            if (missingElements.length > 0) {
-                console.error('Elementos faltantes en el DOM:', missingElements);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'No se pueden cargar los detalles del candidato. Faltan elementos en el modal.'
-                });
-                return;
-            }
-
-            // Basic info
-            document.getElementById('view-name').textContent = this.dataset.name || 'N/A';
-            document.getElementById('view-party').textContent = this.dataset.party || 'N/A';
-            document.getElementById('view-party-full-name').textContent = this.dataset.party_full_name || 'N/A';
-
-            // List info
-            const listOrder = this.dataset.list_order;
-            const listName = this.dataset.list_name;
-            if (listName && listOrder) {
-                document.getElementById('view-list').textContent = `${listName} (Orden: ${listOrder})`;
-            } else if (listName) {
-                document.getElementById('view-list').textContent = listName;
-            } else if (listOrder) {
-                document.getElementById('view-list').textContent = `Orden: ${listOrder}`;
-            } else {
-                document.getElementById('view-list').textContent = 'N/A';
-            }
-
-            // Election info
-            document.getElementById('view-election-type').textContent = this.dataset.election_type || 'N/A';
-            document.getElementById('view-election-category').textContent = this.dataset.election_category || 'N/A';
-            document.getElementById('view-election-code').textContent = this.dataset.election_category_code || 'N/A';
-            document.getElementById('view-ballot-order').textContent = this.dataset.ballot_order || 'N/A';
-            document.getElementById('view-votes-per-person').textContent = this.dataset.votes_per_person || '1';
-
-            // Location
-            const locationParts = [];
-            if (this.dataset.department_name) locationParts.push(this.dataset.department_name);
-            if (this.dataset.province_name) locationParts.push(this.dataset.province_name);
-            if (this.dataset.municipality_name) locationParts.push(this.dataset.municipality_name);
-            document.getElementById('view-location').textContent = locationParts.length > 0 ? locationParts.join(' / ') : 'N/A';
-
-            // Status
-            document.getElementById('view-active').innerHTML = this.dataset.active === '1' ?
-                '<span class="badge bg-success">Activo</span>' :
-                '<span class="badge bg-danger">Inactivo</span>';
-
-            // Photo
-            const photo = document.getElementById('view-photo');
-            if (this.dataset.photoUrl && this.dataset.photoUrl !== 'null' && this.dataset.photoUrl !== 'undefined') {
-                photo.src = this.dataset.photoUrl;
-                photo.style.display = 'block';
-            } else {
-                photo.src = '/build/images/default-candidate.jpg';
-                photo.style.display = 'block';
-            }
-
-            // Party logo
-            const partyLogo = document.getElementById('view-party-logo');
-            if (this.dataset.partyLogoUrl && this.dataset.partyLogoUrl !== 'null' && this.dataset.partyLogoUrl !== 'undefined') {
-                partyLogo.src = this.dataset.partyLogoUrl;
-                partyLogo.style.display = 'inline-block';
-            } else {
-                partyLogo.style.display = 'none';
-            }
-
-            // Color preview
-            const colorPreview = document.getElementById('view-color-preview');
-            if (this.dataset.color) {
-                colorPreview.style.backgroundColor = this.dataset.color;
-                colorPreview.style.display = 'block';
-                colorPreview.title = this.dataset.color;
-            } else {
-                colorPreview.style.display = 'none';
-            }
-        });
+        reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; };
+        reader.readAsDataURL(this.files[0]);
     });
 }
 
+// ══════════════════════════════════════════════════
+//  CREATE BUTTON
+// ══════════════════════════════════════════════════
+function setupCreateButton() {
+    document.getElementById('create-btn')?.addEventListener('click', function () {
+        const form = document.getElementById('candidateForm');
+        if (form) form.reset();
+
+        document.getElementById('modalTitleText').textContent     = 'Agregar Candidato';
+        document.getElementById('form-method').value              = 'POST';
+        document.getElementById('candidate_id').value             = '';
+        if (form) form.action                                      = '/candidates';
+
+        // Default colour
+        document.getElementById('color-field').value = '#1b8af8';
+        document.getElementById('color-hex').value   = '#1b8af8';
+
+        // Hide previews
+        ['photo-preview','party-logo-preview'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+
+        // Hide active-status row (only shown on edit)
+        const activeRow = document.getElementById('active-status-row');
+        if (activeRow) activeRow.style.display = 'none';
+
+        // Reset Choices instances
+        window.choicesETC?.setChoiceByValue('');
+        resetGeographicModalSelects();
+    });
+}
+
+function resetGeographicModalSelects() {
+    const deptSel = document.getElementById('department_id-field');
+    const provSel = document.getElementById('province_id-field');
+    const munSel  = document.getElementById('municipality_id-field');
+
+    if (deptSel) { window.choicesDept?.setChoiceByValue(''); }
+    if (provSel) {
+        window.choicesProv = destroyChoices(window.choicesProv);
+        provSel.innerHTML = '<option value="">Primero seleccione departamento</option>';
+        provSel.disabled  = true;
+        window.choicesProv = makeChoices('#province_id-field', 'Primero seleccione departamento');
+    }
+    if (munSel) {
+        window.choicesMun = destroyChoices(window.choicesMun);
+        munSel.innerHTML = '<option value="">Primero seleccione provincia</option>';
+        munSel.disabled  = true;
+        window.choicesMun = makeChoices('#municipality_id-field', 'Primero seleccione provincia');
+    }
+}
+
+// ══════════════════════════════════════════════════
+//  EDIT BUTTON
+// ══════════════════════════════════════════════════
 function setupEditButton() {
-    const editButtons = document.querySelectorAll('.edit-item-btn');
+    document.querySelectorAll('.edit-item-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const d = this.dataset;
 
-    editButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            if (!this.dataset || !this.dataset.updateUrl) {
-                console.error('El botón de edición no tiene los atributos data necesarios');
-                return;
-            }
+            document.getElementById('modalTitleText').textContent = 'Editar Candidato';
+            document.getElementById('form-method').value          = 'PUT';
+            document.getElementById('candidate_id').value         = d.id;
+            document.getElementById('candidateForm').action       = d.updateUrl;
 
-            resetModalForEdit(this.dataset.updateUrl);
+            // Text fields
+            document.getElementById('name-field').value             = d.name            ?? '';
+            document.getElementById('party-field').value            = d.party           ?? '';
+            document.getElementById('party_full_name-field').value  = d.party_full_name ?? '';
+            document.getElementById('list_order-field').value       = d.list_order      ?? '';
+            document.getElementById('list_name-field').value        = d.list_name       ?? '';
 
-            // Basic fields
-            document.getElementById('name-field').value = this.dataset.name || '';
-            document.getElementById('party-field').value = this.dataset.party || '';
-            document.getElementById('party_full_name-field').value = this.dataset.party_full_name || '';
-            document.getElementById('color-field').value = this.dataset.color || '#1b8af8';
-            document.getElementById('color-hex').value = this.dataset.color || '#1b8af8';
+            // Colour
+            const colour = d.color || '#1b8af8';
+            document.getElementById('color-field').value = colour;
+            document.getElementById('color-hex').value   = colour;
 
-            // Election type category
-            const electionField = document.getElementById('election_type_category_id-field');
-            if (electionField) {
-                if (window.electionTypeCategoryChoices) {
-                    window.electionTypeCategoryChoices.setChoiceByValue(this.dataset.election_type_category_id || '');
-                } else {
-                    electionField.value = this.dataset.election_type_category_id || '';
-                }
-            }
-
-            // List fields
-            document.getElementById('list_order-field').value = this.dataset.list_order || '';
-            document.getElementById('list_name-field').value = this.dataset.list_name || '';
-
-            // Candidate ID for form
-            const candidateIdField = document.getElementById('candidate_id');
-            if (candidateIdField && this.dataset.id) {
-                candidateIdField.value = this.dataset.id;
-            }
-
-            // Geographic selects
-            const departmentField = document.getElementById('department_id-field');
-            const provinceField = document.getElementById('province_id-field');
-            const municipalityField = document.getElementById('municipality_id-field');
-
-            if (departmentField) {
-                // Store selected IDs for later use
-                window.selectedProvinceId = this.dataset.province_id;
-                window.selectedMunicipalityId = this.dataset.municipality_id;
-
-                // Set department
-                if (window.departmentChoices) {
-                    window.departmentChoices.setChoiceByValue(this.dataset.department_id || '');
-                } else {
-                    departmentField.value = this.dataset.department_id || '';
-                }
-
-                // Trigger change to load provinces if department is selected
-                if (this.dataset.department_id) {
-                    setTimeout(() => {
-                        const event = new Event('change', { bubbles: true });
-                        departmentField.dispatchEvent(event);
-                    }, 200);
-                }
-            }
-
-            // Update image previews
-            updateImagePreviews(this.dataset);
+            // Election type/category
+            window.choicesETC?.setChoiceByValue(d.election_type_category_id ?? '');
 
             // Active status
             const activeRow = document.getElementById('active-status-row');
             if (activeRow) {
                 activeRow.style.display = 'block';
                 const activeField = document.getElementById('active-field');
-                if (activeField) {
-                    activeField.checked = this.dataset.active === '1' || this.dataset.active === 'true';
+                if (activeField) activeField.checked = (d.active === '1');
+            }
+
+            // Image previews
+            setPreviewUrl('photo-preview',      d.photoUrl);
+            setPreviewUrl('party-logo-preview', d.partyLogoUrl);
+
+            // Geographic cascade
+            if (d.department_id) {
+                window._pendingProvinceId    = d.province_id    || null;
+                window._pendingMunicipalityId = d.municipality_id || null;
+                window.choicesDept?.setChoiceByValue(d.department_id);
+                setTimeout(() => {
+                    document.getElementById('department_id-field')
+                        ?.dispatchEvent(new Event('change', { bubbles: true }));
+                }, 100);
+            } else {
+                resetGeographicModalSelects();
+            }
+        });
+    });
+}
+
+function setPreviewUrl(previewId, url) {
+    const el = document.getElementById(previewId);
+    if (!el) return;
+    if (url && url !== 'null' && url !== 'undefined') {
+        el.src           = url;
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+// ══════════════════════════════════════════════════
+//  VIEW BUTTON
+// ══════════════════════════════════════════════════
+function setupViewButton() {
+    document.querySelectorAll('.view-item-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const d = this.dataset;
+
+            setText('view-name',           d.name);
+            setText('view-party',          d.party);
+            setText('view-party-full-name',d.party_full_name);
+            setText('view-election-type',  d.election_type);
+            setText('view-election-category', d.election_category);
+            setText('view-election-code',  d.election_category_code);
+            setText('view-ballot-order',   d.ballot_order);
+            setText('view-votes-per-person', d.votes_per_person || '1');
+
+            // List
+            const listParts = [];
+            if (d.list_name)  listParts.push(d.list_name);
+            if (d.list_order) listParts.push(`Orden: ${d.list_order}`);
+            setText('view-list', listParts.join(' — ') || 'N/A');
+
+            // Location
+            const loc = [d.department_name, d.province_name, d.municipality_name].filter(Boolean).join(' / ');
+            setText('view-location', loc || 'N/A');
+
+            // Active badge
+            const activeEl = document.getElementById('view-active');
+            if (activeEl) {
+                activeEl.innerHTML = d.active === '1'
+                    ? '<span class="badge bg-success">Activo</span>'
+                    : '<span class="badge bg-danger">Inactivo</span>';
+            }
+
+            // Photo
+            const photo = document.getElementById('view-photo');
+            if (photo) {
+                photo.src           = (d.photoUrl && d.photoUrl !== 'null') ? d.photoUrl : '/build/images/default-candidate.jpg';
+                photo.style.display = 'block';
+            }
+
+            // Party logo
+            const logo = document.getElementById('view-party-logo');
+            if (logo) {
+                if (d.partyLogoUrl && d.partyLogoUrl !== 'null') {
+                    logo.src           = d.partyLogoUrl;
+                    logo.style.display = 'inline-block';
+                } else {
+                    logo.style.display = 'none';
+                }
+            }
+
+            // Colour swatch
+            const swatch = document.getElementById('view-color-preview');
+            if (swatch) {
+                if (d.color) {
+                    swatch.style.backgroundColor = d.color;
+                    swatch.style.display         = 'inline-block';
+                    swatch.title                 = d.color;
+                } else {
+                    swatch.style.display = 'none';
                 }
             }
         });
     });
 }
 
-function resetModalForEdit(updateUrl) {
-    const modalTitle = document.getElementById('modalTitleText');
-    const form = document.getElementById('candidateForm');
-    const methodField = document.getElementById('method_field');
-    const formMethod = document.getElementById('form-method');
-
-    if (modalTitle) modalTitle.textContent = 'Editar Candidato';
-    if (form) form.action = updateUrl;
-    if (methodField) methodField.value = 'PUT';
-    if (formMethod) formMethod.value = 'PUT';
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value || 'N/A';
 }
 
-function updateImagePreviews(data) {
-    const photoPreview = document.getElementById('photo-preview');
-    const partyLogoPreview = document.getElementById('party-logo-preview');
-
-    if (photoPreview) {
-        if (data.photoUrl && data.photoUrl !== 'null' && data.photoUrl !== 'undefined') {
-            photoPreview.src = data.photoUrl;
-            photoPreview.style.display = 'block';
-        } else {
-            photoPreview.style.display = 'none';
-        }
-    }
-
-    if (partyLogoPreview) {
-        if (data.partyLogoUrl && data.partyLogoUrl !== 'null' && data.partyLogoUrl !== 'undefined') {
-            partyLogoPreview.src = data.partyLogoUrl;
-            partyLogoPreview.style.display = 'block';
-        } else {
-            partyLogoPreview.style.display = 'none';
-        }
-    }
-}
-
-function setupCreateButton() {
-    const createBtn = document.getElementById('create-btn');
-
-    if (createBtn) {
-        createBtn.addEventListener('click', function() {
-            resetModalForCreate();
-
-            // Reset form
-            const form = document.getElementById('candidateForm');
-            if (form) form.reset();
-
-            // Set default color
-            const colorField = document.getElementById('color-field');
-            if (colorField) colorField.value = '#1b8af8';
-
-            const colorHex = document.getElementById('color-hex');
-            if (colorHex) colorHex.value = '#1b8af8';
-
-            // Hide previews
-            const photoPreview = document.getElementById('photo-preview');
-            if (photoPreview) photoPreview.style.display = 'none';
-
-            const partyLogoPreview = document.getElementById('party-logo-preview');
-            if (partyLogoPreview) partyLogoPreview.style.display = 'none';
-
-            // Reset geographic selects
-            resetGeographicSelects();
-
-            // Reset Choices instances
-            resetChoicesInstances();
-
-            // Hide active status row
-            const activeStatusRow = document.getElementById('active-status-row');
-            if (activeStatusRow) {
-                activeStatusRow.style.display = 'none';
-            }
-        });
-    }
-}
-
-function resetGeographicSelects() {
-    const provinceSelect = document.getElementById('province_id-field');
-    const municipalitySelect = document.getElementById('municipality_id-field');
-    const departmentSelect = document.getElementById('department_id-field');
-
-    if (provinceSelect) {
-        provinceSelect.innerHTML = '<option value="">Primero seleccione departamento</option>';
-        provinceSelect.disabled = true;
-        if (window.provinceChoices) {
-            window.provinceChoices.destroy();
-            window.provinceChoices = new Choices(provinceSelect, {
-                searchEnabled: true,
-                shouldSort: false,
-                placeholder: true,
-                placeholderValue: 'Primero seleccione departamento',
-                itemSelectText: '',
-                allowHTML: true,
-            });
-        }
-    }
-
-    if (municipalitySelect) {
-        municipalitySelect.innerHTML = '<option value="">Primero seleccione provincia</option>';
-        municipalitySelect.disabled = true;
-        if (window.municipalityChoices) {
-            window.municipalityChoices.destroy();
-            window.municipalityChoices = new Choices(municipalitySelect, {
-                searchEnabled: true,
-                shouldSort: false,
-                placeholder: true,
-                placeholderValue: 'Primero seleccione provincia',
-                itemSelectText: '',
-                allowHTML: true,
-            });
-        }
-    }
-
-    if (departmentSelect && window.departmentChoices) {
-        window.departmentChoices.setChoiceByValue('');
-    }
-}
-
-function resetModalForCreate() {
-    const modalTitle = document.getElementById('modalTitleText');
-    const form = document.getElementById('candidateForm');
-    const methodField = document.getElementById('method_field');
-    const formMethod = document.getElementById('form-method');
-    const candidateId = document.getElementById('candidate_id');
-
-    if (modalTitle) modalTitle.textContent = 'Agregar Nuevo Candidato';
-    if (form) form.action = '/candidates';
-    if (methodField) methodField.value = '';
-    if (formMethod) formMethod.value = 'POST';
-    if (candidateId) candidateId.value = '';
-}
-
-function resetChoicesInstances() {
-    if (window.electionTypeCategoryChoices) {
-        try {
-            window.electionTypeCategoryChoices.destroy();
-            window.electionTypeCategoryChoices = new Choices('#election_type_category_id-field', {
-                searchEnabled: true,
-                shouldSort: false,
-                placeholder: true,
-                placeholderValue: 'Seleccione una combinación',
-                itemSelectText: '',
-                allowHTML: true,
-            });
-        } catch (e) {
-            console.warn('Error reiniciando Choices para election_type_category_id-field');
-        }
-    }
-}
-
+// ══════════════════════════════════════════════════
+//  DELETE BUTTON
+// ══════════════════════════════════════════════════
 function setupDeleteButton() {
-    document.querySelectorAll('.remove-item-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const deleteForm = document.getElementById('deleteForm');
-            const deleteMessage = document.getElementById('deleteMessage');
-            const candidateName = this.dataset.name || 'este candidato';
-
-            if (deleteForm) deleteForm.action = this.dataset.deleteUrl;
-            if (deleteMessage) deleteMessage.textContent = `¿Está seguro de que desea eliminar el candidato "${candidateName}"?`;
+    document.querySelectorAll('.remove-item-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const form    = document.getElementById('deleteForm');
+            const msg     = document.getElementById('deleteMessage');
+            if (form) form.action = this.dataset.deleteUrl;
+            if (msg)  msg.textContent = `¿Eliminar al candidato "${this.dataset.name}"?`;
         });
     });
 }
 
+// ══════════════════════════════════════════════════
+//  CHECKBOXES + BULK ACTIONS
+// ══════════════════════════════════════════════════
 function setupCheckAll() {
-    const checkAll = document.getElementById('checkAll');
-    const childCheckboxes = document.querySelectorAll('.child-checkbox');
-    const deleteMultipleBtn = document.getElementById('delete-multiple-btn');
-    const exportSelectedBtn = document.getElementById('export-selected-btn');
-    const selectedCountBadge = document.getElementById('selected-count-badge');
+    const checkAll  = document.getElementById('checkAll');
+    const children  = () => document.querySelectorAll('.child-checkbox');
+    const delBtn    = document.getElementById('delete-multiple-btn');
+    const expBtn    = document.getElementById('export-selected-btn');
+    const badge     = document.getElementById('selected-count-badge');
 
     if (checkAll) {
-        checkAll.addEventListener('change', function() {
-            childCheckboxes.forEach(checkbox => {
-                checkbox.checked = this.checked;
-            });
-            updateSelectedButtons(childCheckboxes, deleteMultipleBtn, exportSelectedBtn, selectedCountBadge);
+        checkAll.addEventListener('change', function () {
+            children().forEach(cb => cb.checked = this.checked);
+            updateBulkButtons();
         });
     }
 
-    childCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            if (checkAll) {
-                const allChecked = Array.from(childCheckboxes).every(cb => cb.checked);
-                const someChecked = Array.from(childCheckboxes).some(cb => cb.checked);
-
-                checkAll.checked = allChecked;
-                checkAll.indeterminate = someChecked && !allChecked;
-            }
-            updateSelectedButtons(childCheckboxes, deleteMultipleBtn, exportSelectedBtn, selectedCountBadge);
-        });
+    document.addEventListener('change', function (e) {
+        if (!e.target.classList.contains('child-checkbox')) return;
+        const all  = children();
+        const checked = Array.from(all).filter(cb => cb.checked);
+        if (checkAll) {
+            checkAll.checked       = checked.length === all.length && all.length > 0;
+            checkAll.indeterminate = checked.length > 0 && checked.length < all.length;
+        }
+        updateBulkButtons();
     });
-}
 
-function updateSelectedButtons(childCheckboxes, deleteMultipleBtn, exportSelectedBtn, selectedCountBadge) {
-    const selectedCount = Array.from(childCheckboxes).filter(cb => cb.checked).length;
-
-    if (selectedCount > 0) {
-        if (deleteMultipleBtn) {
-            deleteMultipleBtn.style.display = 'inline-block';
-            deleteMultipleBtn.innerHTML = `<i class="ri-delete-bin-2-line me-1"></i>Eliminar Seleccionados (${selectedCount})`;
+    function updateBulkButtons() {
+        const n = Array.from(children()).filter(cb => cb.checked).length;
+        if (delBtn) {
+            delBtn.classList.toggle('d-none', n === 0);
+            delBtn.innerHTML = `<i class="ri-delete-bin-2-line me-1"></i>Eliminar Seleccionados (${n})`;
         }
-        if (exportSelectedBtn && selectedCountBadge) {
-            exportSelectedBtn.disabled = false;
-            selectedCountBadge.textContent = selectedCount;
-            selectedCountBadge.style.display = 'inline-block';
-        }
-    } else {
-        if (deleteMultipleBtn) deleteMultipleBtn.style.display = 'none';
-        if (exportSelectedBtn && selectedCountBadge) {
-            exportSelectedBtn.disabled = true;
-            selectedCountBadge.style.display = 'none';
-        }
+        if (expBtn) expBtn.disabled = n === 0;
+        if (badge)  { badge.textContent = n; badge.style.display = n > 0 ? 'inline-block' : 'none'; }
     }
 }
 
-window.exportSelected = function() {
-    const selectedIds = Array.from(document.querySelectorAll('.child-checkbox:checked'))
-        .map(cb => cb.value);
+// ══════════════════════════════════════════════════
+//  EXPORT SELECTED
+//  Builds multiple <input name="selected_ids[]"> so
+//  Laravel's array validation works correctly.
+// ══════════════════════════════════════════════════
+window.exportSelected = function () {
+    const ids = Array.from(document.querySelectorAll('.child-checkbox:checked')).map(cb => cb.value);
+    if (!ids.length) {
+        return Swal.fire({ icon: 'warning', title: 'Sin selección',
+            text: 'Seleccione al menos un candidato para exportar.',
+            confirmButtonColor: '#1b8af8' });
+    }
 
-    if (selectedIds.length === 0) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Sin selección',
-            text: 'Por favor seleccione al menos un candidato para exportar.',
-            confirmButtonColor: '#1b8af8'
+    const form = document.getElementById('export-selected-form');
+    // Remove any previously appended inputs
+    form.querySelectorAll('input[name="selected_ids[]"]').forEach(i => i.remove());
+
+    ids.forEach(id => {
+        const input = Object.assign(document.createElement('input'), {
+            type: 'hidden', name: 'selected_ids[]', value: id,
         });
-        return;
-    }
+        form.appendChild(input);
+    });
 
-    const selectedIdsInput = document.getElementById('selected-ids-input');
-    if (selectedIdsInput) {
-        selectedIdsInput.value = JSON.stringify(selectedIds);
-    }
-
-    const exportForm = document.getElementById('export-selected-form');
-    if (exportForm) exportForm.submit();
+    form.submit();
 };
 
-window.deleteMultiple = function() {
-    const selectedIds = Array.from(document.querySelectorAll('.child-checkbox:checked'))
-        .map(cb => cb.value);
-
-    if (selectedIds.length === 0) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Sin selección',
-            text: 'Por favor seleccione al menos un candidato para eliminar.',
-            confirmButtonColor: '#1b8af8'
-        });
-        return;
+// ══════════════════════════════════════════════════
+//  DELETE MULTIPLE
+// ══════════════════════════════════════════════════
+window.deleteMultiple = function () {
+    const ids = Array.from(document.querySelectorAll('.child-checkbox:checked')).map(cb => cb.value);
+    if (!ids.length) {
+        return Swal.fire({ icon: 'warning', title: 'Sin selección',
+            text: 'Seleccione al menos un candidato para eliminar.',
+            confirmButtonColor: '#1b8af8' });
     }
 
     Swal.fire({
         title: '¿Está seguro?',
-        text: `Se eliminarán ${selectedIds.length} candidato(s). Esta acción no se puede deshacer.`,
+        text: `Se eliminarán ${ids.length} candidato(s). Esta acción no se puede deshacer.`,
         icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#f06548',
-        cancelButtonColor: '#8590a5',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/candidates/multiple-delete';
+        showCancelButton:    true,
+        confirmButtonColor:  '#f06548',
+        cancelButtonColor:   '#8590a5',
+        confirmButtonText:   'Sí, eliminar',
+        cancelButtonText:    'Cancelar',
+    }).then(result => {
+        if (!result.isConfirmed) return;
 
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-
-            form.innerHTML = `
-                <input type="hidden" name="_token" value="${csrfToken || ''}">
-                <input type="hidden" name="_method" value="DELETE">
-            `;
-
-            selectedIds.forEach(id => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'ids[]';
-                input.value = id;
-                form.appendChild(input);
-            });
-
-            document.body.appendChild(form);
-            form.submit();
-        }
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/candidates/multiple-delete';
+        form.innerHTML = `
+            <input type="hidden" name="_token"  value="${csrf}">
+            <input type="hidden" name="_method" value="DELETE">
+        `;
+        ids.forEach(id => {
+            const inp = document.createElement('input');
+            inp.type  = 'hidden';
+            inp.name  = 'ids[]';
+            inp.value = id;
+            form.appendChild(inp);
+        });
+        document.body.appendChild(form);
+        form.submit();
     });
 };
 
-// Initialize everything when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    initializeChoices();
-    setupColorPicker();
-    setupGeographicSelects();
-    setupImagePreviews();
-    setupEditButton();
-    setupViewButton();
-    setupCreateButton();
-    setupDeleteButton();
-    setupCheckAll();
-});
+// ══════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', initializeForms);
 </script>

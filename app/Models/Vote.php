@@ -257,7 +257,6 @@ class Vote extends Model
         ]);
     }
 
-    // ===== HELPERS =====
     private function refreshCategoryResult(): void
     {
         $result = VotingTableCategoryResult::where('voting_table_id', $this->voting_table_id)

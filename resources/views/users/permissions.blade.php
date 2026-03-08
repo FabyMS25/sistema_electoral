@@ -1,219 +1,220 @@
 {{-- resources/views/users/permissions.blade.php --}}
 @extends('layouts.master')
 
-@section('title')
-    Permisos Directos - {{ $user->name }}
-@endsection
+@section('title') Permisos Directos - {{ $user->name }} @endsection
 
 @section('css')
-    <link href="{{ URL::asset('build/libs/sweetalert2/sweetalert2.min.css') }}" rel="stylesheet" type="text/css" />
     <style>
-        .permission-group {
-            border: 1px solid #e9e9ef;
-            border-radius: 0.25rem;
-            margin-bottom: 1rem;
-        }
+        .permission-group { border: 1px solid #e9e9ef; border-radius: 0.35rem; margin-bottom: 1rem; }
         .permission-group-header {
             background-color: #f3f6f9;
-            padding: 0.75rem 1rem;
+            padding: 0.65rem 1rem;
             border-bottom: 1px solid #e9e9ef;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         .permission-group-body {
-            padding: 1rem;
+            padding: 0.75rem 1rem;
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 0.5rem;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 0.4rem;
         }
-        .scope-badge {
-            font-size: 0.7rem;
-            padding: 0.2rem 0.4rem;
-            background-color: #e7f1ff;
-            color: #0a5dc2;
-            border-radius: 0.25rem;
-            margin-left: 0.25rem;
-        }
-        .current-permission {
-            border-left: 3px solid #0ab39c;
-            background-color: #f0f9f7;
-            padding: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
+        .perm-item { padding: 0.4rem 0.5rem; border-radius: 0.25rem; }
+        .perm-item:hover { background: #f8f9fa; }
+        .perm-item.is-direct { background: #e7f9f5; }
+        .perm-scope-badge { font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 0.2rem; }
+        .role-perms-info { font-size: 0.75rem; color: #74788d; }
+        .group-count { font-size: 0.75rem; color: #74788d; font-weight: 400; }
     </style>
 @endsection
 
 @section('content')
     @component('components.breadcrumb')
-        @slot('li_1')
-            Usuarios
-        @endslot
-        @slot('li_2')
-            <a href="{{ route('users.show', $user) }}">{{ $user->name }} {{ $user->last_name }}</a>
-        @endslot
-        @slot('title')
-            Permisos Directos
-        @endslot
+        @slot('li_1') Usuarios @endslot
+        @slot('li_2') <a href="{{ route('users.show', $user) }}">{{ $user->name }} {{ $user->last_name }}</a> @endslot
+        @slot('title') Permisos Directos @endslot
     @endcomponent
 
     <div class="row">
-        <div class="col-lg-8">
+        {{-- ── Main form ───────────────────────────────────────────────────── --}}
+        <div class="col-lg-9">
             <div class="card">
-                <div class="card-header">
-                    <h4 class="card-title mb-0">Asignar Permisos Directos</h4>
-                    <p class="text-muted mb-0">
-                        Usuario: <strong>{{ $user->name }} {{ $user->last_name }}</strong> ({{ $user->email }})
-                    </p>
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <h4 class="card-title mb-0">
+                        Permisos directos de: {{ $user->name }} {{ $user->last_name }}
+                    </h4>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-soft-success" id="selectAllPerms">
+                            <i class="ri-check-double-line me-1"></i>Todos
+                        </button>
+                        <button type="button" class="btn btn-sm btn-soft-danger" id="deselectAllPerms">
+                            <i class="ri-close-line me-1"></i>Ninguno
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('users.permissions.update', $user) }}" method="POST">
+
+                    @if(session('success'))
+                        <div class="alert alert-success alert-dismissible">
+                            {{ session('success') }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    @endif
+
+                    <div class="alert alert-info">
+                        <i class="ri-information-line align-middle me-1"></i>
+                        Estos permisos son <strong>adicionales</strong> a los que el usuario ya tiene por sus roles.
+                        Los permisos por rol aparecen sombreados y no se pueden desmarcar aquí — deben gestionarse
+                        desde <a href="{{ route('users.assign-roles.form', $user) }}">Asignar Roles</a>.
+                    </div>
+
+                    <form method="POST" action="{{ route('users.permissions.update', $user) }}" id="permissionsForm">
                         @csrf
                         @method('PUT')
 
-                        <div class="alert alert-info">
-                            <i class="ri-information-line align-middle me-1"></i>
-                            <strong>Nota:</strong> Los permisos directos sobrescriben los permisos de roles. Úselos para casos excepcionales.
-                        </div>
+                        {{-- Build a set of permission IDs inherited via roles (read-only indicators) --}}
+                        @php
+                            $rolePermIds = $user->roles->flatMap(fn($r) => $r->permissions->pluck('id'))->unique()->toArray();
+                            // currentPermissions = user's direct permissions with pivot
+                            $directIds = $currentPermissions->pluck('id')->toArray();
+                        @endphp
 
-                        <div class="row mb-3">
-                            <div class="col-12">
-                                <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-sm btn-soft-success" id="select-all-permissions">
-                                        <i class="ri-checkbox-line me-1"></i> Seleccionar Todos
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-soft-danger" id="deselect-all-permissions">
-                                        <i class="ri-checkbox-blank-line me-1"></i> Deseleccionar Todos
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-soft-info" id="show-selected">
-                                        <i class="ri-eye-line me-1"></i> Ver Seleccionados
-                                    </button>
+                        @foreach($permissions as $group => $groupPermissions)
+                        @php
+                            $groupDirectCount = collect($groupPermissions)->filter(fn($p) => in_array($p->id, $directIds))->count();
+                            $groupTotal = count($groupPermissions);
+                        @endphp
+                        <div class="permission-group">
+                            <div class="permission-group-header">
+                                <div class="form-check mb-0">
+                                    <input type="checkbox" class="form-check-input group-checkbox"
+                                           id="grp_{{ Str::slug($group) }}"
+                                           data-group="{{ Str::slug($group) }}">
+                                    <label class="form-check-label fw-bold" for="grp_{{ Str::slug($group) }}">
+                                        {{ $group }}
+                                    </label>
                                 </div>
+                                <span class="group-count">
+                                    {{ $groupDirectCount }}/{{ $groupTotal }} directos
+                                </span>
+                            </div>
+                            <div class="permission-group-body">
+                                @foreach($groupPermissions as $permission)
+                                @php
+                                    $isDirect   = in_array($permission->id, $directIds);
+                                    $isFromRole = in_array($permission->id, $rolePermIds);
+                                    // Get scope from pivot only if it's a direct permission
+                                    $pivotScope = $currentPermissions->find($permission->id)?->pivot?->scope;
+                                @endphp
+                                <div class="perm-item {{ $isDirect ? 'is-direct' : '' }}">
+                                    <div class="form-check d-flex align-items-start gap-1">
+                                        <input type="checkbox"
+                                               class="form-check-input perm-checkbox flex-shrink-0"
+                                               id="perm_{{ $permission->id }}"
+                                               name="permissions[]"
+                                               value="{{ $permission->id }}"
+                                               data-group="{{ Str::slug($group) }}"
+                                               {{ $isDirect ? 'checked' : '' }}
+                                               {{-- Don't disable: user can choose to add/remove even if role gives it --}}>
+                                        <label class="form-check-label" for="perm_{{ $permission->id }}">
+                                            <span>{{ $permission->display_name ?? $permission->name }}</span>
+                                            @if($isFromRole && !$isDirect)
+                                            <span class="perm-scope-badge bg-light text-muted ms-1"
+                                                  title="Heredado de rol">
+                                                <i class="ri-shield-line"></i>
+                                            </span>
+                                            @endif
+                                            @if($isDirect && $pivotScope && $pivotScope !== 'global')
+                                            <span class="perm-scope-badge bg-info-subtle text-info ms-1">
+                                                {{ $pivotScope }}
+                                            </span>
+                                            @endif
+                                            @if($permission->description)
+                                            <br><small class="role-perms-info">{{ $permission->description }}</small>
+                                            @endif
+                                        </label>
+                                    </div>
+                                </div>
+                                @endforeach
                             </div>
                         </div>
+                        @endforeach
 
-                        <div class="row">
-                            @foreach($permissions as $group => $groupPermissions)
-                            <div class="col-md-12">
-                                <div class="permission-group">
-                                    <div class="permission-group-header">
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input group-checkbox"
-                                                   id="group_{{ Str::slug($group) }}"
-                                                   data-group="{{ $group }}">
-                                            <label class="form-check-label fw-bold" for="group_{{ Str::slug($group) }}">
-                                                {{ $group }}
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="permission-group-body">
-                                        @foreach($groupPermissions as $permission)
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input permission-checkbox"
-                                                   id="perm_{{ $permission->id }}" name="permissions[]"
-                                                   value="{{ $permission->id }}"
-                                                   data-group="{{ $group }}"
-                                                   data-perm-scope="{{ $permission->scope }}"
-                                                   {{ $currentPermissions->contains('id', $permission->id) ? 'checked' : '' }}>
-                                            <label class="form-check-label" for="perm_{{ $permission->id }}">
-                                                {{ $permission->display_name }}
-                                                @if($permission->scope != 'global')
-                                                    <span class="scope-badge">{{ $permission->scope }}</span>
-                                                @endif
-                                            </label>
-                                        </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-                            @endforeach
-                        </div>
-
-                        <div class="mt-4">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="ri-save-line align-middle me-1"></i> Guardar Permisos
-                            </button>
+                        <div class="mt-3 d-flex justify-content-between align-items-center">
                             <a href="{{ route('users.show', $user) }}" class="btn btn-soft-secondary">
                                 Cancelar
                             </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ri-save-line align-middle me-1"></i>
+                                Guardar Permisos Directos
+                            </button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-4">
-            <!-- Info de Roles Actuales -->
+        {{-- ── Sidebar: roles summary ──────────────────────────────────────── --}}
+        <div class="col-lg-3">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">Roles del Usuario</h5>
+                    <h6 class="card-title mb-0">Permisos heredados de roles</h6>
                 </div>
                 <div class="card-body">
                     @if($user->roles->count() > 0)
                         @foreach($user->roles as $role)
-                        <div class="current-permission">
-                            <h6 class="mb-1">
-                                <i class="ri-shield-user-line text-primary me-1"></i>
-                                {{ $role->display_name }}
-                            </h6>
-                            <p class="text-muted small mb-0">
-                                @foreach($role->permissions->take(3) as $perm)
-                                    <span class="badge bg-light text-dark me-1">{{ $perm->display_name }}</span>
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <span class="fw-semibold">{{ $role->display_name ?? $role->name }}</span>
+                                <span class="badge bg-primary-subtle text-primary">
+                                    {{ $role->permissions->count() }}
+                                </span>
+                            </div>
+                            @if($role->permissions->count() > 0)
+                            <div class="ps-2">
+                                @foreach($role->permissions->take(5) as $rp)
+                                <small class="d-block text-muted">
+                                    <i class="ri-checkbox-blank-circle-fill me-1" style="font-size:0.45rem;vertical-align:middle;"></i>
+                                    {{ $rp->display_name ?? $rp->name }}
+                                </small>
                                 @endforeach
-                                @if($role->permissions->count() > 3)
-                                    <span class="badge bg-light">+{{ $role->permissions->count() - 3 }}</span>
+                                @if($role->permissions->count() > 5)
+                                <small class="text-muted">
+                                    + {{ $role->permissions->count() - 5 }} más...
+                                </small>
                                 @endif
-                            </p>
+                            </div>
+                            @else
+                            <small class="text-muted">Sin permisos asignados al rol</small>
+                            @endif
                         </div>
                         @endforeach
                     @else
-                        <p class="text-muted mb-0">No tiene roles asignados</p>
+                        <p class="text-muted small mb-0">El usuario no tiene roles asignados.</p>
                     @endif
                 </div>
             </div>
 
-            <!-- Permisos Actuales -->
             <div class="card mt-3">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">Permisos Directos Actuales</h5>
-                </div>
-                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                    @if($currentPermissions->count() > 0)
-                        @foreach($currentPermissions as $permission)
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span>
-                                <i class="ri-key-line text-warning me-1"></i>
-                                {{ $permission->display_name }}
-                                @if($permission->pivot->scope != 'global')
-                                    <span class="badge bg-info">{{ $permission->pivot->scope }}</span>
-                                @endif
-                            </span>
-                        </div>
-                        @endforeach
-                    @else
-                        <p class="text-muted mb-0 text-center py-3">
-                            No tiene permisos directos asignados
-                        </p>
-                    @endif
-                </div>
-            </div>
-
-            <!-- Ayuda -->
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">Información</h5>
+                    <h6 class="card-title mb-0">Resumen</h6>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-warning mb-0">
-                        <i class="ri-information-line"></i>
-                        <p class="mb-0 small">
-                            <strong>Permisos directos:</strong> Se asignan individualmente y tienen prioridad sobre los permisos de roles.
-                        </p>
-                        <hr>
-                        <p class="mb-0 small">
-                            <strong>Ámbitos:</strong>
-                            <br>🌐 Global - Sin restricciones
-                            <br>🏛️ Recinto - Limitado a un recinto
-                            <br>📊 Mesa - Limitado a una mesa
-                        </p>
+                    <div class="d-flex justify-content-between mb-2">
+                        <small>Directos</small>
+                        <span class="badge bg-success" id="directCount">{{ $currentPermissions->count() }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <small>Por roles</small>
+                        <span class="badge bg-primary">{{ count($rolePermIds) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <small>Total acceso</small>
+                        <span class="badge bg-dark">
+                            {{ count(array_unique(array_merge($directIds, $rolePermIds))) }}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -222,80 +223,66 @@
 @endsection
 
 @section('script')
-<script src="{{ URL::asset('build/libs/sweetalert2/sweetalert2.min.js') }}"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const permissionCheckboxes = document.querySelectorAll('.permission-checkbox');
-        const groupCheckboxes = document.querySelectorAll('.group-checkbox');
+document.addEventListener('DOMContentLoaded', function () {
+    const permCheckboxes = document.querySelectorAll('.perm-checkbox');
+    const groupCheckboxes = document.querySelectorAll('.group-checkbox');
+    const directCountEl = document.getElementById('directCount');
 
-        // ===== FUNCIONALIDAD DE GRUPOS =====
-
-        groupCheckboxes.forEach(groupCb => {
-            groupCb.addEventListener('change', function() {
-                const group = this.dataset.group;
-                const groupPermissions = document.querySelectorAll(`.permission-checkbox[data-group="${group}"]`);
-                groupPermissions.forEach(cb => {
-                    cb.checked = groupCb.checked;
-                });
-            });
-        });
-
-        function updateGroupCheckboxes() {
-            groupCheckboxes.forEach(groupCb => {
-                const group = groupCb.dataset.group;
-                const groupPermissions = document.querySelectorAll(`.permission-checkbox[data-group="${group}"]`);
-                const checkedPermissions = document.querySelectorAll(`.permission-checkbox[data-group="${group}"]:checked`);
-
-                if (groupPermissions.length === 0) return;
-
-                if (checkedPermissions.length === groupPermissions.length) {
-                    groupCb.checked = true;
-                    groupCb.indeterminate = false;
-                } else if (checkedPermissions.length > 0) {
-                    groupCb.checked = false;
-                    groupCb.indeterminate = true;
-                } else {
-                    groupCb.checked = false;
-                    groupCb.indeterminate = false;
-                }
-            });
+    function updateGroupState(groupSlug) {
+        const groupCb = document.querySelector(`.group-checkbox[data-group="${groupSlug}"]`);
+        if (!groupCb) return;
+        const all     = document.querySelectorAll(`.perm-checkbox[data-group="${groupSlug}"]`);
+        const checked = document.querySelectorAll(`.perm-checkbox[data-group="${groupSlug}"]:checked`);
+        if (checked.length === all.length) {
+            groupCb.checked = true; groupCb.indeterminate = false;
+        } else if (checked.length > 0) {
+            groupCb.checked = false; groupCb.indeterminate = true;
+        } else {
+            groupCb.checked = false; groupCb.indeterminate = false;
         }
+    }
 
-        permissionCheckboxes.forEach(cb => {
-            cb.addEventListener('change', updateGroupCheckboxes);
+    function updateDirectCount() {
+        const n = document.querySelectorAll('.perm-checkbox:checked').length;
+        if (directCountEl) directCountEl.textContent = n;
+    }
+
+    permCheckboxes.forEach(cb => {
+        cb.addEventListener('change', function () {
+            updateGroupState(this.dataset.group);
+            updateDirectCount();
         });
-
-        // ===== BOTONES DE SELECCIÓN MASIVA =====
-
-        document.getElementById('select-all-permissions').addEventListener('click', function() {
-            permissionCheckboxes.forEach(cb => cb.checked = true);
-            updateGroupCheckboxes();
-        });
-
-        document.getElementById('deselect-all-permissions').addEventListener('click', function() {
-            permissionCheckboxes.forEach(cb => cb.checked = false);
-            updateGroupCheckboxes();
-        });
-
-        document.getElementById('show-selected').addEventListener('click', function() {
-            const selected = [];
-            permissionCheckboxes.forEach(cb => {
-                if (cb.checked) {
-                    const label = document.querySelector(`label[for="${cb.id}"]`).innerText.trim();
-                    selected.push(label);
-                }
-            });
-
-            Swal.fire({
-                title: 'Permisos Seleccionados',
-                html: selected.length > 0
-                    ? selected.map(p => `<span class="badge bg-info m-1">${p}</span>`).join('')
-                    : '<p class="text-muted">No hay permisos seleccionados</p>',
-                confirmButtonText: 'Cerrar'
-            });
-        });
-
-        updateGroupCheckboxes();
     });
+
+    groupCheckboxes.forEach(gcb => {
+        gcb.addEventListener('change', function () {
+            document.querySelectorAll(`.perm-checkbox[data-group="${this.dataset.group}"]`)
+                    .forEach(cb => cb.checked = this.checked);
+            updateDirectCount();
+        });
+    });
+
+    document.getElementById('selectAllPerms').addEventListener('click', () => {
+        permCheckboxes.forEach(cb => cb.checked = true);
+        groupCheckboxes.forEach(gcb => {
+            gcb.checked = true; gcb.indeterminate = false;
+        });
+        updateDirectCount();
+    });
+
+    document.getElementById('deselectAllPerms').addEventListener('click', () => {
+        permCheckboxes.forEach(cb => cb.checked = false);
+        groupCheckboxes.forEach(gcb => {
+            gcb.checked = false; gcb.indeterminate = false;
+        });
+        updateDirectCount();
+    });
+
+    // Init group states
+    const groups = new Set([...permCheckboxes].map(cb => cb.dataset.group));
+    groups.forEach(updateGroupState);
+    updateDirectCount();
+});
 </script>
 @endsection

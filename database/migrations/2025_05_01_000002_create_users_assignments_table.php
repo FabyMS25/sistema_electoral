@@ -13,7 +13,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('institution_id')->constrained()->onDelete('cascade');
-            $table->foreignId('election_type_id')->constrained()->onDelete('cascade');
             $table->enum('delegate_type', [
                 'delegado_general',
                 'delegado_mesa',
@@ -33,20 +32,20 @@ return new class extends Migration
             $table->text('observations')->nullable();
             $table->timestamps();
             $table->softDeletes();
-            $table->index(['institution_id', 'election_type_id', 'status']);
-            $table->index(['voting_table_id', 'election_type_id']);
-            $table->index(['user_id', 'election_type_id', 'status']);
+            $table->index(['institution_id', 'status']);
+            $table->index(['voting_table_id', 'status']);
+            $table->index(['user_id', 'status']);
             $table->index(['delegate_type', 'status']);
         });
 
         DB::statement('
             CREATE UNIQUE INDEX unique_user_assignment_no_table
-            ON user_assignments (user_id, institution_id, election_type_id)
+            ON user_assignments (user_id, institution_id)
             WHERE voting_table_id IS NULL AND deleted_at IS NULL
         ');
         DB::statement('
             CREATE UNIQUE INDEX unique_user_assignment_with_table
-            ON user_assignments (user_id, institution_id, election_type_id, voting_table_id)
+            ON user_assignments (user_id, institution_id, voting_table_id)
             WHERE voting_table_id IS NOT NULL AND deleted_at IS NULL
         ');
     }

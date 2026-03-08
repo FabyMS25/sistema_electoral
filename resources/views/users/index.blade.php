@@ -1,43 +1,17 @@
 {{-- resources/views/users/index.blade.php --}}
 @extends('layouts.master')
-
 @section('title')
     @lang('translation.list-users')
 @endsection
-
 @section('css')
     <link href="{{ URL::asset('build/libs/sweetalert2/sweetalert2.min.css') }}" rel="stylesheet" type="text/css" />
-    <style>
-        .filter-card {
-            background-color: #f8f9fa;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .delegate-badge {
-            font-size: 0.7rem;
-            padding: 0.2rem 0.4rem;
-            background-color: #e7f1ff;
-            color: #0a5dc2;
-            border-radius: 0.25rem;
-            margin-right: 0.25rem;
-            display: inline-block;
-        }
-    </style>
 @endsection
-
 @section('content')
     @component('components.breadcrumb')
-        @slot('li_1')
-            Usuarios
-        @endslot
-        @slot('title')
-            Gestión de Usuarios
-        @endslot
+        @slot('li_1') Usuarios @endslot
+        @slot('title') Gestión de Usuarios @endslot
     @endcomponent
-
-    <!-- Stats Cards -->
-    <div class="row">
+    {{-- <div class="row">
         <div class="col-xl-3 col-md-6">
             <div class="card">
                 <div class="card-body">
@@ -60,7 +34,6 @@
                 </div>
             </div>
         </div>
-
         <div class="col-xl-3 col-md-6">
             <div class="card">
                 <div class="card-body">
@@ -83,7 +56,6 @@
                 </div>
             </div>
         </div>
-
         <div class="col-xl-3 col-md-6">
             <div class="card">
                 <div class="card-body">
@@ -106,7 +78,6 @@
                 </div>
             </div>
         </div>
-
         <div class="col-xl-3 col-md-6">
             <div class="card">
                 <div class="card-body">
@@ -129,11 +100,8 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Filtros Avanzados -->
+    </div> --}}
     <div class="row">
-        <div class="col-12">
             <div class="card">
                 <div class="card-body">
                     <form method="GET" action="{{ route('users.index') }}" id="filterForm">
@@ -146,19 +114,17 @@
                                     <i class="ri-search-line search-icon"></i>
                                 </div>
                             </div>
-
                             <div class="col-md-2">
                                 <label class="form-label">Rol</label>
                                 <select name="role" class="form-select">
                                     <option value="">Todos</option>
                                     @foreach($roles as $role)
                                         <option value="{{ $role->name }}" {{ request('role') == $role->name ? 'selected' : '' }}>
-                                            {{ $role->display_name }}
+                                            {{ $role->display_name ?? $role->name }}
                                         </option>
                                     @endforeach
                                 </select>
                             </div>
-
                             <div class="col-md-2">
                                 <label class="form-label">Tipo Delegado</label>
                                 <select name="delegate_type" class="form-select">
@@ -170,16 +136,14 @@
                                     @endforeach
                                 </select>
                             </div>
-
                             <div class="col-md-2">
                                 <label class="form-label">Estado</label>
                                 <select name="status" class="form-select">
                                     <option value="">Todos</option>
-                                    <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>Activos</option>
+                                    <option value="active"   {{ request('status') == 'active'   ? 'selected' : '' }}>Activos</option>
                                     <option value="inactive" {{ request('status') == 'inactive' ? 'selected' : '' }}>Inactivos</option>
                                 </select>
                             </div>
-
                             <div class="col-md-3 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary me-2">
                                     <i class="ri-filter-3-line align-middle me-1"></i> Filtrar
@@ -192,22 +156,17 @@
                     </form>
                 </div>
             </div>
-        </div>
     </div>
-
-    <!-- Listado de Usuarios -->
     <div class="row">
-        <div class="col-lg-12">
             <div class="card">
                 <div class="card-header d-flex align-items-center justify-content-between">
                     <h4 class="card-title mb-0">Administración de Usuarios del Sistema</h4>
-                    @can('create_users')
+                    @if(auth()->user()->allPermissions->contains('name', 'create_users'))
                     <a href="{{ route('users.create') }}" class="btn btn-success">
                         <i class="ri-add-line align-bottom me-1"></i> Nuevo Usuario
                     </a>
-                    @endcan
+                    @endif
                 </div>
-
                 <div class="card-body">
                     @include('components.alerts')
 
@@ -247,23 +206,25 @@
                                     </td>
                                     <td>
                                         @foreach($user->roles as $role)
-                                            <span class="badge bg-info-subtle text-info">{{ $role->display_name }}</span>
+                                            <span class="badge bg-info-subtle text-info">
+                                                {{ $role->display_name ?? $role->name }}
+                                            </span>
                                         @endforeach
                                     </td>
                                     <td>
                                         @foreach($user->assignments->take(2) as $assignment)
-                                            @if($assignment->institution_id)
-                                                <span class="delegate-badge" title="Recinto">
-                                                    <i class="ri-building-line"></i> {{ $assignment->institution->code ?? '' }}
+                                            @if($assignment->voting_table_id)
+                                                <span class="badge bg-primary-subtle text-primary" title="{{ $assignment->delegate_type_label }}">
+                                                    <i class="ri-table-line"></i> Mesa {{ $assignment->votingTable?->number ?? '—' }}
                                                 </span>
-                                            @elseif($assignment->voting_table_id)
-                                                <span class="delegate-badge" title="Mesa {{ $assignment->delegate_type_label }}">
-                                                    <i class="ri-table-line"></i> Mesa {{ $assignment->votingTable->number ?? '' }}
+                                            @elseif($assignment->institution_id)
+                                                <span class="badge bg-primary-subtle text-primary" title="Recinto">
+                                                    <i class="ri-building-line"></i> {{ $assignment->institution?->name ?? '—' }}
                                                 </span>
                                             @endif
                                         @endforeach
                                         @if($user->assignments->count() > 2)
-                                            <span class="delegate-badge">+{{ $user->assignments->count() - 2 }}</span>
+                                            <span class="badge bg-primary-subtle text-primary">+{{ $user->assignments->count() - 2 }}</span>
                                         @endif
                                     </td>
                                     <td>
@@ -282,38 +243,48 @@
                                     </td>
                                     <td>
                                         <div class="d-flex gap-2">
-                                            @can('view_users')
-                                            <a href="{{ route('users.show', $user) }}" class="btn btn-sm btn-info" title="Ver">
+                                            @if(auth()->user()->allPermissions->contains('name', 'view_users'))
+                                            <a href="{{ route('users.show', $user) }}"
+                                               class="btn btn-sm btn-info" title="Ver">
                                                 <i class="ri-eye-line"></i>
                                             </a>
-                                            @endcan
+                                            @endif
 
-                                            @can('assign_roles')
-                                            <a href="{{ route('users.assign-roles.form', $user) }}" class="btn btn-sm btn-primary" title="Asignar Roles">
-                                                <i class="ri-shield-user-line"></i>
+                                            @if(auth()->user()->allPermissions->contains('name', 'assign_roles') || auth()->user()->allPermissions->contains('name', 'assign_delegates'))
+                                            <a href="{{ route('users.assign-roles.form', $user) }}"
+                                               class="btn btn-sm btn-primary" title="Asignaciones">
+                                                <i class="ri-links-line"></i>
                                             </a>
-                                            @endcan
+                                            @endif
 
-                                            @can('edit_users')
-                                            <a href="{{ route('users.edit', $user) }}" class="btn btn-sm btn-warning" title="Editar">
+                                            @if(auth()->user()->allPermissions->contains('name', 'edit_users'))
+                                            <a href="{{ route('users.edit', $user) }}"
+                                               class="btn btn-sm btn-warning" title="Editar">
                                                 <i class="ri-pencil-line"></i>
                                             </a>
-                                            @endcan
+                                            @endif
 
-                                            @if($user->is_active)
-                                                @can('delete_users')
-                                                <button class="btn btn-sm btn-danger"
-                                                        onclick="confirmDeactivate('{{ $user->id }}', '{{ $user->name }}')"
-                                                        title="Desactivar">
-                                                    <i class="ri-user-unfollow-line"></i>
-                                                </button>
-                                                @endcan
-                                            @else
-                                                @can('edit_users')
-                                                <a href="{{ route('users.activate', $user) }}" class="btn btn-sm btn-success" title="Activar">
-                                                    <i class="ri-user-follow-line"></i>
-                                                </a>
-                                                @endcan
+                                            @if($user->id !== auth()->id())
+                                                @if($user->is_active)
+                                                    @if(auth()->user()->allPermissions->contains('name', 'delete_users'))
+                                                    <button class="btn btn-sm btn-danger"
+                                                            onclick="confirmDeactivate('{{ $user->id }}', '{{ addslashes($user->name) }}')"
+                                                            title="Desactivar">
+                                                        <i class="ri-user-unfollow-line"></i>
+                                                    </button>
+                                                    @endif
+                                                @else
+                                                    @if(auth()->user()->allPermissions->contains('name', 'activate_users'))
+                                                    <form method="POST"
+                                                          action="{{ route('users.activate', $user) }}"
+                                                          class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-success" title="Activar">
+                                                            <i class="ri-user-follow-line"></i>
+                                                        </button>
+                                                    </form>
+                                                    @endif
+                                                @endif
                                             @endif
                                         </div>
                                     </td>
@@ -324,10 +295,11 @@
                                         <div class="noresult">
                                             <div class="text-center">
                                                 <lord-icon src="https://cdn.lordicon.com/msoeawqm.json" trigger="loop"
-                                                    colors="primary:#121331,secondary:#08a88a" style="width:75px;height:75px">
+                                                    colors="primary:#121331,secondary:#08a88a"
+                                                    style="width:75px;height:75px">
                                                 </lord-icon>
-                                                <h5 class="mt-2">Lo sentimos! No se encontraron resultados</h5>
-                                                <p class="text-muted mb-0">No hay usuarios registrados en el sistema.</p>
+                                                <h5 class="mt-2">No se encontraron resultados</h5>
+                                                <p class="text-muted mb-0">No hay usuarios que coincidan con los filtros.</p>
                                             </div>
                                         </div>
                                     </td>
@@ -342,13 +314,13 @@
                     </div>
                 </div>
             </div>
-        </div>
     </div>
 @endsection
 
 @section('script')
     <script src="{{ URL::asset('build/libs/sweetalert2/sweetalert2.min.js') }}"></script>
     <script>
+        const CSRF_TOKEN = '{{ csrf_token() }}';
         function confirmDeactivate(userId, userName) {
             Swal.fire({
                 title: '¿Desactivar usuario?',
@@ -359,28 +331,32 @@
                 cancelButtonColor: '#3085d6',
                 confirmButtonText: 'Sí, desactivar',
                 cancelButtonText: 'Cancelar'
-            }).then((result) => {
+            }).then(result => {
                 if (result.isConfirmed) {
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.action = `/users/${userId}`;
-                    form.innerHTML = `
-                        @csrf
-                        @method('DELETE')
-                    `;
+
+                    const csrf = document.createElement('input');
+                    csrf.type = 'hidden';
+                    csrf.name = '_token';
+                    csrf.value = CSRF_TOKEN;
+
+                    const method = document.createElement('input');
+                    method.type = 'hidden';
+                    method.name = '_method';
+                    method.value = 'DELETE';
+
+                    form.appendChild(csrf);
+                    form.appendChild(method);
                     document.body.appendChild(form);
                     form.submit();
                 }
             });
         }
-
-        // Auto-cerrar alertas después de 5 segundos
-        setTimeout(function() {
-            document.querySelectorAll('.alert-dismissible').forEach(function(alert) {
-                if (alert) {
-                    const bsAlert = new bootstrap.Alert(alert);
-                    bsAlert.close();
-                }
+        setTimeout(function () {
+            document.querySelectorAll('.alert-dismissible').forEach(function (alert) {
+                bootstrap.Alert.getOrCreateInstance(alert).close();
             });
         }, 5000);
     </script>

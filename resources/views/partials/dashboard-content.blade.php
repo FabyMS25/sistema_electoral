@@ -38,8 +38,7 @@
             </div>
         </div>
     </div>
-
-    <div class="col-xl-2 col-md-6">
+    <div class="col-xl-3 col-md-6">
         <div class="card card-animate">
             <div class="card-body">
                 <div class="d-flex align-items-center">
@@ -73,8 +72,7 @@
             </div>
         </div>
     </div>
-
-    <div class="col-xl-4 col-md-6">
+    <div class="col-xl-3 col-md-6">
         <div class="card card-animate">
             <div class="card-body">
                 <div class="d-flex align-items-center">
@@ -131,7 +129,6 @@
             </div>
         </div>
     </div>
-
     <div class="col-xl-3 col-md-6">
         <div class="card card-animate">
             <div class="card-body">
@@ -162,7 +159,126 @@
         </div>
     </div>
 </div>
-<div class="row mt-4">
+    <div class="row">
+        <div class="card">
+            <div class="card-header border-0 align-items-center d-flex">
+                <h4 class="card-title mb-0 flex-grow-1">Resultados por Candidato</h4>
+                <div>
+                    <button type="button" class="btn btn-soft-secondary btn-sm" onclick="window.location.reload()">
+                        Actualizar
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="candidates_chart"></div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="card">
+            <div class="card-header border-0 align-items-center d-flex">
+                <h4 class="card-title mb-0 flex-grow-1">Resultados por Localidad</h4>
+                <div>
+                    <button type="button" class="btn btn-soft-secondary btn-sm" onclick="filterLocality('all')">Todos</button>
+                    @foreach($localityStats->take(5) as $locality)
+                    <button type="button" class="btn btn-soft-secondary btn-sm"
+                            onclick="filterLocality('{{ $locality->id }}')">
+                        {{ $locality->name }}
+                    </button>
+                    @endforeach
+                </div>
+            </div>
+            <div class="card-header p-0 border-0 bg-light-subtle">
+                <div class="row g-0 text-center">
+                    <div class="col-6 col-sm-3">
+                        <div class="p-3 border border-dashed border-start-0">
+                            <h5 class="mb-1"><span class="counter-value total-votes-counter" data-target="{{ $totalVotes }}">{{ $totalVotes }}</span></h5>
+                            <p class="text-muted mb-0">Total de Votos</p>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                        <div class="p-3 border border-dashed border-start-0">
+                            <h5 class="mb-1"><span class="counter-value total-tables-counter" data-target="{{ $totalTables }}">{{ $totalTables }}</span></h5>
+                            <p class="text-muted mb-0">Mesas Totales</p>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                        <div class="p-3 border border-dashed border-start-0">
+                            <h5 class="mb-1"><span class="counter-value reported-tables-counter" data-target="{{ $reportedTables }}">{{ $reportedTables }}</span></h5>
+                            <p class="text-muted mb-0">Mesas Reportadas</p>
+                        </div>
+                    </div>
+                    <div class="col-6 col-sm-3">
+                        <div class="p-3 border border-dashed border-start-0 border-end-0">
+                            <h5 class="mb-1 text-success"><span class="counter-value progress-counter" data-target="{{ $progressPercentage }}">{{ $progressPercentage }}</span>%</h5>
+                            <p class="text-muted mb-0">Avance</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0 pb-2">
+                <div id="projects-overview-chart" style="height: 350px;"></div>
+            </div>
+        </div>
+    </div>
+<div class="row">
+    <div class="col-6">
+        <div class="card card-height-100">
+            <div class="card-header align-items-center d-flex">
+                <h4 class="card-title mb-0 flex-grow-1">Distribución por Partido</h4>
+                <div class="flex-shrink-0">
+                    <button type="button" class="btn btn-soft-primary btn-sm" id="exportPartyData">
+                        Exportar
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="party_distribution_chart" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6">
+        <div class="card card-height-100">
+            <div class="card-header align-items-center d-flex">
+                <h4 class="card-title mb-0 flex-grow-1">Votos por Localidades</h4>
+                <div class="flex-shrink-0">
+                    <button type="button" class="btn btn-soft-primary btn-sm" id="exportMapData">
+                        Exportar
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div style="height: 269px; position: relative;">
+                    <div id="votes-by-locations"
+                        data-colors='["#e9e9ef", "#0ab39c", "#f06548"]'
+                        style="height: 100%; width: 100%;"></div>
+                </div>
+                <div class="px-2 py-2 mt-1 locality-progress-container" style="max-height: 200px; overflow-y: auto;">
+                    @foreach($localityStats as $locality)
+                    @php
+                        $progress = $locality->total_tables > 0
+                            ? round(($locality->reported_tables / $locality->total_tables) * 100, 1)
+                            : 0;
+                    @endphp
+                    <div class="locality-progress-item mb-2" data-locality-id="{{ $locality->id }}">
+                        <div class="d-flex justify-content-between">
+                            <p class="mb-1 small">{{ $locality->name }} ({{ $locality->municipality_name }})</p>
+                            <span class="small fw-bold">{{ $progress }}%</span>
+                        </div>
+                        <div class="progress" style="height: 4px;">
+                            <div class="progress-bar bg-primary" role="progressbar"
+                                style="width: {{ $progress }}%;" aria-valuenow="{{ $progress }}"
+                                aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
@@ -225,7 +341,7 @@
         </div>
     </div>
 </div>
-<div class="row mt-4">
+<div class="row">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
@@ -271,7 +387,7 @@
         </div>
     </div>
 </div>
-<div class="row mt-4">
+<div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header align-items-center d-flex">
@@ -356,127 +472,7 @@
         </div>
     </div>
 </div>
-<div class="row mt-4">
-    <div class="col-xl-8">
-        <div class="card">
-            <div class="card-header border-0 align-items-center d-flex">
-                <h4 class="card-title mb-0 flex-grow-1">Resultados por Candidato</h4>
-                <div>
-                    <button type="button" class="btn btn-soft-secondary btn-sm" onclick="window.location.reload()">
-                        Actualizar
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="candidates_chart"></div>
-            </div>
-        </div>
-    </div>
 
-    <div class="col-xl-4">
-        <div class="card card-height-100">
-            <div class="card-header align-items-center d-flex">
-                <h4 class="card-title mb-0 flex-grow-1">Distribución por Partido</h4>
-                <div class="flex-shrink-0">
-                    <button type="button" class="btn btn-soft-primary btn-sm" id="exportPartyData">
-                        Exportar
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div id="party_distribution_chart" style="height: 300px;"></div>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="row mt-4">
-    <div class="col-xl-8">
-        <div class="card">
-            <div class="card-header border-0 align-items-center d-flex">
-                <h4 class="card-title mb-0 flex-grow-1">Resultados por Localidad</h4>
-                <div>
-                    <button type="button" class="btn btn-soft-secondary btn-sm" onclick="filterLocality('all')">Todos</button>
-                    @foreach($localityStats->take(5) as $locality)
-                    <button type="button" class="btn btn-soft-secondary btn-sm"
-                            onclick="filterLocality('{{ $locality->id }}')">
-                        {{ $locality->name }}
-                    </button>
-                    @endforeach
-                </div>
-            </div>
-            <div class="card-header p-0 border-0 bg-light-subtle">
-                <div class="row g-0 text-center">
-                    <div class="col-6 col-sm-3">
-                        <div class="p-3 border border-dashed border-start-0">
-                            <h5 class="mb-1"><span class="counter-value total-votes-counter" data-target="{{ $totalVotes }}">{{ $totalVotes }}</span></h5>
-                            <p class="text-muted mb-0">Total de Votos</p>
-                        </div>
-                    </div>
-                    <div class="col-6 col-sm-3">
-                        <div class="p-3 border border-dashed border-start-0">
-                            <h5 class="mb-1"><span class="counter-value total-tables-counter" data-target="{{ $totalTables }}">{{ $totalTables }}</span></h5>
-                            <p class="text-muted mb-0">Mesas Totales</p>
-                        </div>
-                    </div>
-                    <div class="col-6 col-sm-3">
-                        <div class="p-3 border border-dashed border-start-0">
-                            <h5 class="mb-1"><span class="counter-value reported-tables-counter" data-target="{{ $reportedTables }}">{{ $reportedTables }}</span></h5>
-                            <p class="text-muted mb-0">Mesas Reportadas</p>
-                        </div>
-                    </div>
-                    <div class="col-6 col-sm-3">
-                        <div class="p-3 border border-dashed border-start-0 border-end-0">
-                            <h5 class="mb-1 text-success"><span class="counter-value progress-counter" data-target="{{ $progressPercentage }}">{{ $progressPercentage }}</span>%</h5>
-                            <p class="text-muted mb-0">Avance</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body p-0 pb-2">
-                <div id="projects-overview-chart" style="height: 350px;"></div>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-4">
-        <div class="card card-height-100">
-            <div class="card-header align-items-center d-flex">
-                <h4 class="card-title mb-0 flex-grow-1">Votos por Localidades</h4>
-                <div class="flex-shrink-0">
-                    <button type="button" class="btn btn-soft-primary btn-sm" id="exportMapData">
-                        Exportar
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div style="height: 269px; position: relative;">
-                    <div id="votes-by-locations"
-                        data-colors='["#e9e9ef", "#0ab39c", "#f06548"]'
-                        style="height: 100%; width: 100%;"></div>
-                </div>
-                <div class="px-2 py-2 mt-1 locality-progress-container" style="max-height: 200px; overflow-y: auto;">
-                    @foreach($localityStats as $locality)
-                    @php
-                        $progress = $locality->total_tables > 0
-                            ? round(($locality->reported_tables / $locality->total_tables) * 100, 1)
-                            : 0;
-                    @endphp
-                    <div class="locality-progress-item mb-2" data-locality-id="{{ $locality->id }}">
-                        <div class="d-flex justify-content-between">
-                            <p class="mb-1 small">{{ $locality->name }} ({{ $locality->municipality_name }})</p>
-                            <span class="small fw-bold">{{ $progress }}%</span>
-                        </div>
-                        <div class="progress" style="height: 4px;">
-                            <div class="progress-bar bg-primary" role="progressbar"
-                                style="width: {{ $progress }}%;" aria-valuenow="{{ $progress }}"
-                                aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 <div class="auto-refresh-controls" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
     <div class="btn-group btn-group-sm">
         <button class="btn btn-outline-primary" onclick="refreshDashboard()" title="Actualizar ahora">
@@ -497,297 +493,297 @@
     </div>
 </div>
 @section('dashboard-scripts')
-<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.2/dist/apexcharts.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    if (typeof ApexCharts === 'undefined') {
-        console.error('❌ ApexCharts no está cargado');
-        return;
-    }
-    let refreshInterval = 120000;
-    let refreshTimer = null;
-    let isRefreshing = false;
-    let charts = {};
-    initializeCharts();
-    startAutoRefresh();
-    document.getElementById('exportLocalityTable')?.addEventListener('click', function() {
-        exportTableToCSV('locality-table', 'resultados_localidades.csv');
-    });
-    function initializeCharts() {
-        try {
-            const candidateStats = @json($candidateStats ?? []);
-            if (Object.keys(candidateStats).length === 0) {
-                console.warn('⚠️ No hay datos de candidatos para mostrar');
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.2/dist/apexcharts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof ApexCharts === 'undefined') {
+                console.error('❌ ApexCharts no está cargado');
                 return;
             }
-            const sortedStats = Object.values(candidateStats).sort((a, b) => b.votes - a.votes);
-            const candidateNames = sortedStats.map(stat => {
-                const name = stat.candidate?.name || 'Sin nombre';
-                return name.length > 20 ? name.substring(0, 18) + '...' : name;
+            let refreshInterval = 120000;
+            let refreshTimer = null;
+            let isRefreshing = false;
+            let charts = {};
+            initializeCharts();
+            startAutoRefresh();
+            document.getElementById('exportLocalityTable')?.addEventListener('click', function() {
+                exportTableToCSV('locality-table', 'resultados_localidades.csv');
             });
-            const candidateColors = sortedStats.map(stat => stat.candidate?.color || '#3b5de7');
-            const candidateVotes = sortedStats.map(stat => stat.votes || 0);
-            const barContainer = document.querySelector("#candidates_chart");
-            if (barContainer) {
-                const barOptions = {
-                    series: [{ name: 'Votos', data: candidateVotes }],
-                    chart: { type: 'bar', height: 350, toolbar: { show: true } },
-                    plotOptions: { bar: { distributed: true, borderRadius: 4 } },
-                    xaxis: {
-                        categories: candidateNames,
-                        labels: { rotate: -45, trim: true, style: { fontSize: '11px' } }
-                    },
-                    colors: candidateColors,
-                    tooltip: { y: { formatter: val => val.toLocaleString() + ' votos' } },
-                    legend: { show: false }
-                };
-                charts.candidateChart = new ApexCharts(barContainer, barOptions);
-                charts.candidateChart.render();
-            }
-            const donutContainer = document.querySelector("#party_distribution_chart");
-            if (donutContainer && candidateVotes.length > 0) {
-                const donutOptions = {
-                    series: candidateVotes,
-                    labels: candidateNames,
-                    colors: candidateColors,
-                    chart: { type: 'donut', height: 300 },
-                    legend: { position: 'bottom', fontSize: '11px' },
-                    plotOptions: {
-                        pie: {
-                            donut: {
-                                size: '60%',
-                                labels: {
-                                    show: true,
-                                    total: {
-                                        show: true,
-                                        label: 'Total',
-                                        formatter: (w) => w.globals.seriesTotals.reduce((a, b) => a + b, 0).toLocaleString()
+            function initializeCharts() {
+                try {
+                    const candidateStats = @json($candidateStats ?? []);
+                    if (Object.keys(candidateStats).length === 0) {
+                        console.warn('⚠️ No hay datos de candidatos para mostrar');
+                        return;
+                    }
+                    const sortedStats = Object.values(candidateStats).sort((a, b) => b.votes - a.votes);
+                    const candidateNames = sortedStats.map(stat => {
+                        const name = stat.candidate?.name || 'Sin nombre';
+                        return name.length > 20 ? name.substring(0, 18) + '...' : name;
+                    });
+                    const candidateColors = sortedStats.map(stat => stat.candidate?.color || '#3b5de7');
+                    const candidateVotes = sortedStats.map(stat => stat.votes || 0);
+                    const barContainer = document.querySelector("#candidates_chart");
+                    if (barContainer) {
+                        const barOptions = {
+                            series: [{ name: 'Votos', data: candidateVotes }],
+                            chart: { type: 'bar', height: 350, toolbar: { show: true } },
+                            plotOptions: { bar: { distributed: true, borderRadius: 4 } },
+                            xaxis: {
+                                categories: candidateNames,
+                                labels: { rotate: -45, trim: true, style: { fontSize: '11px' } }
+                            },
+                            colors: candidateColors,
+                            tooltip: { y: { formatter: val => val.toLocaleString() + ' votos' } },
+                            legend: { show: false }
+                        };
+                        charts.candidateChart = new ApexCharts(barContainer, barOptions);
+                        charts.candidateChart.render();
+                    }
+                    const donutContainer = document.querySelector("#party_distribution_chart");
+                    if (donutContainer && candidateVotes.length > 0) {
+                        const donutOptions = {
+                            series: candidateVotes,
+                            labels: candidateNames,
+                            colors: candidateColors,
+                            chart: { type: 'donut', height: 300 },
+                            legend: { position: 'bottom', fontSize: '11px' },
+                            plotOptions: {
+                                pie: {
+                                    donut: {
+                                        size: '60%',
+                                        labels: {
+                                            show: true,
+                                            total: {
+                                                show: true,
+                                                label: 'Total',
+                                                formatter: (w) => w.globals.seriesTotals.reduce((a, b) => a + b, 0).toLocaleString()
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                        }
-                    },
-                    tooltip: { y: { formatter: val => val.toLocaleString() + ' votos' } }
-                };
-                charts.partyChart = new ApexCharts(donutContainer, donutOptions);
-                charts.partyChart.render();
-            }
-            const localityContainer = document.querySelector("#projects-overview-chart");
-            const localityResults = @json($localityResults ?? []);
-            const localities = Object.values(localityResults).map(l => l.name);
-
-            if (localityContainer && localities.length > 0 && candidateNames.length > 0) {
-                const series = candidateNames.map((name, index) => {
-                    return {
-                        name: name,
-                        type: 'bar',
-                        data: Object.values(localityResults).map(l => {
-                            const candidate = (l.candidates || []).find(c => c.name === name);
-                            return candidate ? candidate.votes : 0;
-                        })
-                    };
-                });
-
-                const localityOptions = {
-                    series: series,
-                    chart: { type: 'bar', height: 350, stacked: false, toolbar: { show: true } },
-                    xaxis: {
-                        categories: localities,
-                        labels: { rotate: -45, trim: true, style: { fontSize: '11px' } }
-                    },
-                    colors: candidateColors,
-                    legend: { position: 'bottom', horizontalAlign: 'center' },
-                    tooltip: { shared: true, intersect: false },
-                    plotOptions: { bar: { columnWidth: '70%' } }
-                };
-                charts.localityChart = new ApexCharts(localityContainer, localityOptions);
-                charts.localityChart.render();
-            }
-            initializeMap(localityResults);
-        } catch (error) {
-            console.error('❌ Error creando gráficos:', error);
-        }
-    }
-    function initializeMap(localityResults) {
-        const mapContainer = document.getElementById("votes-by-locations");
-        if (!mapContainer || !localityResults || Object.keys(localityResults).length === 0) return;
-        try {
-            const markers = Object.values(localityResults).map(l => {
-                return {
-                    name: l.name + " (" + (l.total_votes || 0) + " votos)",
-                    coords: [l.latitude || -17.4, l.longitude || -66.2],
-                    votes: l.total_votes || 0,
-                    candidates: l.candidates || []
-                };
-            });
-            if (typeof jsVectorMap !== 'undefined') {
-                mapContainer.innerHTML = "";
-                charts.boliviaMap = new jsVectorMap({
-                    map: "world",
-                    selector: "#votes-by-locations",
-                    zoomOnScroll: true,
-                    zoomButtons: true,
-                    markers: markers,
-                    markerStyle: {
-                        initial: { fill: '#0ab39c' },
-                        hover: { fill: '#f06548' },
-                        selected: { fill: '#f06548' }
-                    },
-                    labels: {
-                        markers: {
-                            render: function(marker) {
-                                return marker.name;
-                            }
-                        }
-                    },
-                    onMarkerClick: function(event, index) {
-                        const m = markers[index];
-                        showMarkerPopup(m);
+                            },
+                            tooltip: { y: { formatter: val => val.toLocaleString() + ' votos' } }
+                        };
+                        charts.partyChart = new ApexCharts(donutContainer, donutOptions);
+                        charts.partyChart.render();
                     }
-                });
-            }
-        } catch (error) {
-            console.error('❌ Error creando mapa:', error);
-        }
-    }
-    function showMarkerPopup(marker) {
-        const popup = document.createElement('div');
-        popup.className = 'custom-map-popup';
-        let candidatesHtml = '';
-        if (marker.candidates && marker.candidates.length > 0) {
-            candidatesHtml = marker.candidates.map(c => `
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    ${c.name} (${c.party})
-                    <span class="badge bg-primary rounded-pill">
-                        ${c.votes?.toLocaleString() || 0} (${c.percentage || 0}%)
-                    </span>
-                </li>
-            `).join('');
-        } else {
-            candidatesHtml = '<li class="list-group-item">No hay datos</li>';
-        }
-        popup.innerHTML = `
-            <div class="popup-header">
-                <h5>${marker.name}</h5>
-                <button type="button" class="btn-close" aria-label="Close"></button>
-            </div>
-            <div class="popup-body">
-                <p><strong>Total votos:</strong> ${marker.votes?.toLocaleString() || 0}</p>
-                <h6>Resultados:</h6>
-                <ul class="list-group">
-                    ${candidatesHtml}
-                </ul>
-            </div>
-        `;
-        if (!document.querySelector('#map-popup-styles')) {
-            const styles = document.createElement('style');
-            styles.id = 'map-popup-styles';
-            styles.textContent = `
-                .custom-map-popup {
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    background: white;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-                    z-index: 10000;
-                    width: 320px;
-                    max-width: 90vw;
-                }
-                .popup-header {
-                    padding: 12px 16px;
-                    border-bottom: 1px solid #dee2e6;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .popup-body {
-                    padding: 16px;
-                    max-height: 60vh;
-                    overflow-y: auto;
-                }
-            `;
-            document.head.appendChild(styles);
-        }
-        popup.querySelector('.btn-close').addEventListener('click', function() {
-            document.body.removeChild(popup);
-        });
-        document.body.appendChild(popup);
-    }
-    function exportTableToCSV(tableId, filename) {
-        const table = document.getElementById(tableId);
-        if (!table) return;
-        let csv = [];
-        let rows = table.querySelectorAll('tr');
+                    const localityContainer = document.querySelector("#projects-overview-chart");
+                    const localityResults = @json($localityResults ?? []);
+                    const localities = Object.values(localityResults).map(l => l.name);
 
-        for (let i = 0; i < rows.length; i++) {
-            let row = [], cols = rows[i].querySelectorAll('td, th');
-            for (let j = 0; j < cols.length; j++) {
-                let data = cols[j].innerText.replace(/\n/g, ' ').replace(/"/g, '""');
-                row.push('"' + data + '"');
-            }
-            csv.push(row.join(','));
-        }
-        let csvContent = csv.join('\n');
-        let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        let link = document.createElement('a');
-        let url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', filename);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-    window.filterLocality = function(localityId) {
-        if (!charts.localityChart) return;
-        console.log('Filtrar por localidad:', localityId);
-    };
-    function refreshDashboard() {
-        if (isRefreshing) return;
-        isRefreshing = true;
-        showLoadingIndicator();
-        const electionType = document.querySelector('select[name="election_type"]')?.value || '';
-        const url = `/refresh-dashboard?election_type=${electionType}`;
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
+                    if (localityContainer && localities.length > 0 && candidateNames.length > 0) {
+                        const series = candidateNames.map((name, index) => {
+                            return {
+                                name: name,
+                                type: 'bar',
+                                data: Object.values(localityResults).map(l => {
+                                    const candidate = (l.candidates || []).find(c => c.name === name);
+                                    return candidate ? candidate.votes : 0;
+                                })
+                            };
+                        });
+
+                        const localityOptions = {
+                            series: series,
+                            chart: { type: 'bar', height: 350, stacked: false, toolbar: { show: true } },
+                            xaxis: {
+                                categories: localities,
+                                labels: { rotate: -45, trim: true, style: { fontSize: '11px' } }
+                            },
+                            colors: candidateColors,
+                            legend: { position: 'bottom', horizontalAlign: 'center' },
+                            tooltip: { shared: true, intersect: false },
+                            plotOptions: { bar: { columnWidth: '70%' } }
+                        };
+                        charts.localityChart = new ApexCharts(localityContainer, localityOptions);
+                        charts.localityChart.render();
+                    }
+                    initializeMap(localityResults);
+                } catch (error) {
+                    console.error('❌ Error creando gráficos:', error);
                 }
-                isRefreshing = false;
-                hideLoadingIndicator();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                isRefreshing = false;
-                hideLoadingIndicator();
-            });
-    }
-    function startAutoRefresh() {
-        if (refreshTimer) clearInterval(refreshTimer);
-        refreshTimer = setInterval(refreshDashboard, refreshInterval);
-        document.getElementById('refresh-status').innerHTML = '<small class="text-success">● Activo</small>';
-    }
-    function stopAutoRefresh() {
-        if (refreshTimer) {
-            clearInterval(refreshTimer);
-            refreshTimer = null;
-        }
-        document.getElementById('refresh-status').innerHTML = '<small class="text-secondary">○ Pausado</small>';
-    }
-    function showLoadingIndicator() {
-        document.getElementById('loading-indicator').style.display = 'block';
-    }
-    function hideLoadingIndicator() {
-        document.getElementById('loading-indicator').style.display = 'none';
-    }
-    window.refreshDashboard = refreshDashboard;
-    window.startAutoRefresh = startAutoRefresh;
-    window.stopAutoRefresh = stopAutoRefresh;
-});
-</script>
+            }
+            function initializeMap(localityResults) {
+                const mapContainer = document.getElementById("votes-by-locations");
+                if (!mapContainer || !localityResults || Object.keys(localityResults).length === 0) return;
+                try {
+                    const markers = Object.values(localityResults).map(l => {
+                        return {
+                            name: l.name + " (" + (l.total_votes || 0) + " votos)",
+                            coords: [l.latitude || -17.4, l.longitude || -66.2],
+                            votes: l.total_votes || 0,
+                            candidates: l.candidates || []
+                        };
+                    });
+                    if (typeof jsVectorMap !== 'undefined') {
+                        mapContainer.innerHTML = "";
+                        charts.boliviaMap = new jsVectorMap({
+                            map: "world",
+                            selector: "#votes-by-locations",
+                            zoomOnScroll: true,
+                            zoomButtons: true,
+                            markers: markers,
+                            markerStyle: {
+                                initial: { fill: '#0ab39c' },
+                                hover: { fill: '#f06548' },
+                                selected: { fill: '#f06548' }
+                            },
+                            labels: {
+                                markers: {
+                                    render: function(marker) {
+                                        return marker.name;
+                                    }
+                                }
+                            },
+                            onMarkerClick: function(event, index) {
+                                const m = markers[index];
+                                showMarkerPopup(m);
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('❌ Error creando mapa:', error);
+                }
+            }
+            function showMarkerPopup(marker) {
+                const popup = document.createElement('div');
+                popup.className = 'custom-map-popup';
+                let candidatesHtml = '';
+                if (marker.candidates && marker.candidates.length > 0) {
+                    candidatesHtml = marker.candidates.map(c => `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            ${c.name} (${c.party})
+                            <span class="badge bg-primary rounded-pill">
+                                ${c.votes?.toLocaleString() || 0} (${c.percentage || 0}%)
+                            </span>
+                        </li>
+                    `).join('');
+                } else {
+                    candidatesHtml = '<li class="list-group-item">No hay datos</li>';
+                }
+                popup.innerHTML = `
+                    <div class="popup-header">
+                        <h5>${marker.name}</h5>
+                        <button type="button" class="btn-close" aria-label="Close"></button>
+                    </div>
+                    <div class="popup-body">
+                        <p><strong>Total votos:</strong> ${marker.votes?.toLocaleString() || 0}</p>
+                        <h6>Resultados:</h6>
+                        <ul class="list-group">
+                            ${candidatesHtml}
+                        </ul>
+                    </div>
+                `;
+                if (!document.querySelector('#map-popup-styles')) {
+                    const styles = document.createElement('style');
+                    styles.id = 'map-popup-styles';
+                    styles.textContent = `
+                        .custom-map-popup {
+                            position: fixed;
+                            top: 50%;
+                            left: 50%;
+                            transform: translate(-50%, -50%);
+                            background: white;
+                            border-radius: 8px;
+                            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                            z-index: 10000;
+                            width: 320px;
+                            max-width: 90vw;
+                        }
+                        .popup-header {
+                            padding: 12px 16px;
+                            border-bottom: 1px solid #dee2e6;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                        }
+                        .popup-body {
+                            padding: 16px;
+                            max-height: 60vh;
+                            overflow-y: auto;
+                        }
+                    `;
+                    document.head.appendChild(styles);
+                }
+                popup.querySelector('.btn-close').addEventListener('click', function() {
+                    document.body.removeChild(popup);
+                });
+                document.body.appendChild(popup);
+            }
+            function exportTableToCSV(tableId, filename) {
+                const table = document.getElementById(tableId);
+                if (!table) return;
+                let csv = [];
+                let rows = table.querySelectorAll('tr');
+
+                for (let i = 0; i < rows.length; i++) {
+                    let row = [], cols = rows[i].querySelectorAll('td, th');
+                    for (let j = 0; j < cols.length; j++) {
+                        let data = cols[j].innerText.replace(/\n/g, ' ').replace(/"/g, '""');
+                        row.push('"' + data + '"');
+                    }
+                    csv.push(row.join(','));
+                }
+                let csvContent = csv.join('\n');
+                let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                let link = document.createElement('a');
+                let url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            window.filterLocality = function(localityId) {
+                if (!charts.localityChart) return;
+                console.log('Filtrar por localidad:', localityId);
+            };
+            function refreshDashboard() {
+                if (isRefreshing) return;
+                isRefreshing = true;
+                showLoadingIndicator();
+                const electionType = document.querySelector('select[name="election_type"]')?.value || '';
+                const url = `/refresh-dashboard?election_type=${electionType}`;
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        }
+                        isRefreshing = false;
+                        hideLoadingIndicator();
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        isRefreshing = false;
+                        hideLoadingIndicator();
+                    });
+            }
+            function startAutoRefresh() {
+                if (refreshTimer) clearInterval(refreshTimer);
+                refreshTimer = setInterval(refreshDashboard, refreshInterval);
+                document.getElementById('refresh-status').innerHTML = '<small class="text-success">● Activo</small>';
+            }
+            function stopAutoRefresh() {
+                if (refreshTimer) {
+                    clearInterval(refreshTimer);
+                    refreshTimer = null;
+                }
+                document.getElementById('refresh-status').innerHTML = '<small class="text-secondary">○ Pausado</small>';
+            }
+            function showLoadingIndicator() {
+                document.getElementById('loading-indicator').style.display = 'block';
+            }
+            function hideLoadingIndicator() {
+                document.getElementById('loading-indicator').style.display = 'none';
+            }
+            window.refreshDashboard = refreshDashboard;
+            window.startAutoRefresh = startAutoRefresh;
+            window.stopAutoRefresh = stopAutoRefresh;
+        });
+    </script>
 @endsection

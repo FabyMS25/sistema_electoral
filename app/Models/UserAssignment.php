@@ -68,7 +68,6 @@ class UserAssignment extends Model
         ];
     }
 
-    // ===== RELACIONES =====
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
