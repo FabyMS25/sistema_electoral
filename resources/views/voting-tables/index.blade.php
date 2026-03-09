@@ -89,7 +89,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modales -->
     @include('voting-tables.partials.modal-delete')
     @include('voting-tables.partials.modal-import')
