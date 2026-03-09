@@ -33,8 +33,6 @@ class ElectionCategory extends Model
     public const SCOPE_PROVINCIAL    = 'provincial';
     public const SCOPE_MUNICIPAL     = 'municipal';
     public const SCOPE_INDIGENA_IOC  = 'indigena_ioc';
-
-    // Category codes — match what's in your seeder
     public const CODE_GOBERNADOR = 'GOB';
     public const CODE_ASM_TERRITORIO = 'AST';
     public const CODE_ASM_POBLACION  = 'ASP';

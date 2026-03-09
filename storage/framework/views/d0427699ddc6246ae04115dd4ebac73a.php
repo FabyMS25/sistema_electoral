@@ -1,4 +1,4 @@
-{{-- resources/views/voting-tables/scripts/voting-table-js.blade.php --}}
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -115,9 +115,9 @@ function deleteMultiple() {
 
         Swal.fire({ title: 'Eliminando…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-        fetch('{{ route("voting-tables.deleteMultiple") }}', {
+        fetch('<?php echo e(route("voting-tables.deleteMultiple")); ?>', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '<?php echo e(csrf_token()); ?>' },
             body: JSON.stringify({ ids }),
         })
         .then(r => r.json())
@@ -135,3 +135,4 @@ function deleteMultiple() {
     });
 }
 </script>
+<?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-tables/scripts/voting-table-js.blade.php ENDPATH**/ ?>

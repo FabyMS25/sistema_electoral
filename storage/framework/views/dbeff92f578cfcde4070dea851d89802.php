@@ -1,4 +1,4 @@
-{{-- resources/views/institutions/scripts/institution-js.blade.php --}}
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -263,10 +263,10 @@ function deleteMultiple() {
         Swal.fire({ title: 'Eliminando...', text: 'Por favor espere',
                     allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-        fetch('{{ route("institutions.deleteMultiple") }}', {
+        fetch('<?php echo e(route("institutions.deleteMultiple")); ?>', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json',
-                       'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                       'X-CSRF-TOKEN': '<?php echo e(csrf_token()); ?>' },
             body: JSON.stringify({ ids }),
         })
         .then(r => r.json())
@@ -288,3 +288,4 @@ function deleteMultiple() {
     });
 }
 </script>
+<?php /**PATH D:\_Mine\sistema_electoral\resources\views/institutions/scripts/institution-js.blade.php ENDPATH**/ ?>

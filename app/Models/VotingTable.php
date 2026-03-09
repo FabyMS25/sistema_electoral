@@ -36,154 +36,250 @@ class VotingTable extends Model
     ];
 
     protected $casts = [
-        'number'          => 'integer',
         'expected_voters' => 'integer',
+        'number'          => 'integer',
     ];
 
-    public const TYPE_MIXTA     = 'mixta';
     public const TYPE_MASCULINA = 'masculina';
     public const TYPE_FEMENINA  = 'femenina';
+    public const TYPE_MIXTA     = 'mixta';
+
+    // ─── Relationships ────────────────────────────────────────────────────────
 
     public function institution(): BelongsTo
     {
         return $this->belongsTo(Institution::class);
     }
 
-    public function tableElections(): HasMany
+    public function elections(): HasMany
     {
         return $this->hasMany(VotingTableElection::class);
     }
 
-    public function electionTypes()
-    {
-        return $this->belongsToMany(ElectionType::class, 'voting_table_elections')
-            ->withPivot([
-                'status',
-                'ballots_received',
-                'ballots_used',
-                'ballots_leftover',
-                'ballots_spoiled',
-                'total_voters',
-                'election_date',
-                'opening_time',
-                'closing_time',
-                'observations',
-            ])
-            ->withTimestamps();
-    }
-
-    public function categoryResults(): HasMany
-    {
-        return $this->hasMany(VotingTableCategoryResult::class);
-    }
     public function votes(): HasMany
     {
         return $this->hasMany(Vote::class);
     }
-    public function observations(): HasMany
-    {
-        return $this->hasMany(Observation::class);
-    }
-    public function actas(): HasMany
-    {
-        return $this->hasMany(Acta::class);
-    }
-    public function assignments(): HasMany
-    {
-        return $this->hasMany(UserAssignment::class, 'voting_table_id');
-    }
+
     public function president(): BelongsTo
     {
         return $this->belongsTo(User::class, 'president_id');
     }
+
     public function secretary(): BelongsTo
     {
         return $this->belongsTo(User::class, 'secretary_id');
     }
+
     public function vocal1(): BelongsTo
     {
         return $this->belongsTo(User::class, 'vocal1_id');
     }
+
     public function vocal2(): BelongsTo
     {
         return $this->belongsTo(User::class, 'vocal2_id');
     }
+
     public function vocal3(): BelongsTo
     {
         return $this->belongsTo(User::class, 'vocal3_id');
     }
+
     public function vocal4(): BelongsTo
     {
         return $this->belongsTo(User::class, 'vocal4_id');
     }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
-    public function forElection(int $electionTypeId): ?VotingTableElection
+
+    public function municipality()
     {
-        return $this->tableElections()
-            ->where('election_type_id', $electionTypeId)
-            ->first();
-    }
-    public function categoryResultsForElection(int $electionTypeId)
-    {
-        return $this->categoryResults()
-            ->whereHas('electionTypeCategory', function ($q) use ($electionTypeId) {
-                $q->where('election_type_id', $electionTypeId);
-            })
-            ->get();
-    }
-    public function isConsistentForElection(int $electionTypeId): bool
-    {
-        return $this->categoryResultsForElection($electionTypeId)
-            ->every(fn($r) => $r->is_consistent);
-    }
-    public function delegates()
-    {
-        return $this->assignments()
-            ->whereIn('delegate_type', ['delegado_mesa', 'presidente', 'secretario', 'vocal'])
-            ->where('status', 'activo');
-    }
-    public function hasPendingObservations(): bool
-    {
-        return $this->observations()
-            ->where('status', 'pending')
-            ->exists();
+        return $this->hasOneThrough(
+            Municipality::class,
+            Institution::class,
+            'id',
+            'id',
+            'institution_id',
+            'municipality_id'
+        );
     }
 
-    public function getParticipationPercentageAttribute(): float
+    // ─── Accessors for view compatibility ───────────────────────────────────
+
+    public function getStatusAttribute(): ?string
     {
-        if ($this->expected_voters === 0) return 0.0;
-
-        $maxVoters = $this->tableElections()->max('total_voters') ?? 0;
-
-        return round(($maxVoters / $this->expected_voters) * 100, 2);
+        $latest = $this->elections()->latest('updated_at')->first();
+        return $latest?->status;
     }
 
-    public function getAbsentVotersAttribute(): int
+    public function getTotalVotersAttribute(): int
     {
-        $maxVoters = $this->tableElections()->max('total_voters') ?? 0;
-
-        return max(0, $this->expected_voters - $maxVoters);
+        return $this->elections()->sum('total_voters');
     }
 
-    public function getTypeLabelAttribute(): string
+    public function getBallotsReceivedAttribute(): int
     {
-        return match ($this->type) {
-            self::TYPE_MIXTA     => 'Mixta',
-            self::TYPE_MASCULINA => 'Masculina',
-            self::TYPE_FEMENINA  => 'Femenina',
-            default              => $this->type,
-        };
+        return $this->elections()->sum('ballots_received');
+    }
+
+    public function getBallotsUsedAttribute(): int
+    {
+        return $this->elections()->sum('ballots_used');
+    }
+
+    public function getBallotsLeftoverAttribute(): int
+    {
+        return $this->elections()->sum('ballots_leftover');
+    }
+
+    public function getBallotsSpoiledAttribute(): int
+    {
+        return $this->elections()->sum('ballots_spoiled');
+    }
+
+    public function getOpeningTimeAttribute(): ?string
+    {
+        $latest = $this->elections()->latest('updated_at')->first();
+        return $latest?->opening_time;
+    }
+
+    public function getClosingTimeAttribute(): ?string
+    {
+        $latest = $this->elections()->latest('updated_at')->first();
+        return $latest?->closing_time;
+    }
+
+    public function getElectionDateAttribute(): ?string
+    {
+        $latest = $this->elections()->latest('updated_at')->first();
+        return $latest?->election_date;
+    }
+
+    public function getElectionTypeAttribute()
+    {
+        $latest = $this->elections()->with('electionType')->latest('updated_at')->first();
+        return $latest?->electionType;
+    }
+
+    // Temporary for backward compatibility with old views
+    public function getValidVotesAttribute(): int
+    {
+        return 0; // This should be calculated from category results
+    }
+
+    public function getBlankVotesAttribute(): int
+    {
+        return 0;
+    }
+
+    public function getNullVotesAttribute(): int
+    {
+        return 0;
+    }
+
+    public function getValidVotesSecondAttribute(): int
+    {
+        return 0;
+    }
+
+    public function getBlankVotesSecondAttribute(): int
+    {
+        return 0;
+    }
+
+    public function getNullVotesSecondAttribute(): int
+    {
+        return 0;
+    }
+
+    public function getTotalVotersSecondAttribute(): int
+    {
+        return 0;
+    }
+
+    public function getActaNumberAttribute(): ?string
+    {
+        return null;
+    }
+
+    public function getActaUploadedAtAttribute(): ?string
+    {
+        return null;
+    }
+
+    public function getActaPhotoAttribute(): ?string
+    {
+        return null;
+    }
+
+    public function getVocal4NameAttribute(): ?string
+    {
+        return $this->vocal4?->name;
+    }
+
+    // ─── Scopes ───────────────────────────────────────────────────────────────
+
+    public function scopeForElections($query)
+    {
+        return $query->whereHas('institution', fn($q) =>
+            $q->where('status', 'activo')->where('is_operative', true)
+        );
+    }
+
+    public function scopeByInstitution($query, int $institutionId)
+    {
+        return $query->where('institution_id', $institutionId);
+    }
+
+    public function scopeByType($query, string $type)
+    {
+        return $query->where('type', $type);
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    public function electionStatus(int $electionTypeId): ?VotingTableElection
+    {
+        return $this->elections()->where('election_type_id', $electionTypeId)->first();
     }
 
     public function getFullCodeAttribute(): string
     {
-        return $this->internal_code ?? $this->oep_code;
+        return $this->letter
+            ? "{$this->number}{$this->letter}"
+            : (string) $this->number;
+    }
+
+    public function getTypeLabel(): string
+    {
+        return match ($this->type) {
+            self::TYPE_MASCULINA => 'Masculina',
+            self::TYPE_FEMENINA  => 'Femenina',
+            default              => 'Mixta',
+        };
+    }
+
+    public static function getStatuses(): array
+    {
+        return [
+            'configurada'   => 'Configurada',
+            'en_espera'     => 'En Espera',
+            'votacion'      => 'En Votación',
+            'cerrada'       => 'Cerrada',
+            'en_escrutinio' => 'En Escrutinio',
+            'escrutada'     => 'Escrutada',
+            'observada'     => 'Observada',
+            'transmitida'   => 'Transmitida',
+            'anulada'       => 'Anulada',
+        ];
     }
 }

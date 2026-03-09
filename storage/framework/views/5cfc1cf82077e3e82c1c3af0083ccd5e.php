@@ -1,15 +1,5 @@
-{{-- resources/views/voting-tables/partials/modal-delete.blade.php --}}
-{{--
-  Triggered by any delete button that carries these data attributes:
-    data-bs-toggle="modal"
-    data-bs-target="#deleteRecordModal"
-    data-oep="<oep_code>"
-    data-internal="<internal_code>"
-    data-number="<number>"
-    data-institution="<institution name>"
-    data-elections="<count of VotingTableElection rows>"
-    data-delete-url="{{ route('voting-tables.destroy', $table->id) }}"
---}}
+
+
 <div class="modal fade" id="deleteRecordModal" tabindex="-1"
      aria-labelledby="deleteRecordModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -69,8 +59,8 @@
                     <i class="ri-close-line me-1"></i>Cancelar
                 </button>
                 <form id="deleteRecordForm" method="POST" style="display:inline">
-                    @csrf
-                    @method('DELETE')
+                    <?php echo csrf_field(); ?>
+                    <?php echo method_field('DELETE'); ?>
                     <button type="submit" class="btn btn-danger px-4">
                         <i class="ri-delete-bin-line me-1"></i>Eliminar
                     </button>
@@ -104,3 +94,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+<?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-tables/partials/modal-delete.blade.php ENDPATH**/ ?>

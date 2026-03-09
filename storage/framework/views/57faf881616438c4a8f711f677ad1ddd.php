@@ -1,12 +1,10 @@
-{{-- resources/views/voting-tables/show.blade.php --}}
-@extends('layouts.master')
+<?php $__env->startSection('title'); ?>
+    Mesa <?php echo e($votingTable->oep_code ?? $votingTable->internal_code); ?>
 
-@section('title')
-    Mesa {{ $votingTable->oep_code ?? $votingTable->internal_code }}
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('css')
-    <link href="{{ URL::asset('build/libs/apexcharts/apexcharts.min.css') }}" rel="stylesheet" />
+<?php $__env->startSection('css'); ?>
+    <link href="<?php echo e(URL::asset('build/libs/apexcharts/apexcharts.min.css')); ?>" rel="stylesheet" />
     <style>
         .info-box {
             background: #f8f9fa;
@@ -63,19 +61,20 @@
             padding: 0.5rem 1rem;
         }
     </style>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('content')
-    @component('components.breadcrumb')
-        @slot('li_1')
-            <a href="{{ route('voting-tables.index') }}">Mesas</a>
-        @endslot
-        @slot('title')
-            Mesa {{ $votingTable->oep_code ?? $votingTable->internal_code }}
-        @endslot
-    @endcomponent
+<?php $__env->startSection('content'); ?>
+    <?php $__env->startComponent('components.breadcrumb'); ?>
+        <?php $__env->slot('li_1'); ?>
+            <a href="<?php echo e(route('voting-tables.index')); ?>">Mesas</a>
+        <?php $__env->endSlot(); ?>
+        <?php $__env->slot('title'); ?>
+            Mesa <?php echo e($votingTable->oep_code ?? $votingTable->internal_code); ?>
 
-    @php
+        <?php $__env->endSlot(); ?>
+    <?php echo $__env->renderComponent(); ?>
+
+    <?php
         $latestElection = $votingTable->elections->sortByDesc('updated_at')->first();
         $status = $latestElection?->status ?? 'configurada';
         $totalVoters = $votingTable->elections->sum('total_voters');
@@ -107,7 +106,7 @@
             'transmitida' => 'Transmitida',
             'anulada' => 'Anulada'
         ];
-    @endphp
+    ?>
 
     <div class="row">
         <div class="col-lg-12">
@@ -118,61 +117,63 @@
                         Detalles de la Mesa de Votación
                     </h4>
                     <div>
-                        @can('edit_mesas')
-                        <a href="{{ route('voting-tables.edit', $votingTable->id) }}" class="btn btn-warning btn-sm">
+                        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('edit_mesas')): ?>
+                        <a href="<?php echo e(route('voting-tables.edit', $votingTable->id)); ?>" class="btn btn-warning btn-sm">
                             <i class="ri-pencil-line me-1"></i>Editar
                         </a>
-                        @endcan
-                        <a href="{{ route('voting-tables.election-config', $votingTable->id) }}" class="btn btn-info btn-sm">
+                        <?php endif; ?>
+                        <a href="<?php echo e(route('voting-tables.election-config', $votingTable->id)); ?>" class="btn btn-info btn-sm">
                             <i class="ri-settings-4-line me-1"></i>Configuración Electoral
                         </a>
-                        <a href="{{ route('voting-tables.index') }}" class="btn btn-secondary btn-sm">
+                        <a href="<?php echo e(route('voting-tables.index')); ?>" class="btn btn-secondary btn-sm">
                             <i class="ri-arrow-left-line me-1"></i>Volver
                         </a>
                     </div>
                 </div>
                 <div class="card-body">
+                    <!-- Estado y Progreso -->
                     <div class="row mb-4">
                         <div class="col-md-4">
                             <div class="info-box">
                                 <h5 class="mb-3">Estado de la Mesa</h5>
                                 <div class="text-center">
-                                    <span class="badge bg-{{ $statusColors[$status] ?? 'secondary' }} status-badge">
-                                        {{ $statusLabels[$status] ?? $status }}
+                                    <span class="badge bg-<?php echo e($statusColors[$status] ?? 'secondary'); ?> status-badge">
+                                        <?php echo e($statusLabels[$status] ?? $status); ?>
+
                                     </span>
                                 </div>
-                                @if($status == 'observada')
+                                <?php if($status == 'observada'): ?>
                                     <div class="alert alert-danger mt-3 mb-0">
                                         <i class="ri-alert-line me-1"></i>
                                         Esta mesa tiene observaciones pendientes
                                     </div>
-                                @endif
+                                <?php endif; ?>
                             </div>
                         </div>
 
                         <div class="col-md-4">
                             <div class="info-box">
                                 <h5 class="mb-3">Progreso de Votación</h5>
-                                @php
+                                <?php
                                     $progress = $votingTable->expected_voters > 0
                                         ? round(($totalVoters / $votingTable->expected_voters) * 100, 1)
                                         : 0;
-                                @endphp
-                                <h2 class="text-center mb-3">{{ $progress }}%</h2>
+                                ?>
+                                <h2 class="text-center mb-3"><?php echo e($progress); ?>%</h2>
                                 <div class="progress mb-3">
                                     <div class="progress-bar bg-success" role="progressbar"
-                                         style="width: {{ $progress }}%;"
-                                         aria-valuenow="{{ $progress }}"
+                                         style="width: <?php echo e($progress); ?>%;"
+                                         aria-valuenow="<?php echo e($progress); ?>"
                                          aria-valuemin="0"
                                          aria-valuemax="100"></div>
                                 </div>
                                 <div class="row text-center">
                                     <div class="col-6">
-                                        <strong>{{ number_format($totalVoters) }}</strong>
+                                        <strong><?php echo e(number_format($totalVoters)); ?></strong>
                                         <small class="d-block text-muted">Votaron</small>
                                     </div>
                                     <div class="col-6">
-                                        <strong>{{ number_format($votingTable->expected_voters - $totalVoters) }}</strong>
+                                        <strong><?php echo e(number_format($votingTable->expected_voters - $totalVoters)); ?></strong>
                                         <small class="d-block text-muted">Faltan</small>
                                     </div>
                                 </div>
@@ -184,19 +185,19 @@
                                 <h5 class="mb-3">Cómputo de Papeletas</h5>
                                 <div class="row text-center">
                                     <div class="col-6">
-                                        <h4 class="text-primary">{{ number_format($ballotsReceived) }}</h4>
+                                        <h4 class="text-primary"><?php echo e(number_format($ballotsReceived)); ?></h4>
                                         <small class="text-muted">Recibidas</small>
                                     </div>
                                     <div class="col-6">
-                                        <h4 class="text-success">{{ number_format($ballotsUsed) }}</h4>
+                                        <h4 class="text-success"><?php echo e(number_format($ballotsUsed)); ?></h4>
                                         <small class="text-muted">Usadas</small>
                                     </div>
                                     <div class="col-6 mt-2">
-                                        <h4 class="text-warning">{{ number_format($ballotsLeftover) }}</h4>
+                                        <h4 class="text-warning"><?php echo e(number_format($ballotsLeftover)); ?></h4>
                                         <small class="text-muted">Sobrantes</small>
                                     </div>
                                     <div class="col-6 mt-2">
-                                        <h4 class="text-danger">{{ number_format($ballotsSpoiled) }}</h4>
+                                        <h4 class="text-danger"><?php echo e(number_format($ballotsSpoiled)); ?></h4>
                                         <small class="text-muted">Deterioradas</small>
                                     </div>
                                 </div>
@@ -216,57 +217,59 @@
                                     <tr>
                                         <td class="info-label">Código OEP:</td>
                                         <td class="info-value">
-                                            <span class="badge bg-primary code-badge">{{ $votingTable->oep_code ?? 'N/A' }}</span>
+                                            <span class="badge bg-primary code-badge"><?php echo e($votingTable->oep_code ?? 'N/A'); ?></span>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Código Interno:</td>
                                         <td class="info-value">
-                                            <span class="badge bg-info code-badge">{{ $votingTable->internal_code ?? 'N/A' }}</span>
+                                            <span class="badge bg-info code-badge"><?php echo e($votingTable->internal_code ?? 'N/A'); ?></span>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Número de Mesa:</td>
                                         <td class="info-value">
-                                            <strong>{{ $votingTable->number }}</strong>
-                                            @if($votingTable->letter)
-                                                <span class="badge bg-secondary ms-1">Letra {{ $votingTable->letter }}</span>
-                                            @endif
+                                            <strong><?php echo e($votingTable->number); ?></strong>
+                                            <?php if($votingTable->letter): ?>
+                                                <span class="badge bg-secondary ms-1">Letra <?php echo e($votingTable->letter); ?></span>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Tipo:</td>
                                         <td class="info-value">
-                                            @php
+                                            <?php
                                                 $typeLabels = [
                                                     'mixta' => 'Mixta',
                                                     'masculina' => 'Masculina',
                                                     'femenina' => 'Femenina'
                                                 ];
-                                            @endphp
-                                            {{ $typeLabels[$votingTable->type] ?? $votingTable->type }}
+                                            ?>
+                                            <?php echo e($typeLabels[$votingTable->type] ?? $votingTable->type); ?>
+
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Recinto:</td>
                                         <td class="info-value">
-                                            <strong>{{ $votingTable->institution->name ?? 'N/A' }}</strong>
+                                            <strong><?php echo e($votingTable->institution->name ?? 'N/A'); ?></strong>
                                             <br>
-                                            <small class="text-muted">{{ $votingTable->institution->code ?? '' }}</small>
+                                            <small class="text-muted"><?php echo e($votingTable->institution->code ?? ''); ?></small>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Municipio:</td>
-                                        <td class="info-value">{{ $votingTable->institution->municipality->name ?? 'N/A' }}</td>
+                                        <td class="info-value"><?php echo e($votingTable->institution->municipality->name ?? 'N/A'); ?></td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Tipo de Elección:</td>
-                                        <td class="info-value">{{ $votingTable->electionType?->name ?? 'N/A' }}</td>
+                                        <td class="info-value"><?php echo e($votingTable->electionType?->name ?? 'N/A'); ?></td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Fecha Elección:</td>
                                         <td class="info-value">
-                                            {{ $latestElection && $latestElection->election_date ? \Carbon\Carbon::parse($latestElection->election_date)->format('d/m/Y') : 'No definida' }}
+                                            <?php echo e($latestElection && $latestElection->election_date ? \Carbon\Carbon::parse($latestElection->election_date)->format('d/m/Y') : 'No definida'); ?>
+
                                         </td>
                                     </tr>
                                 </table>
@@ -281,11 +284,11 @@
                                 <table class="table table-borderless">
                                     <tr>
                                         <td class="info-label">Hora de Apertura:</td>
-                                        <td class="info-value">{{ $latestElection && $latestElection->opening_time ? \Carbon\Carbon::parse($latestElection->opening_time)->format('H:i') : 'No registrada' }}</td>
+                                        <td class="info-value"><?php echo e($latestElection && $latestElection->opening_time ? \Carbon\Carbon::parse($latestElection->opening_time)->format('H:i') : 'No registrada'); ?></td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Hora de Cierre:</td>
-                                        <td class="info-value">{{ $latestElection && $latestElection->closing_time ? \Carbon\Carbon::parse($latestElection->closing_time)->format('H:i') : 'No registrada' }}</td>
+                                        <td class="info-value"><?php echo e($latestElection && $latestElection->closing_time ? \Carbon\Carbon::parse($latestElection->closing_time)->format('H:i') : 'No registrada'); ?></td>
                                     </tr>
                                 </table>
                             </div>
@@ -303,7 +306,7 @@
                                         <div class="card bg-primary-subtle">
                                             <div class="card-body text-center">
                                                 <h6 class="text-muted">Desde</h6>
-                                                <h5>{{ $votingTable->voter_range_start_name ?? 'N/A' }}</h5>
+                                                <h5><?php echo e($votingTable->voter_range_start_name ?? 'N/A'); ?></h5>
                                             </div>
                                         </div>
                                     </div>
@@ -311,13 +314,13 @@
                                         <div class="card bg-info-subtle">
                                             <div class="card-body text-center">
                                                 <h6 class="text-muted">Hasta</h6>
-                                                <h5>{{ $votingTable->voter_range_end_name ?? 'N/A' }}</h5>
+                                                <h5><?php echo e($votingTable->voter_range_end_name ?? 'N/A'); ?></h5>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="text-center mt-3">
-                                    <strong>Total Habilitados: {{ number_format($votingTable->expected_voters) }}</strong>
+                                    <strong>Total Habilitados: <?php echo e(number_format($votingTable->expected_voters)); ?></strong>
                                 </div>
                             </div>
 
@@ -330,19 +333,19 @@
                                 <table class="table table-borderless">
                                     <tr>
                                         <td class="info-label">Papeletas Recibidas:</td>
-                                        <td class="info-value">{{ number_format($ballotsReceived) }}</td>
+                                        <td class="info-value"><?php echo e(number_format($ballotsReceived)); ?></td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Papeletas Usadas:</td>
-                                        <td class="info-value">{{ number_format($ballotsUsed) }}</td>
+                                        <td class="info-value"><?php echo e(number_format($ballotsUsed)); ?></td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Papeletas Sobrantes:</td>
-                                        <td class="info-value">{{ number_format($ballotsLeftover) }}</td>
+                                        <td class="info-value"><?php echo e(number_format($ballotsLeftover)); ?></td>
                                     </tr>
                                     <tr>
                                         <td class="info-label">Papeletas Deterioradas:</td>
-                                        <td class="info-value">{{ number_format($ballotsSpoiled) }}</td>
+                                        <td class="info-value"><?php echo e(number_format($ballotsSpoiled)); ?></td>
                                     </tr>
                                 </table>
                             </div>
@@ -358,7 +361,7 @@
                                     Delegados de Mesa
                                 </h5>
                                 <div class="row">
-                                    @php
+                                    <?php
                                         $delegates = [
                                             'president' => ['label' => 'Presidente', 'color' => 'primary'],
                                             'secretary' => ['label' => 'Secretario', 'color' => 'success'],
@@ -366,59 +369,61 @@
                                             'vocal2' => ['label' => 'Vocal 2', 'color' => 'warning'],
                                             'vocal3' => ['label' => 'Vocal 3', 'color' => 'secondary'],
                                         ];
-                                    @endphp
+                                    ?>
 
-                                    @foreach($delegates as $relation => $info)
-                                        @php
+                                    <?php $__currentLoopData = $delegates; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $relation => $info): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <?php
                                             $delegate = $votingTable->$relation;
-                                        @endphp
+                                        ?>
                                         <div class="col-md-4 col-lg-2 mb-3">
                                             <div class="delegate-card">
-                                                @if($delegate)
-                                                    <div class="delegate-avatar bg-{{ $info['color'] }}">
-                                                        {{ strtoupper(substr($delegate->name, 0, 1)) }}{{ strtoupper(substr($delegate->last_name ?? '', 0, 1)) }}
+                                                <?php if($delegate): ?>
+                                                    <div class="delegate-avatar bg-<?php echo e($info['color']); ?>">
+                                                        <?php echo e(strtoupper(substr($delegate->name, 0, 1))); ?><?php echo e(strtoupper(substr($delegate->last_name ?? '', 0, 1))); ?>
+
                                                     </div>
-                                                    <h6 class="mb-1">{{ $delegate->name }} {{ $delegate->last_name }}</h6>
-                                                    <small class="text-muted d-block">{{ $info['label'] }}</small>
-                                                    <small class="text-muted">{{ $delegate->email }}</small>
-                                                @else
+                                                    <h6 class="mb-1"><?php echo e($delegate->name); ?> <?php echo e($delegate->last_name); ?></h6>
+                                                    <small class="text-muted d-block"><?php echo e($info['label']); ?></small>
+                                                    <small class="text-muted"><?php echo e($delegate->email); ?></small>
+                                                <?php else: ?>
                                                     <div class="delegate-avatar bg-light text-muted">
                                                         <i class="ri-user-line fs-2"></i>
                                                     </div>
                                                     <h6 class="mb-1 text-muted">No asignado</h6>
-                                                    <small class="text-muted d-block">{{ $info['label'] }}</small>
+                                                    <small class="text-muted d-block"><?php echo e($info['label']); ?></small>
                                                     <small class="text-muted">Disponible</small>
-                                                @endif
+                                                <?php endif; ?>
                                             </div>
                                         </div>
-                                    @endforeach
+                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
 
-                                    @if($votingTable->vocal4)
+                                    <?php if($votingTable->vocal4): ?>
                                     <div class="col-md-4 col-lg-2 mb-3">
                                         <div class="delegate-card">
                                             <div class="delegate-avatar bg-dark">
-                                                {{ strtoupper(substr($votingTable->vocal4->name, 0, 1)) }}{{ strtoupper(substr($votingTable->vocal4->last_name ?? '', 0, 1)) }}
+                                                <?php echo e(strtoupper(substr($votingTable->vocal4->name, 0, 1))); ?><?php echo e(strtoupper(substr($votingTable->vocal4->last_name ?? '', 0, 1))); ?>
+
                                             </div>
-                                            <h6 class="mb-1">{{ $votingTable->vocal4->name }} {{ $votingTable->vocal4->last_name }}</h6>
+                                            <h6 class="mb-1"><?php echo e($votingTable->vocal4->name); ?> <?php echo e($votingTable->vocal4->last_name); ?></h6>
                                             <small class="text-muted d-block">Vocal 4</small>
-                                            <small class="text-muted">{{ $votingTable->vocal4->email }}</small>
+                                            <small class="text-muted"><?php echo e($votingTable->vocal4->email); ?></small>
                                         </div>
                                     </div>
-                                    @endif
+                                    <?php endif; ?>
                                 </div>
-                                @can('edit_mesas')
+                                <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('edit_mesas')): ?>
                                 <div class="text-end mt-3">
-                                    <a href="{{ route('voting-tables.assign-delegates', $votingTable->id) }}" class="btn btn-sm btn-primary">
+                                    <a href="<?php echo e(route('voting-tables.assign-delegates', $votingTable->id)); ?>" class="btn btn-sm btn-primary">
                                         <i class="ri-user-add-line me-1"></i>Asignar Delegados
                                     </a>
                                 </div>
-                                @endcan
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
 
                     <!-- Observaciones -->
-                    @if($votingTable->observations)
+                    <?php if($votingTable->observations): ?>
                     <div class="row mt-3">
                         <div class="col-12">
                             <div class="info-box">
@@ -426,11 +431,11 @@
                                     <i class="ri-chat-1-line me-1"></i>
                                     Observaciones
                                 </h5>
-                                <p class="mb-0">{{ $votingTable->observations }}</p>
+                                <p class="mb-0"><?php echo e($votingTable->observations); ?></p>
                             </div>
                         </div>
                     </div>
-                    @endif
+                    <?php endif; ?>
 
                     <!-- Auditoría -->
                     <div class="row mt-3">
@@ -443,22 +448,22 @@
                                 <div class="row">
                                     <div class="col-md-3">
                                         <small class="text-muted d-block">Creado por:</small>
-                                        <strong>{{ $votingTable->createdBy->name ?? 'Sistema' }}</strong>
+                                        <strong><?php echo e($votingTable->createdBy->name ?? 'Sistema'); ?></strong>
                                     </div>
                                     <div class="col-md-3">
                                         <small class="text-muted d-block">Fecha creación:</small>
-                                        <strong>{{ $votingTable->created_at?->format('d/m/Y H:i') ?? 'N/A' }}</strong>
+                                        <strong><?php echo e($votingTable->created_at?->format('d/m/Y H:i') ?? 'N/A'); ?></strong>
                                     </div>
-                                    @if($votingTable->updatedBy)
+                                    <?php if($votingTable->updatedBy): ?>
                                     <div class="col-md-3">
                                         <small class="text-muted d-block">Actualizado por:</small>
-                                        <strong>{{ $votingTable->updatedBy->name }}</strong>
+                                        <strong><?php echo e($votingTable->updatedBy->name); ?></strong>
                                     </div>
                                     <div class="col-md-3">
                                         <small class="text-muted d-block">Fecha actualización:</small>
-                                        <strong>{{ $votingTable->updated_at?->format('d/m/Y H:i') ?? 'N/A' }}</strong>
+                                        <strong><?php echo e($votingTable->updated_at?->format('d/m/Y H:i') ?? 'N/A'); ?></strong>
                                     </div>
-                                    @endif
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -467,19 +472,19 @@
             </div>
         </div>
     </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('script')
-    <script src="{{ URL::asset('build/libs/apexcharts/apexcharts.min.js') }}"></script>
-    @if($votingTable->votes->count() > 0)
+<?php $__env->startSection('script'); ?>
+    <script src="<?php echo e(URL::asset('build/libs/apexcharts/apexcharts.min.js')); ?>"></script>
+    <?php if($votingTable->votes->count() > 0): ?>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var options = {
                 series: [{
                     data: [
-                        @foreach($votingTable->votes as $vote)
-                            {{ $vote->quantity }},
-                        @endforeach
+                        <?php $__currentLoopData = $votingTable->votes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $vote): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <?php echo e($vote->quantity); ?>,
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     ]
                 }],
                 chart: {
@@ -494,9 +499,9 @@
                 },
                 xaxis: {
                     categories: [
-                        @foreach($votingTable->votes as $vote)
-                            '{{ $vote->candidate->name ?? "N/A" }}',
-                        @endforeach
+                        <?php $__currentLoopData = $votingTable->votes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $vote): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            '<?php echo e($vote->candidate->name ?? "N/A"); ?>',
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     ],
                 },
                 colors: ['#0ab39c'],
@@ -514,5 +519,7 @@
             chart.render();
         });
     </script>
-    @endif
-@endsection
+    <?php endif; ?>
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.master', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-tables/show.blade.php ENDPATH**/ ?>

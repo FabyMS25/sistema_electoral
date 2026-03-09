@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Institution extends Model
 {
     use HasFactory, SoftDeletes;
+
     protected $fillable = [
         'code',
         'name',
@@ -37,6 +39,7 @@ class Institution extends Model
         'created_by',
         'updated_by',
     ];
+
     protected $casts = [
         'is_operative'           => 'boolean',
         'registered_citizens'    => 'integer',
@@ -52,6 +55,7 @@ class Institution extends Model
     protected static function boot()
     {
         parent::boot();
+
         static::creating(function ($model) {
             if (empty($model->code)) {
                 $model->code = static::generateUniqueCode();
@@ -66,61 +70,132 @@ class Institution extends Model
         return 'INST' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
     }
 
+    // =========================================================================
+    // RELATIONSHIPS
+    // =========================================================================
+
     public function municipality(): BelongsTo
     {
         return $this->belongsTo(Municipality::class);
     }
+
     public function locality(): BelongsTo
     {
         return $this->belongsTo(Locality::class);
     }
+
     public function district(): BelongsTo
     {
         return $this->belongsTo(District::class);
     }
+
     public function zone(): BelongsTo
     {
         return $this->belongsTo(Zone::class);
     }
+
     public function votingTables(): HasMany
     {
         return $this->hasMany(VotingTable::class);
     }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
     }
 
+    // =========================================================================
+    // CONVENIENCE ACCESSORS
+    // Province and Department are reached through Municipality.
+    // There are no province_id / department_id columns on the institutions table.
+    // Usage: $institution->province  /  $institution->department
+    // =========================================================================
+
     public function getProvinceAttribute(): ?Province
     {
         return $this->municipality?->province;
     }
+
     public function getDepartmentAttribute(): ?Department
     {
         return $this->municipality?->province?->department;
     }
 
+    // =========================================================================
+    // SCOPES
+    // =========================================================================
+
+    /** Physical building is open and usable. */
     public function scopeActive($query)
     {
         return $query->where('status', 'activo');
     }
+
+    /** Included in the current election cycle. */
     public function scopeOperative($query)
     {
         return $query->where('is_operative', true);
     }
+
+    /**
+     * Active building AND included in elections.
+     * Use this in 95% of election-day queries instead of chaining both.
+     */
+    public function scopeForElections($query)
+    {
+        return $query->where('status', 'activo')->where('is_operative', true);
+    }
+
     public function scopeByMunicipality($query, $municipalityId)
     {
         return $query->where('municipality_id', $municipalityId);
     }
 
+    // ── State helpers ─────────────────────────────────────────────────────────
+
+    public function isActive(): bool        { return $this->status === 'activo'; }
+    public function isInMaintenance(): bool { return $this->status === 'en_mantenimiento'; }
+    public function isInactive(): bool      { return $this->status === 'inactivo'; }
+
+    /**
+     * True only when building is open AND included in elections.
+     * Check this before allowing vote registration on a table.
+     */
+    public function isReadyForElections(): bool
+    {
+        return $this->status === 'activo' && $this->is_operative;
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            'activo'           => 'Activo',
+            'inactivo'         => 'Inactivo',
+            'en_mantenimiento' => 'En mantenimiento',
+            default            => $this->status,
+        };
+    }
+
+    // =========================================================================
+    // BUSINESS LOGIC
+    // =========================================================================
+
+    /**
+     * Recomputes the institution's aggregate counters from its voting tables
+     * and their VotingTableElection pivot rows.
+     */
     public function updateTotals(): void
     {
+        // ✅ FIXED: eager load tableElections to avoid N+1 inside filter closures
         $tables = $this->votingTables()->with('tableElections')->get();
+
         $totalTables = $tables->count();
+
         $computed = $tables->filter(function ($table) {
             return $table->tableElections->every(
                 fn($te) => in_array($te->status, [
@@ -129,11 +204,13 @@ class Institution extends Model
                 ])
             );
         })->count();
+
         $annulled = $tables->filter(function ($table) {
             return $table->tableElections->contains(
                 fn($te) => $te->status === VotingTableElection::STATUS_ANULADA
             );
         })->count();
+
         $pending = $tables->filter(function ($table) {
             return $table->tableElections->contains(
                 fn($te) => in_array($te->status, [
@@ -142,6 +219,7 @@ class Institution extends Model
                 ])
             );
         })->count();
+
         $this->update([
             'total_voting_tables'    => $totalTables,
             'total_computed_records' => $computed,
@@ -156,6 +234,10 @@ class Institution extends Model
         return $this->votingTables()->sum('expected_voters');
     }
 
+    // =========================================================================
+    // DISPLAY HELPERS
+    // =========================================================================
+
     public function getFullAddressAttribute(): string
     {
         $parts = array_filter([
@@ -165,8 +247,10 @@ class Institution extends Model
             $this->municipality?->province?->name,
             $this->municipality?->province?->department?->name,
         ]);
+
         return implode(', ', $parts);
     }
+
     public function getStatusBadgeAttribute(): string
     {
         return match ($this->status) {

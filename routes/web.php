@@ -50,15 +50,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/template', [InstitutionController::class, 'downloadTemplate'])->name('template');
         Route::post('/import', [InstitutionController::class, 'import'])->name('import');
         Route::post('/delete-multiple', [InstitutionController::class, 'deleteMultiple'])->name('deleteMultiple');
-
-        // Carga dinámica (CORREGIDO - sin parámetros en el nombre de la ruta)
         Route::get('/provinces/{department}', [InstitutionController::class, 'getProvinces'])->name('provinces');
         Route::get('/municipalities/{province}', [InstitutionController::class, 'getMunicipalities'])->name('municipalities');
         Route::get('/localities/{municipality}', [InstitutionController::class, 'getLocalities'])->name('localities');
         Route::get('/districts/{locality}', [InstitutionController::class, 'getDistricts'])->name('districts');
         Route::get('/zones/{district}', [InstitutionController::class, 'getZones'])->name('zones');
-
-        // CRUD
         Route::get('/', [InstitutionController::class, 'index'])->name('index');
         Route::get('/create', [InstitutionController::class, 'create'])->name('create');
         Route::post('/', [InstitutionController::class, 'store'])->name('store');
@@ -85,6 +81,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/{voting_table}', [VotingTableController::class, 'destroy'])->name('destroy');
         Route::get('/{voting_table}/assign-delegates', [VotingTableController::class, 'assignDelegatesForm'])->name('assign-delegates');
         Route::post('/{voting_table}/assign-delegates', [VotingTableController::class, 'assignDelegates'])->name('assign-delegates.store');
+        Route::get('/{voting_table}/election-config', [VotingTableController::class, 'electionConfig'])->name('election-config');
+        Route::post('/{voting_table}/election-config', [VotingTableController::class, 'updateElectionConfig'])->name('election-config.update');
     });
 
     // ===== CANDIDATOS =====

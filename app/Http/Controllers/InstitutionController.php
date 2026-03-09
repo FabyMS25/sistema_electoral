@@ -84,33 +84,36 @@ class InstitutionController extends Controller
 
     private function validationRules($id = null)
     {
+        $nameUnique = 'required|string|max:255|unique:institutions,name' . ($id ? ','.$id : '');
+        $codeUnique = 'nullable|string|max:20|unique:institutions,code'  . ($id ? ','.$id : '');
+
         return [
-            'name' => 'required|string|max:255|unique:institutions,name,' . $id,
-            'short_name' => 'nullable|string|max:100',
-            'code' => 'nullable|string|max:20|unique:institutions,code,' . $id,
+            'name' => $nameUnique,
+            'code' => $codeUnique,
 
-            'department_id' => 'required|exists:departments,id',
-            'province_id' => 'required|exists:provinces,id',
+            'short_name'      => 'nullable|string|max:100',
+            'department_id'   => 'required|exists:departments,id',
+            'province_id'     => 'required|exists:provinces,id',
             'municipality_id' => 'required|exists:municipalities,id',
-            'locality_id' => 'required|exists:localities,id',
-            'district_id' => 'nullable|exists:districts,id',
-            'zone_id' => 'nullable|exists:zones,id',
+            'locality_id'     => 'required|exists:localities,id',
+            'district_id'     => 'nullable|exists:districts,id',
+            'zone_id'         => 'nullable|exists:zones,id',
 
-            'address' => 'nullable|string|max:500',
-            'reference' => 'nullable|string|max:255',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
+            'address'          => 'nullable|string|max:500',
+            'reference'        => 'nullable|string|max:255',
+            'latitude'         => 'nullable|numeric|between:-90,90',
+            'longitude'        => 'nullable|numeric|between:-180,180',
 
-            'phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255',
+            'phone'            => 'nullable|string|max:20',
+            'email'            => 'nullable|email|max:255',
             'responsible_name' => 'nullable|string|max:255',
 
-            'registered_citizens' => 'nullable|integer|min:0',
+            'registered_citizens'    => 'nullable|integer|min:0',
             'total_computed_records' => 'nullable|integer|min:0',
             'total_annulled_records' => 'nullable|integer|min:0',
-            'total_enabled_records' => 'nullable|integer|min:0',
+            'total_enabled_records'  => 'nullable|integer|min:0',
 
-            'status' => 'nullable|in:activo,inactivo,en_mantenimiento',
+            'status'       => 'nullable|in:activo,inactivo,en_mantenimiento',
             'is_operative' => 'nullable|boolean',
             'observations' => 'nullable|string',
         ];

@@ -1,13 +1,11 @@
-{{-- resources/views/voting-tables/create.blade.php --}}
-@extends('layouts.master')
-@section('title', 'Crear Mesa')
+<?php $__env->startSection('title', 'Crear Mesa'); ?>
 
-@section('content')
-    @component('components.breadcrumb')
-        @slot('li_1') Mesas @endslot
-        @slot('li_2') <a href="{{ route('voting-tables.index') }}">Lista de Mesas</a> @endslot
-        @slot('title') Crear Nueva Mesa @endslot
-    @endcomponent
+<?php $__env->startSection('content'); ?>
+    <?php $__env->startComponent('components.breadcrumb'); ?>
+        <?php $__env->slot('li_1'); ?> Mesas <?php $__env->endSlot(); ?>
+        <?php $__env->slot('li_2'); ?> <a href="<?php echo e(route('voting-tables.index')); ?>">Lista de Mesas</a> <?php $__env->endSlot(); ?>
+        <?php $__env->slot('title'); ?> Crear Nueva Mesa <?php $__env->endSlot(); ?>
+    <?php echo $__env->renderComponent(); ?>
 
     <div class="row">
         <div class="col-lg-12">
@@ -19,13 +17,7 @@
                     </h4>
                 </div>
                 <div class="card-body">
-                    {{--
-                        form-fields only collects voting_tables columns.
-                        Election-level data (ballots, status, times) is managed
-                        via "Configuración Electoral" after the table is created.
-                        The controller auto-creates a VotingTableElection row for
-                        every currently active ElectionType on store().
-                    --}}
+                    
                     <div class="alert alert-info py-2">
                         <i class="ri-information-line me-1"></i>
                         Los campos marcados con <span class="text-danger">*</span> son obligatorios.
@@ -33,19 +25,19 @@
                         <strong>Configuración Electoral</strong> en la vista de detalle, una vez creada la mesa.
                     </div>
 
-                    <form action="{{ route('voting-tables.store') }}" method="POST" id="votingTableForm">
-                        @csrf
+                    <form action="<?php echo e(route('voting-tables.store')); ?>" method="POST" id="votingTableForm">
+                        <?php echo csrf_field(); ?>
 
-                        @include('voting-tables.partials.form-fields', [
+                        <?php echo $__env->make('voting-tables.partials.form-fields', [
                             'votingTable'  => null,
                             'institutions' => $institutions,
                             'users'        => $users,
-                        ])
+                        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
                         <hr class="my-4">
 
                         <div class="d-flex justify-content-end gap-2">
-                            <a href="{{ route('voting-tables.index') }}" class="btn btn-secondary">
+                            <a href="<?php echo e(route('voting-tables.index')); ?>" class="btn btn-secondary">
                                 <i class="ri-close-line me-1"></i>Cancelar
                             </a>
                             <button type="submit" class="btn btn-primary">
@@ -57,9 +49,9 @@
             </div>
         </div>
     </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('script')
+<?php $__env->startSection('script'); ?>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Init tooltips
@@ -67,5 +59,7 @@
               .forEach(el => new bootstrap.Tooltip(el));
         });
     </script>
-    @include('voting-tables.scripts.voting-table-js')
-@endsection
+    <?php echo $__env->make('voting-tables.scripts.voting-table-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.master', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-tables/create.blade.php ENDPATH**/ ?>

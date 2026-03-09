@@ -1,12 +1,9 @@
-{{-- resources/views/voting-tables/edit.blade.php --}}
-@extends('layouts.master')
-
-@section('title')
+<?php $__env->startSection('title'); ?>
     Editar Mesa
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('css')
-    <link href="{{ URL::asset('build/libs/choices.js/public/assets/styles/choices.min.css') }}" rel="stylesheet" />
+<?php $__env->startSection('css'); ?>
+    <link href="<?php echo e(URL::asset('build/libs/choices.js/public/assets/styles/choices.min.css')); ?>" rel="stylesheet" />
     <style>
         .required-field label:after {
             content: " *";
@@ -20,20 +17,20 @@
             border-radius: 0.25rem;
         }
     </style>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('content')
-    @component('components.breadcrumb')
-        @slot('li_1')
-            <a href="{{ route('voting-tables.index') }}">Mesas</a>
-        @endslot
-        @slot('li_2')
-            <a href="{{ route('voting-tables.show', $votingTable->id) }}">Mesa {{ $votingTable->oep_code ?? $votingTable->internal_code }}</a>
-        @endslot
-        @slot('title')
+<?php $__env->startSection('content'); ?>
+    <?php $__env->startComponent('components.breadcrumb'); ?>
+        <?php $__env->slot('li_1'); ?>
+            <a href="<?php echo e(route('voting-tables.index')); ?>">Mesas</a>
+        <?php $__env->endSlot(); ?>
+        <?php $__env->slot('li_2'); ?>
+            <a href="<?php echo e(route('voting-tables.show', $votingTable->id)); ?>">Mesa <?php echo e($votingTable->oep_code ?? $votingTable->internal_code); ?></a>
+        <?php $__env->endSlot(); ?>
+        <?php $__env->slot('title'); ?>
             Editar Mesa
-        @endslot
-    @endcomponent
+        <?php $__env->endSlot(); ?>
+    <?php echo $__env->renderComponent(); ?>
 
     <div class="row">
         <div class="col-lg-12">
@@ -41,13 +38,14 @@
                 <div class="card-header">
                     <h4 class="card-title mb-0">
                         <i class="ri-edit-line me-1"></i>
-                        Editando Mesa: {{ $votingTable->oep_code ?? $votingTable->internal_code }} - N° {{ $votingTable->number }}
+                        Editando Mesa: <?php echo e($votingTable->oep_code ?? $votingTable->internal_code); ?> - N° <?php echo e($votingTable->number); ?>
+
                     </h4>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('voting-tables.update', $votingTable->id) }}" method="POST" id="votingTableForm">
-                        @csrf
-                        @method('PUT')
+                    <form action="<?php echo e(route('voting-tables.update', $votingTable->id)); ?>" method="POST" id="votingTableForm">
+                        <?php echo csrf_field(); ?>
+                        <?php echo method_field('PUT'); ?>
 
                         <div class="alert alert-info">
                             <i class="ri-information-line me-1"></i>
@@ -56,15 +54,15 @@
                             <small>Los datos electorales (papeletas, estado, horarios) se configuran por separado.</small>
                         </div>
 
-                        @include('voting-tables.partials.form-fields', [
+                        <?php echo $__env->make('voting-tables.partials.form-fields', [
                             'votingTable' => $votingTable,
                             'institutions' => $institutions,
                             'users' => $users
-                        ])
+                        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
                         <div class="row mt-4">
                             <div class="col-12 text-end">
-                                <a href="{{ route('voting-tables.show', $votingTable->id) }}" class="btn btn-secondary">
+                                <a href="<?php echo e(route('voting-tables.show', $votingTable->id)); ?>" class="btn btn-secondary">
                                     <i class="ri-close-line me-1"></i>Cancelar
                                 </a>
                                 <button type="submit" class="btn btn-primary">
@@ -77,11 +75,11 @@
             </div>
         </div>
     </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('script')
-    <script src="{{ URL::asset('build/libs/choices.js/public/assets/scripts/choices.min.js') }}"></script>
-    @include('voting-tables.scripts.voting-table-js')
+<?php $__env->startSection('script'); ?>
+    <script src="<?php echo e(URL::asset('build/libs/choices.js/public/assets/scripts/choices.min.js')); ?>"></script>
+    <?php echo $__env->make('voting-tables.scripts.voting-table-js', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -97,4 +95,6 @@
             }
         });
     </script>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.master', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-tables/edit.blade.php ENDPATH**/ ?>

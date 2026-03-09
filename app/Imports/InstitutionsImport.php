@@ -15,243 +15,257 @@ use Illuminate\Support\Facades\DB;
 
 class InstitutionsImport
 {
-    private $errors = [];
-    private $successCount = 0;
-    private $warnings = [];
+    private array $errors       = [];
+    private array $warnings     = [];
+    private int   $successCount = 0;
 
-    public function import($uploadedFile)
+    // ── Pre-loaded lookup maps (populated once before the row loop) ──────────
+    private array $deptLookup  = [];   // name_lower → Department
+    private array $provLookup  = [];   // "dept_id|name_lower" → Province
+    private array $munLookup   = [];   // "prov_id|name_lower" → Municipality
+    private array $locLookup   = [];   // "mun_id|name_lower"  → Locality
+    private array $distLookup  = [];   // "mun_id|name_lower"  → District
+    private array $zoneLookup  = [];   // "dist_id|name_lower" → Zone
+
+    // ── Column indices ────────────────────────────────────────────────────────
+    private const COL_CODE        = 0;
+    private const COL_NAME        = 1;
+    private const COL_SHORT_NAME  = 2;
+    private const COL_DEPARTMENT  = 3;
+    private const COL_PROVINCE    = 4;
+    private const COL_MUNICIPALITY= 5;
+    private const COL_LOCALITY    = 6;
+    private const COL_DISTRICT    = 7;
+    private const COL_ZONE        = 8;
+    private const COL_ADDRESS     = 9;
+    private const COL_REFERENCE   = 10;
+    private const COL_PHONE       = 11;
+    private const COL_EMAIL       = 12;
+    private const COL_RESPONSIBLE = 13;
+    private const COL_CITIZENS    = 14;
+    private const COL_STATUS      = 15;
+    private const COL_OPERATIVE   = 16;
+    private const COL_OBS         = 17;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    public function import($uploadedFile): array
     {
         try {
-            Log::info('Starting institutions import process', ['file' => $uploadedFile->getClientOriginalName()]);
+            Log::info('Starting institutions import', [
+                'file' => $uploadedFile->getClientOriginalName(),
+            ]);
+
             $filePath = $uploadedFile->store('imports');
             $fullPath = storage_path("app/{$filePath}");
+
             $spreadsheet = IOFactory::load($fullPath);
-            $sheet = $spreadsheet->getActiveSheet();
-            $rows = $sheet->toArray();
+            $sheet       = $spreadsheet->getActiveSheet();
+            $rows        = $sheet->toArray();
+
             if (empty($rows) || count($rows) < 2) {
                 throw new \Exception('El archivo está vacío o no tiene datos válidos.');
             }
-            DB::beginTransaction();
+
+            // Pre-load all geographic data into memory maps
+            $this->buildLookupMaps();
+
+            // ── Two-pass: validate first, then bulk insert ──
+            $toImport = [];
+
             foreach (array_slice($rows, 1) as $index => $row) {
+                $rowNum = $index + 2;
+
+                if (empty(array_filter(array_map('strval', $row)))) {
+                    continue; // blank row
+                }
+
                 try {
-                    $this->processRow($row, $index + 2);
+                    $data = $this->validateRow($row, $rowNum);
+                    if ($data !== null) {
+                        $toImport[] = $data;
+                    }
                 } catch (\Exception $e) {
-                    $this->errors[] = "Fila " . ($index + 2) . ": " . $e->getMessage();
+                    $this->errors[] = "Fila {$rowNum}: " . $e->getMessage();
                 }
             }
-            if (empty($this->errors)) {
-                DB::commit();
-                Log::info('Import completed successfully. Records: ' . $this->successCount);
-            } else {
-                DB::rollBack();
-                Log::warning('Import completed with errors. Success: ' . $this->successCount . ', Errors: ' . count($this->errors));
+
+            // Only commit if there are no hard errors
+            if (empty($this->errors) && !empty($toImport)) {
+                DB::transaction(function () use ($toImport) {
+                    foreach ($toImport as $data) {
+                        $existing = Institution::where('name', $data['name'])->first();
+                        if ($existing) {
+                            $existing->update($data);
+                        } else {
+                            Institution::create($data);
+                        }
+                        $this->successCount++;
+                    }
+                });
             }
+
             Storage::delete($filePath);
+
+            Log::info("Import finished. Success: {$this->successCount}, Errors: " . count($this->errors));
+
             return [
-                'success' => true,
-                'errors' => $this->errors,
-                'warnings' => $this->warnings,
-                'success_count' => $this->successCount
+                'success'       => true,
+                'errors'        => $this->errors,
+                'warnings'      => $this->warnings,
+                'success_count' => $this->successCount,
             ];
+
         } catch (\Exception $e) {
-            DB::rollBack();
             if (isset($filePath)) {
                 Storage::delete($filePath);
             }
-            Log::error('Import error: ' . $e->getMessage());
+            Log::error('Import fatal error: ' . $e->getMessage());
+
             return [
-                'success' => false,
-                'errors' => [$e->getMessage()],
-                'success_count' => 0
+                'success'       => false,
+                'errors'        => [$e->getMessage()],
+                'warnings'      => [],
+                'success_count' => 0,
             ];
         }
     }
 
-    private function processRow($row, $rowNumber)
+    // ── Build in-memory lookup maps (no N+1 per row) ─────────────────────────
+    private function buildLookupMaps(): void
     {
-        if (empty(array_filter($row))) {
-            return;
-        }
-        $colCode = 0;               // A - Código
-        $colName = 1;               // B - Nombre
-        $colShortName = 2;          // C - Nombre Corto
-        $colDepartment = 3;         // D - Departamento
-        $colProvince = 4;           // E - Provincia
-        $colMunicipality = 5;       // F - Municipio
-        $colLocality = 6;           // G - Localidad
-        $colDistrict = 7;           // H - Distrito
-        $colZone = 8;               // I - Zona
-        $colAddress = 9;            // J - Dirección
-        $colReference = 10;         // K - Referencia
-        $colPhone = 11;             // L - Teléfono
-        $colEmail = 12;             // M - Email
-        $colResponsible = 13;       // N - Responsable
-        $colCitizens = 14;          // O - Ciudadanos Habilitados
-        $colStatus = 15;            // P - Estado
-        $colOperative = 16;         // Q - Operativo
-        $colObservations = 17;      // R - Observaciones
+        Department::all()->each(function ($d) {
+            $this->deptLookup[mb_strtolower($d->name)] = $d;
+        });
 
-        if (empty(trim($row[$colName] ?? ''))) {
-            throw new \Exception("El nombre del recinto es requerido");
+        Province::all()->each(function ($p) {
+            $key = $p->department_id . '|' . mb_strtolower($p->name);
+            $this->provLookup[$key] = $p;
+        });
+
+        Municipality::all()->each(function ($m) {
+            $key = $m->province_id . '|' . mb_strtolower($m->name);
+            $this->munLookup[$key] = $m;
+        });
+
+        Locality::all()->each(function ($l) {
+            $key = $l->municipality_id . '|' . mb_strtolower($l->name);
+            $this->locLookup[$key] = $l;
+        });
+
+        District::all()->each(function ($d) {
+            $key = $d->municipality_id . '|' . mb_strtolower($d->name);
+            $this->distLookup[$key] = $d;
+        });
+
+        Zone::all()->each(function ($z) {
+            $key = $z->district_id . '|' . mb_strtolower($z->name);
+            $this->zoneLookup[$key] = $z;
+        });
+    }
+
+    // ── Validate one row and return the data array (or null to skip) ──────────
+    private function validateRow(array $row, int $rowNum): ?array
+    {
+        $name = trim($row[self::COL_NAME] ?? '');
+        if ($name === '') {
+            throw new \Exception('El nombre del recinto es requerido.');
         }
-        $department = $this->findDepartment($row[$colDepartment] ?? null, $rowNumber);
+
+        // ── Geographic resolution ─────────────────────────────────────────────
+        $deptVal = trim($row[self::COL_DEPARTMENT] ?? '');
+        $provVal = trim($row[self::COL_PROVINCE]   ?? '');
+        $munVal  = trim($row[self::COL_MUNICIPALITY] ?? '');
+        $locVal  = trim($row[self::COL_LOCALITY]   ?? '');
+
+        if ($deptVal === '') {
+            throw new \Exception('El Departamento es requerido.');
+        }
+
+        $department = $this->deptLookup[mb_strtolower($deptVal)] ?? null;
         if (!$department) {
-            throw new \Exception("Departamento no encontrado: " . ($row[$colDepartment] ?? 'vacío'));
+            throw new \Exception("Departamento no encontrado: \"{$deptVal}\"");
         }
-        $province = $this->findProvince($row[$colProvince] ?? null, $department->id, $rowNumber);
+
+        if ($provVal === '') {
+            throw new \Exception('La Provincia es requerida.');
+        }
+        $province = $this->provLookup[$department->id . '|' . mb_strtolower($provVal)] ?? null;
         if (!$province) {
-            throw new \Exception("Provincia no encontrada: " . ($row[$colProvince] ?? 'vacío'));
+            throw new \Exception("Provincia no encontrada: \"{$provVal}\" en {$department->name}");
         }
-        $municipality = $this->findMunicipality($row[$colMunicipality] ?? null, $province->id, $rowNumber);
+
+        if ($munVal === '') {
+            throw new \Exception('El Municipio es requerido.');
+        }
+        $municipality = $this->munLookup[$province->id . '|' . mb_strtolower($munVal)] ?? null;
         if (!$municipality) {
-            throw new \Exception("Municipio no encontrado: " . ($row[$colMunicipality] ?? 'vacío'));
+            throw new \Exception("Municipio no encontrado: \"{$munVal}\" en {$province->name}");
         }
-        $locality = $this->findLocality($row[$colLocality] ?? null, $municipality->id, $rowNumber);
+
+        if ($locVal === '') {
+            throw new \Exception('La Localidad es requerida.');
+        }
+        $locality = $this->locLookup[$municipality->id . '|' . mb_strtolower($locVal)] ?? null;
         if (!$locality) {
-            throw new \Exception("Localidad no encontrada: " . ($row[$colLocality] ?? 'vacío'));
+            throw new \Exception("Localidad no encontrada: \"{$locVal}\" en {$municipality->name}");
         }
-        $district = $this->findDistrict($row[$colDistrict] ?? null, $municipality->id, $rowNumber);
-        $zone = $this->findZone($row[$colZone] ?? null, $district->id ?? null, $rowNumber);
-        $this->processInstitutionData($row, $rowNumber, $locality, $district, $zone);
-    }
 
-    private function findDepartment($value, $rowNumber)
-    {
-        if (empty($value)) return null;
-        $department = Department::where('name', $value)->first();
-        if (!$department) {
-            $department = Department::where('name', 'ilike', '%' . $value . '%')->first();
-        }
-        return $department;
-    }
-
-    private function findProvince($value, $departmentId, $rowNumber)
-    {
-        if (empty($value)) return null;
-        $province = Province::where('name', $value)
-            ->where('department_id', $departmentId)
-            ->first();
-        if (!$province) {
-            $province = Province::where('name', 'ilike', '%' . $value . '%')
-                ->where('department_id', $departmentId)
-                ->first();
-        }
-        return $province;
-    }
-
-    private function findMunicipality($value, $provinceId, $rowNumber)
-    {
-        if (empty($value)) return null;
-        $municipality = Municipality::where('name', $value)
-            ->where('province_id', $provinceId)
-            ->first();
-        if (!$municipality) {
-            $municipality = Municipality::where('name', 'ilike', '%' . $value . '%')
-                ->where('province_id', $provinceId)
-                ->first();
-        }
-        return $municipality;
-    }
-
-    private function findLocality($value, $municipalityId, $rowNumber)
-    {
-        if (empty($value)) return null;
-        $locality = Locality::where('name', $value)
-            ->where('municipality_id', $municipalityId)
-            ->first();
-        if (!$locality) {
-            $locality = Locality::where('name', 'ilike', '%' . $value . '%')
-                ->where('municipality_id', $municipalityId)
-                ->first();
-        }
-        return $locality;
-    }
-
-    private function findDistrict($value, $municipalityId, $rowNumber)
-    {
-        if (empty($value)) return null;
-        $district = District::where('name', $value)
-            ->where('municipality_id', $municipalityId)
-            ->first();
-        if (!$district) {
-            $district = District::where('name', 'ilike', '%' . $value . '%')
-                ->where('municipality_id', $municipalityId)
-                ->first();
-            if ($district) {
-                $this->warnings[] = "Fila {$rowNumber}: Se usó coincidencia parcial para el distrito: {$district->name}";
+        // ── Optional: district & zone ─────────────────────────────────────────
+        $district = null;
+        $distVal  = trim($row[self::COL_DISTRICT] ?? '');
+        if ($distVal !== '') {
+            $district = $this->distLookup[$municipality->id . '|' . mb_strtolower($distVal)] ?? null;
+            if (!$district) {
+                $this->warnings[] = "Fila {$rowNum}: Distrito \"{$distVal}\" no encontrado — se omite.";
             }
         }
-        return $district;
-    }
 
-    private function findZone($value, $districtId, $rowNumber)
-    {
-        if (empty($value) || !$districtId) return null;
-        $zone = Zone::where('name', $value)
-            ->where('district_id', $districtId)
-            ->first();
-        if (!$zone) {
-            $zone = Zone::where('name', 'ilike', '%' . $value . '%')
-                ->where('district_id', $districtId)
-                ->first();
-            if ($zone) {
-                $this->warnings[] = "Fila {$rowNumber}: Se usó coincidencia parcial para la zona: {$zone->name}";
+        $zone    = null;
+        $zoneVal = trim($row[self::COL_ZONE] ?? '');
+        if ($zoneVal !== '' && $district) {
+            $zone = $this->zoneLookup[$district->id . '|' . mb_strtolower($zoneVal)] ?? null;
+            if (!$zone) {
+                $this->warnings[] = "Fila {$rowNum}: Zona \"{$zoneVal}\" no encontrada — se omite.";
             }
         }
-        return $zone;
-    }
 
-    private function processInstitutionData($row, $rowNumber, $locality, $district, $zone)
-    {
-        $colCode = 0;
-        $colName = 1;
-        $colShortName = 2;
-        $colAddress = 9;
-        $colReference = 10;
-        $colPhone = 11;
-        $colEmail = 12;
-        $colResponsible = 13;
-        $colCitizens = 14;
-        $colStatus = 15;
-        $colOperative = 16;
-        $colObservations = 17;
-        $name = trim($row[$colName]);
-        $code = !empty($row[$colCode]) ? trim($row[$colCode]) : null;
-        $status = !empty($row[$colStatus]) ? strtolower(trim($row[$colStatus])) : 'activo';
-        $isOperative = !empty($row[$colOperative]) && strtolower(trim($row[$colOperative])) === 'sí';
-        $existingInstitution = Institution::where('name', $name)->first();
-        $data = [
-            'code' => $code,
-            'name' => $name,
-            'short_name' => !empty($row[$colShortName]) ? trim($row[$colShortName]) : null,
-            'locality_id' => $locality->id,
-            'district_id' => $district?->id,
-            'zone_id' => $zone?->id,
-            'address' => !empty($row[$colAddress]) ? trim($row[$colAddress]) : null,
-            'reference' => !empty($row[$colReference]) ? trim($row[$colReference]) : null,
-            'phone' => !empty($row[$colPhone]) ? trim($row[$colPhone]) : null,
-            'email' => !empty($row[$colEmail]) ? trim($row[$colEmail]) : null,
-            'responsible_name' => !empty($row[$colResponsible]) ? trim($row[$colResponsible]) : null,
-            'registered_citizens' => !empty($row[$colCitizens]) ? intval($row[$colCitizens]) : 0,
-            'status' => $status,
-            'is_operative' => $isOperative,
-            'observations' => !empty($row[$colObservations]) ? trim($row[$colObservations]) : null,
+        // ── Code uniqueness (soft check – will also be enforced by DB unique) ─
+        $code = !empty($row[self::COL_CODE]) ? trim($row[self::COL_CODE]) : null;
+        if ($code !== null) {
+            $duplicate = Institution::where('code', $code)
+                ->where('name', '!=', $name)   // allow update of same record
+                ->exists();
+            if ($duplicate) {
+                throw new \Exception("El código \"{$code}\" ya está en uso por otro recinto.");
+            }
+        }
+
+        // ── Status & operative ────────────────────────────────────────────────
+        $rawStatus = strtolower(trim($row[self::COL_STATUS] ?? ''));
+        $validStatuses = ['activo', 'inactivo', 'en_mantenimiento'];
+        $status = in_array($rawStatus, $validStatuses) ? $rawStatus : 'activo';
+
+        $rawOp      = strtolower(trim($row[self::COL_OPERATIVE] ?? ''));
+        $isOperative = in_array($rawOp, ['sí', 'si', 'yes', '1', 'true']);
+
+        // ── Build the data array (only columns that exist in the migration) ───
+        return [
+            'code'               => $code,
+            'name'               => $name,
+            'short_name'         => trim($row[self::COL_SHORT_NAME] ?? '') ?: null,
+            'municipality_id'    => $municipality->id,   // ← from locality chain
+            'locality_id'        => $locality->id,
+            'district_id'        => $district?->id,
+            'zone_id'            => $zone?->id,
+            'address'            => trim($row[self::COL_ADDRESS]     ?? '') ?: null,
+            'reference'          => trim($row[self::COL_REFERENCE]   ?? '') ?: null,
+            'phone'              => trim($row[self::COL_PHONE]       ?? '') ?: null,
+            'email'              => trim($row[self::COL_EMAIL]       ?? '') ?: null,
+            'responsible_name'   => trim($row[self::COL_RESPONSIBLE] ?? '') ?: null,
+            'registered_citizens'=> (int) ($row[self::COL_CITIZENS] ?? 0),
+            'status'             => $status,
+            'is_operative'       => $isOperative,
+            'observations'       => trim($row[self::COL_OBS] ?? '') ?: null,
         ];
-        $data['department_id'] = $locality->municipality->province->department->id;
-        $data['province_id'] = $locality->municipality->province->id;
-        $data['municipality_id'] = $locality->municipality->id;
-        if ($existingInstitution) {
-            $existingInstitution->update($data);
-            Log::info("Updated institution ID: {$existingInstitution->id}");
-        } else {
-            if ($code) {
-                $existingCode = Institution::where('code', $code)->first();
-                if ($existingCode) {
-                    throw new \Exception("El código {$code} ya existe en otro recinto");
-                }
-            }
-            Institution::create($data);
-        }
-        $this->successCount++;
     }
 }

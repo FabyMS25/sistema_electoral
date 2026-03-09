@@ -1,22 +1,10 @@
 {{-- resources/views/institutions/edit.blade.php --}}
 @extends('layouts.master')
 
-@section('title')
-    Editar Recinto
-@endsection
+@section('title', 'Editar Recinto')
 
 @section('css')
     <link href="{{ URL::asset('build/libs/choices.js/public/assets/styles/choices.min.css') }}" rel="stylesheet" />
-    <style>
-        .required-field label:after {
-            content: " *";
-            color: red;
-        }
-        .info-tooltip {
-            cursor: help;
-            border-bottom: 1px dotted #ccc;
-        }
-    </style>
 @endsection
 
 @section('content')
@@ -45,15 +33,16 @@
                     <form action="{{ route('institutions.update', $institution->id) }}" method="POST" id="institutionForm">
                         @csrf
                         @method('PUT')
-                        
+
                         <div class="alert alert-info">
                             <i class="ri-information-line me-1"></i>
                             Los campos marcados con <span class="text-danger">*</span> son obligatorios.
                         </div>
 
                         @include('institutions.partials.form-fields', [
-                            'institution' => $institution,
-                            'departments' => $departments
+                            'institution'   => $institution,
+                            'departments'   => $departments,
+                            'statusOptions' => $statusOptions,
                         ])
 
                         <div class="row mt-4">
@@ -74,44 +63,5 @@
 @endsection
 
 @section('script')
-    <script src="{{ URL::asset('build/libs/choices.js/public/assets/scripts/choices.min.js') }}"></script>
     @include('institutions.scripts.institution-js')
-    
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Precargar valores existentes para edición
-            const institution = @json($institution);
-            
-            setTimeout(() => {
-                if (institution.locality?.municipality?.province?.department?.id) {
-                    document.getElementById('department-field').value = institution.locality.municipality.province.department.id;
-                    document.getElementById('department-field').dispatchEvent(new Event('change'));
-                    
-                    setTimeout(() => {
-                        document.getElementById('province-field').value = institution.locality.municipality.province.id;
-                        document.getElementById('province-field').dispatchEvent(new Event('change'));
-                        
-                        setTimeout(() => {
-                            document.getElementById('municipality-field').value = institution.locality.municipality.id;
-                            document.getElementById('municipality-field').dispatchEvent(new Event('change'));
-                            
-                            setTimeout(() => {
-                                document.getElementById('locality-field').value = institution.locality_id;
-                                if (institution.district_id) {
-                                    setTimeout(() => {
-                                        document.getElementById('district-field').value = institution.district_id;
-                                        if (institution.zone_id) {
-                                            setTimeout(() => {
-                                                document.getElementById('zone-field').value = institution.zone_id;
-                                            }, 300);
-                                        }
-                                    }, 300);
-                                }
-                            }, 300);
-                        }, 300);
-                    }, 300);
-                }
-            }, 500);
-        });
-    </script>
 @endsection

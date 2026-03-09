@@ -1,417 +1,403 @@
 <?php
+
 namespace App\Imports;
 
 use App\Models\VotingTable;
 use App\Models\Institution;
 use App\Models\ElectionType;
+use App\Models\VotingTableElection;
 use App\Models\User;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Two-pass import for VotingTable.
+ *
+ * Schema facts (from migration):
+ *   voting_tables        → identity, institution, padron, delegates
+ *   voting_table_elections → one row per (table × election_type): ballots, status, times
+ *
+ * A table is NOT tied to a single election type in voting_tables.
+ * On import we auto-create a VotingTableElection for every active ElectionType,
+ * using any ballots/status data from the spreadsheet columns if present.
+ *
+ * Columns resolved by header name (accent/case insensitive) so column order never matters.
+ */
 class VotingTablesImport
 {
-    private $errors = [];
-    private $successCount = 0;
-    private $warnings = [];
+    private array $errors       = [];
+    private array $warnings     = [];
+    private int   $successCount = 0;
 
-    public function import($uploadedFile)
+    // Pre-loaded lookup maps
+    private array $institutionsByCode  = [];
+    private array $institutionsByName  = [];
+    private array $activeElectionTypes = []; // all active election types
+    private array $usersByEmail        = [];
+    private array $usersByIdCard       = [];
+
+    // ─── Entry point ─────────────────────────────────────────────────────────
+
+    public function import($uploadedFile): array
     {
         try {
-            Log::info('Starting import process', ['file' => $uploadedFile->getClientOriginalName()]);
-
             $filePath = $uploadedFile->store('imports');
             $fullPath = storage_path("app/{$filePath}");
 
             $spreadsheet = IOFactory::load($fullPath);
             $sheet = $spreadsheet->getActiveSheet();
-            $rows = $sheet->toArray();
-
-            if (empty($rows) || count($rows) < 2) {
-                throw new \Exception('El archivo está vacío o no tiene datos válidos.');
-            }
-
-            DB::beginTransaction();
-
-            foreach (array_slice($rows, 1) as $index => $row) {
-                try {
-                    $this->processRow($row, $index + 2);
-                } catch (\Exception $e) {
-                    $this->errors[] = "Fila " . ($index + 2) . ": " . $e->getMessage();
-                }
-            }
-
-            if (empty($this->errors)) {
-                DB::commit();
-                Log::info('Import completed successfully. Records: ' . $this->successCount);
-            } else {
-                DB::rollBack();
-                Log::warning('Import completed with errors. Success: ' . $this->successCount . ', Errors: ' . count($this->errors));
-            }
+            $rows  = $sheet->toArray(null, true, true, false);
 
             Storage::delete($filePath);
 
-            return [
-                'success' => true,
-                'errors' => $this->errors,
-                'warnings' => $this->warnings,
-                'success_count' => $this->successCount
-            ];
+            if (count($rows) < 2) {
+                return $this->fail('El archivo está vacío o no tiene datos válidos.');
+            }
 
+            $colMap = $this->buildColumnMap($rows[0]);
+            if (empty($colMap)) {
+                return $this->fail('No se reconocieron los encabezados. Descargue la plantilla oficial.');
+            }
+
+            $this->preloadLookups();
+
+            if (empty($this->activeElectionTypes)) {
+                return $this->fail('No hay tipos de elección activos en el sistema. Actívelos antes de importar.');
+            }
+
+            // ── Pass 1: validate ──────────────────────────────────────────────
+            $payloads = [];
+            foreach (array_slice($rows, 1) as $i => $row) {
+                $rowNum = $i + 2;
+                if (empty(array_filter($row))) continue;
+                try {
+                    $payload = $this->validateRow($row, $rowNum, $colMap);
+                    if ($payload !== null) {
+                        $payloads[$rowNum] = $payload;
+                    }
+                } catch (\RuntimeException $e) {
+                    $this->errors[] = "❌ Fila {$rowNum}: " . $e->getMessage();
+                }
+            }
+
+            if (empty($payloads)) {
+                return ['success' => false, 'errors' => $this->errors, 'warnings' => $this->warnings, 'success_count' => 0];
+            }
+
+            // ── Pass 2: insert ────────────────────────────────────────────────
+            DB::beginTransaction();
+            try {
+                foreach ($payloads as $rowNum => $payload) {
+                    $this->insertRow($payload, $rowNum);
+                }
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error('VotingTablesImport insert error: ' . $e->getMessage());
+                return $this->fail('Error al guardar los datos: ' . $e->getMessage());
+            }
+
+            Log::info("VotingTablesImport done. Inserted: {$this->successCount}, Errors: " . count($this->errors));
+
+            return [
+                'success'       => true,
+                'errors'        => $this->errors,
+                'warnings'      => $this->warnings,
+                'success_count' => $this->successCount,
+            ];
         } catch (\Exception $e) {
-            DB::rollBack();
-            if (isset($filePath)) {
-                Storage::delete($filePath);
-            }
-            Log::error('Import error: ' . $e->getMessage());
-
-            return [
-                'success' => false,
-                'errors' => [$e->getMessage()],
-                'success_count' => 0
-            ];
+            Log::error('VotingTablesImport fatal: ' . $e->getMessage());
+            return $this->fail($e->getMessage());
         }
     }
 
-    private function processRow($row, $rowNumber)
+    // ─── Column map ──────────────────────────────────────────────────────────
+
+    private function buildColumnMap(array $headerRow): array
     {
-        if (empty(array_filter($row))) {
-            return;
-        }
-        $colOepCode = 0;           // A - Código OEP
-        $colInternalCode = 1;       // B - Código Interno
-        $colNumber = 2;             // C - N° Mesa
-        $colLetter = 3;             // D - Letra
-        $colType = 4;               // E - Tipo
-        $colInstitutionName = 5;    // F - Recinto
-        $colInstitutionCode = 6;    // G - Código Recinto
-        $colElectionType = 11;      // L - Tipo Elección
-        $colFromName = 12;          // M - Rango Desde Apellido
-        $colToName = 13;            // N - Rango Hasta Apellido
-        $colExpectedVoters = 16;     // Q - Votantes Esperados
-        $colBallotsReceived = 17;    // R - Papeletas Recibidas
-        $colBallotsSpoiled = 18;     // S - Papeletas Deterioradas
-        $colValidVotes = 19;         // T - Votos Válidos Alcalde
-        $colBlankVotes = 20;         // U - Votos Blancos Alcalde
-        $colNullVotes = 21;          // V - Votos Nulos Alcalde
-        $colValidVotesSecond = 22;   // W - Votos Válidos Concejal
-        $colBlankVotesSecond = 23;   // X - Votos Blancos Concejal
-        $colNullVotesSecond = 24;    // Y - Votos Nulos Concejal
-        $colPresident = 25;          // Z - Presidente
-        $colSecretary = 26;          // AA - Secretario
-        $colVocal1 = 27;             // AB - Vocal 1
-        $colVocal2 = 28;             // AC - Vocal 2
-        $colVocal3 = 29;             // AD - Vocal 3
-        $colOpenTime = 30;           // AE - Hora Apertura
-        $colCloseTime = 31;          // AF - Hora Cierre
-        $colElectionDate = 32;       // AG - Fecha Elección
-        $colActaNumber = 33;         // AH - N° Acta
-        $colStatus = 34;             // AI - Estado
-        if (empty(trim($row[$colNumber] ?? ''))) {
-            throw new \Exception("El número de mesa es requerido");
-        }
+        $normalize = fn($s) => strtolower(trim(
+            preg_replace('/\s+/', ' ',
+                iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string) $s))
+        ));
 
-        // Buscar institución
-        $institution = $this->findInstitution($row, $rowNumber);
-        if (!$institution) {
-            throw new \Exception("Recinto no encontrado");
-        }
-
-        // Buscar tipo de elección
-        $electionType = $this->findElectionType($row, $rowNumber);
-        if (!$electionType) {
-            throw new \Exception("No se pudo determinar el tipo de elección");
-        }
-
-        $this->processTableData($row, $rowNumber, $institution, $electionType);
-    }
-
-    private function findInstitution($row, $rowNumber)
-    {
-        $colInstitutionCode = 6; // G - Código Recinto
-        $colInstitutionName = 5; // F - Recinto
-
-        if (!empty($row[$colInstitutionCode])) {
-            $institution = Institution::where('code', trim($row[$colInstitutionCode]))->first();
-            if ($institution) return $institution;
-        }
-
-        if (!empty($row[$colInstitutionName])) {
-            $name = trim($row[$colInstitutionName]);
-            $institution = Institution::where('name', $name)->first();
-            if ($institution) return $institution;
-
-            $institution = Institution::where('name', 'LIKE', '%' . $name . '%')->first();
-            if ($institution) {
-                $this->warnings[] = "Fila {$rowNumber}: Se usó coincidencia parcial para el recinto: {$institution->name}";
-                return $institution;
-            }
-        }
-
-        return null;
-    }
-
-    private function findElectionType($row, $rowNumber)
-    {
-        $colElectionType = 11; // L - Tipo Elección
-
-        if (!empty($row[$colElectionType])) {
-            $typeName = trim($row[$colElectionType]);
-            $electionType = ElectionType::where('name', 'LIKE', '%' . $typeName . '%')
-                ->where('active', true)
-                ->first();
-
-            if ($electionType) return $electionType;
-        }
-
-        $defaultType = ElectionType::where('active', true)->first();
-        if ($defaultType) {
-            $this->warnings[] = "Fila {$rowNumber}: No se encontró el tipo de elección, se usará: {$defaultType->name}";
-            return $defaultType;
-        }
-
-        return null;
-    }
-
-    private function processTableData($row, $rowNumber, $institution, $electionType)
-    {
-        // Column indices
-        $colOepCode = 0;
-        $colInternalCode = 1;
-        $colNumber = 2;
-        $colLetter = 3;
-        $colType = 4;
-        $colFromName = 12;
-        $colToName = 13;
-        $colExpectedVoters = 16;
-        $colBallotsReceived = 17;
-        $colBallotsSpoiled = 18;
-        $colValidVotes = 19;
-        $colBlankVotes = 20;
-        $colNullVotes = 21;
-        $colValidVotesSecond = 22;
-        $colBlankVotesSecond = 23;
-        $colNullVotesSecond = 24;
-        $colPresident = 25;
-        $colSecretary = 26;
-        $colVocal1 = 27;
-        $colVocal2 = 28;
-        $colVocal3 = 29;
-        $colOpenTime = 30;
-        $colCloseTime = 31;
-        $colElectionDate = 32;
-        $colActaNumber = 33;
-        $colStatus = 34;
-
-        // Determinar tipo
-        $type = 'mixta';
-        if (!empty($row[$colType])) {
-            $typeValue = strtolower(trim($row[$colType]));
-            if (in_array($typeValue, ['masculina', 'masculino'])) $type = 'masculina';
-            elseif (in_array($typeValue, ['femenina', 'femenino'])) $type = 'femenina';
-        }
-
-        // Determinar estado
-        $status = 'configurada';
-        if (!empty($row[$colStatus])) {
-            $statusValue = strtolower(trim($row[$colStatus]));
-            $statusMap = [
-                'configurada' => 'configurada',
-                'en espera' => 'en_espera',
-                'votacion' => 'votacion',
-                'cerrada' => 'cerrada',
-                'en escrutinio' => 'en_escrutinio',
-                'escrutada' => 'escrutada',
-                'observada' => 'observada',
-                'transmitida' => 'transmitida',
-                'anulada' => 'anulada',
-            ];
-            $status = $statusMap[$statusValue] ?? 'configurada';
-        }
-
-        $number = intval($row[$colNumber]);
-
-        // Generar códigos si están vacíos
-        $oepCode = !empty($row[$colOepCode]) ? trim($row[$colOepCode]) : $institution->code . '-' . $number;
-        $internalCode = !empty($row[$colInternalCode]) ? trim($row[$colInternalCode]) : $institution->code . '-M' . str_pad($number, 2, '0', STR_PAD_LEFT);
-
-        $existingTable = VotingTable::where('institution_id', $institution->id)
-            ->where('number', $number)
-            ->first();
-
-        // Parsear fechas
-        $electionDate = !empty($row[$colElectionDate]) ? $this->parseDate($row[$colElectionDate]) : null;
-        $openTime = !empty($row[$colOpenTime]) ? $this->parseTime($row[$colOpenTime]) : null;
-        $closeTime = !empty($row[$colCloseTime]) ? $this->parseTime($row[$colCloseTime]) : null;
-
-        // Buscar delegados
-        $president = $this->findUser($row[$colPresident] ?? null);
-        $secretary = $this->findUser($row[$colSecretary] ?? null);
-        $vocal1 = $this->findUser($row[$colVocal1] ?? null);
-        $vocal2 = $this->findUser($row[$colVocal2] ?? null);
-        $vocal3 = $this->findUser($row[$colVocal3] ?? null);
-        $vocal4 = $this->findUser($row[$colVocal4] ?? null);
-
-        // Calcular totales
-        $totalVoters = ($row[$colValidVotes] ?? 0) + ($row[$colBlankVotes] ?? 0) + ($row[$colNullVotes] ?? 0);
-        $totalVotersSecond = ($row[$colValidVotesSecond] ?? 0) + ($row[$colBlankVotesSecond] ?? 0) + ($row[$colNullVotesSecond] ?? 0);
-
-        // Validar consistencia
-        if ($totalVoters != $totalVotersSecond && ($totalVoters > 0 || $totalVotersSecond > 0)) {
-            $this->warnings[] = "Fila {$rowNumber}: El total de votantes de Alcalde ($totalVoters) no coincide con Concejal ($totalVotersSecond)";
-        }
-
-        $tableData = [
-            // CÓDIGOS - Nuevos campos
-            'oep_code' => $oepCode,
-            'internal_code' => $internalCode,
-
-            // Datos básicos
-            'number' => $number,
-            'letter' => !empty($row[$colLetter]) ? trim($row[$colLetter]) : null,
-            'type' => $type,
-
-            // Relaciones
-            'institution_id' => $institution->id,
-            'election_type_id' => $electionType->id,
-
-            // Datos pre-electorales
-            'expected_voters' => !empty($row[$colExpectedVoters]) ? intval($row[$colExpectedVoters]) : 0,
-            'ballots_received' => !empty($row[$colBallotsReceived]) ? intval($row[$colBallotsReceived]) : 0,
-            'ballots_spoiled' => !empty($row[$colBallotsSpoiled]) ? intval($row[$colBallotsSpoiled]) : 0,
-
-            // Rango de votantes
-            'voter_range_start_name' => !empty($row[$colFromName]) ? trim($row[$colFromName]) : null,
-            'voter_range_end_name' => !empty($row[$colToName]) ? trim($row[$colToName]) : null,
-
-            // Personal de mesa
-            'president_id' => $president?->id,
-            'secretary_id' => $secretary?->id,
-            'vocal1_id' => $vocal1?->id,
-            'vocal2_id' => $vocal2?->id,
-            'vocal3_id' => $vocal3?->id,
-            'vocal4_id' => $vocal4?->id,
-
-            // Fechas y horas
-            'election_date' => $electionDate,
-            'opening_time' => $openTime,
-            'closing_time' => $closeTime,
-
-            // Estado
-            'status' => $status,
-
-            // Control de papeletas (se calculan automáticamente)
-            'ballots_used' => 0,
-            'ballots_leftover' => 0,
-
-            // Resultados Alcalde
-            'valid_votes' => !empty($row[$colValidVotes]) ? intval($row[$colValidVotes]) : 0,
-            'blank_votes' => !empty($row[$colBlankVotes]) ? intval($row[$colBlankVotes]) : 0,
-            'null_votes' => !empty($row[$colNullVotes]) ? intval($row[$colNullVotes]) : 0,
-
-            // Resultados Concejal
-            'valid_votes_second' => !empty($row[$colValidVotesSecond]) ? intval($row[$colValidVotesSecond]) : 0,
-            'blank_votes_second' => !empty($row[$colBlankVotesSecond]) ? intval($row[$colBlankVotesSecond]) : 0,
-            'null_votes_second' => !empty($row[$colNullVotesSecond]) ? intval($row[$colNullVotesSecond]) : 0,
-
-            // Totales
-            'total_voters' => $totalVoters,
-            'total_voters_second' => $totalVotersSecond,
-
-            // Acta
-            'acta_number' => !empty($row[$colActaNumber]) ? trim($row[$colActaNumber]) : null,
-            'acta_photo' => null,
-            'acta_uploaded_at' => null,
-            'observations' => null,
+        $expected = [
+            'codigo oep'               => 'oep_code',
+            'codigo interno'           => 'internal_code',
+            'n mesa'                   => 'number',
+            'n° mesa'                  => 'number',
+            'numero mesa'              => 'number',
+            'numero de mesa'           => 'number',
+            'letra'                    => 'letter',
+            'tipo'                     => 'type',
+            'recinto'                  => 'institution_name',
+            'nombre recinto'           => 'institution_name',
+            'codigo recinto'           => 'institution_code',
+            'rango desde (apellido)'   => 'voter_range_start_name',
+            'rango desde apellido'     => 'voter_range_start_name',
+            'rango hasta (apellido)'   => 'voter_range_end_name',
+            'rango hasta apellido'     => 'voter_range_end_name',
+            'votantes esperados'       => 'expected_voters',
+            'votantes esperados (padron)' => 'expected_voters',
+            // election-level (optional — written to voting_table_elections)
+            'papeletas recibidas'      => 'ballots_received',
+            'papeletas deterioradas'   => 'ballots_spoiled',
+            'total votantes'           => 'total_voters',
+            'estado'                   => 'status',
+            'hora apertura'            => 'opening_time',
+            'hora cierre'              => 'closing_time',
+            'fecha eleccion'           => 'election_date',
+            'fecha de eleccion'        => 'election_date',
+            // delegates
+            'presidente'               => 'president',
+            'secretario'               => 'secretary',
+            'vocal 1'                  => 'vocal1',
+            'vocal 2'                  => 'vocal2',
+            'vocal 3'                  => 'vocal3',
+            'vocal 4'                  => 'vocal4',
+            'observaciones'            => 'observations',
         ];
 
-        if ($existingTable) {
-            $existingTable->update($tableData);
-            Log::info("Updated table ID: {$existingTable->id}");
+        $map = [];
+        foreach ($headerRow as $idx => $header) {
+            $key = $normalize((string) $header);
+            if (isset($expected[$key])) {
+                $map[$expected[$key]] = $idx;
+            }
+        }
+        return $map;
+    }
+
+    // ─── Pre-load lookups ─────────────────────────────────────────────────────
+
+    private function preloadLookups(): void
+    {
+        foreach (Institution::select('id', 'code', 'name')->get() as $i) {
+            $this->institutionsByCode[strtolower($i->code)] = $i;
+            $this->institutionsByName[strtolower($i->name)] = $i;
+        }
+
+        foreach (ElectionType::where('active', true)->get() as $et) {
+            $this->activeElectionTypes[$et->id] = $et;
+        }
+
+        foreach (User::where('is_active', true)->select('id', 'email', 'id_card', 'name', 'last_name')->get() as $u) {
+            if ($u->email)   $this->usersByEmail[strtolower($u->email)]    = $u;
+            if ($u->id_card) $this->usersByIdCard[strtolower($u->id_card)] = $u;
+        }
+    }
+
+    // ─── Row helpers ──────────────────────────────────────────────────────────
+
+    private function str(array $row, array $colMap, string $field): ?string
+    {
+        if (!isset($colMap[$field])) return null;
+        $v = $row[$colMap[$field]] ?? null;
+        return ($v !== null && trim((string) $v) !== '') ? trim((string) $v) : null;
+    }
+
+    private function int_(array $row, array $colMap, string $field): ?int
+    {
+        $v = $this->str($row, $colMap, $field);
+        return ($v !== null && is_numeric($v)) ? (int) $v : null;
+    }
+
+    // ─── Pass 1 ───────────────────────────────────────────────────────────────
+
+    private function validateRow(array $row, int $rowNum, array $colMap): ?array
+    {
+        // Number
+        $numberRaw = $this->str($row, $colMap, 'number');
+        if ($numberRaw === null || !is_numeric($numberRaw) || (int) $numberRaw < 1) {
+            throw new \RuntimeException('El número de mesa es obligatorio y debe ser ≥ 1.');
+        }
+        $number = (int) $numberRaw;
+        $letter = $this->str($row, $colMap, 'letter');
+
+        // Institution
+        $institution = null;
+        $code = $this->str($row, $colMap, 'institution_code');
+        $name = $this->str($row, $colMap, 'institution_name');
+
+        if ($code) $institution = $this->institutionsByCode[strtolower($code)] ?? null;
+        if (!$institution && $name) {
+            $institution = $this->institutionsByName[strtolower($name)] ?? null;
+            if (!$institution) {
+                foreach ($this->institutionsByName as $n => $inst) {
+                    if (str_contains($n, strtolower($name)) || str_contains(strtolower($name), $n)) {
+                        $institution = $inst;
+                        $this->warnings[] = "⏭️ Fila {$rowNum}: coincidencia parcial de recinto → {$inst->name}";
+                        break;
+                    }
+                }
+            }
+        }
+        if (!$institution) {
+            throw new \RuntimeException('Recinto no encontrado. Use nombre o código exacto del sistema.');
+        }
+
+        // Uniqueness
+        if (VotingTable::where('institution_id', $institution->id)
+                       ->where('number', $number)
+                       ->when($letter, fn($q) => $q->where('letter', $letter))
+                       ->exists()) {
+            $label = $number . ($letter ? $letter : '');
+            throw new \RuntimeException("Ya existe la Mesa {$label} en '{$institution->name}'. Se omite.");
+        }
+
+        // Type
+        $typeRaw = strtolower($this->str($row, $colMap, 'type') ?? 'mixta');
+        $type = match(true) {
+            in_array($typeRaw, ['masculina', 'masculino']) => 'masculina',
+            in_array($typeRaw, ['femenina',  'femenino'])  => 'femenina',
+            default                                        => 'mixta',
+        };
+
+        // Codes
+        $oepCode      = $this->str($row, $colMap, 'oep_code')      ?? ($institution->code . '-' . $number . ($letter ?? ''));
+        $internalCode = $this->str($row, $colMap, 'internal_code') ?? ($institution->code . '-M' . str_pad($number, 2, '0', STR_PAD_LEFT) . ($letter ?? ''));
+
+        // Delegates
+        $presidentId = $this->findUser($this->str($row, $colMap, 'president'))?->id;
+        $secretaryId = $this->findUser($this->str($row, $colMap, 'secretary'))?->id;
+        $vocal1Id    = $this->findUser($this->str($row, $colMap, 'vocal1'))?->id;
+        $vocal2Id    = $this->findUser($this->str($row, $colMap, 'vocal2'))?->id;
+        $vocal3Id    = $this->findUser($this->str($row, $colMap, 'vocal3'))?->id;
+        $vocal4Id    = $this->findUser($this->str($row, $colMap, 'vocal4'))?->id;
+
+        // Election-level optional fields (will be written to voting_table_elections)
+        $statusMap = [
+            'configurada'   => 'configurada',  'en espera'     => 'en_espera',
+            'en_espera'     => 'en_espera',    'votacion'      => 'votacion',
+            'en votacion'   => 'votacion',     'cerrada'       => 'cerrada',
+            'en escrutinio' => 'en_escrutinio','en_escrutinio' => 'en_escrutinio',
+            'escrutada'     => 'escrutada',    'observada'     => 'observada',
+            'transmitida'   => 'transmitida',  'anulada'       => 'anulada',
+        ];
+        $statusRaw = strtolower($this->str($row, $colMap, 'status') ?? '');
+        $status    = $statusMap[$statusRaw] ?? 'configurada';
+
+        return [
+            'institution'  => $institution,
+            'tableData'    => [
+                'oep_code'               => $oepCode,
+                'internal_code'          => $internalCode,
+                'number'                 => $number,
+                'letter'                 => $letter,
+                'type'                   => $type,
+                'institution_id'         => $institution->id,
+                'expected_voters'        => $this->int_($row, $colMap, 'expected_voters') ?? 0,
+                'voter_range_start_name' => $this->str($row, $colMap, 'voter_range_start_name'),
+                'voter_range_end_name'   => $this->str($row, $colMap, 'voter_range_end_name'),
+                'president_id'           => $presidentId,
+                'secretary_id'           => $secretaryId,
+                'vocal1_id'              => $vocal1Id,
+                'vocal2_id'              => $vocal2Id,
+                'vocal3_id'              => $vocal3Id,
+                'vocal4_id'              => $vocal4Id,
+                'observations'           => $this->str($row, $colMap, 'observations'),
+            ],
+            'electionData' => [
+                // Written to voting_table_elections — one row per active election type
+                'ballots_received' => $this->int_($row, $colMap, 'ballots_received') ?? 0,
+                'ballots_spoiled'  => $this->int_($row, $colMap, 'ballots_spoiled')  ?? 0,
+                'total_voters'     => $this->int_($row, $colMap, 'total_voters')     ?? 0,
+                'status'           => $status,
+                'opening_time'     => $this->parseTime($this->str($row, $colMap, 'opening_time')),
+                'closing_time'     => $this->parseTime($this->str($row, $colMap, 'closing_time')),
+                'election_date'    => $this->parseDate($this->str($row, $colMap, 'election_date')),
+            ],
+        ];
+    }
+
+    // ─── Pass 2 ───────────────────────────────────────────────────────────────
+
+    private function insertRow(array $payload, int $rowNum): void
+    {
+        $institution  = $payload['institution'];
+        $tableData    = $payload['tableData'];
+        $electionData = $payload['electionData'];
+
+        $existing = VotingTable::where('institution_id', $institution->id)
+            ->where('number', $tableData['number'])
+            ->when($tableData['letter'], fn($q) => $q->where('letter', $tableData['letter']))
+            ->first();
+
+        if ($existing) {
+            $existing->update($tableData);
+            $table = $existing;
+            $this->warnings[] = "⏭️ Fila {$rowNum}: Mesa ya existía → actualizada.";
         } else {
-            // Verificar que los códigos no existan
-            $existingOepCode = VotingTable::where('oep_code', $oepCode)->first();
-            if ($existingOepCode) {
-                throw new \Exception("El código OEP {$oepCode} ya existe en otra mesa");
-            }
+            $table = VotingTable::create($tableData);
+        }
 
-            $existingInternalCode = VotingTable::where('internal_code', $internalCode)->first();
-            if ($existingInternalCode) {
-                throw new \Exception("El código interno {$internalCode} ya existe en otra mesa");
-            }
-
-            VotingTable::create($tableData);
+        // Create/update a VotingTableElection for EVERY active election type
+        foreach ($this->activeElectionTypes as $electionType) {
+            VotingTableElection::updateOrCreate(
+                ['voting_table_id' => $table->id, 'election_type_id' => $electionType->id],
+                array_merge([
+                    'ballots_used'     => 0,
+                    'ballots_leftover' => 0,
+                    'election_date'    => $electionType->election_date,
+                ], $electionData)
+            );
         }
 
         $this->successCount++;
     }
 
-    private function findUser($value)
+    // ─── Lookup helpers ───────────────────────────────────────────────────────
+
+    private function findUser(?string $value): ?User
     {
-        if (empty($value)) return null;
-
-        $value = trim($value);
-
-        $user = User::where('email', $value)->first();
-        if ($user) return $user;
-
-        $user = User::where('id_card', $value)->first();
-        if ($user) return $user;
-
-        $nameParts = explode(' ', $value);
-        if (count($nameParts) >= 2) {
-            $user = User::where('name', 'LIKE', '%' . $nameParts[0] . '%')
-                ->where('last_name', 'LIKE', '%' . implode(' ', array_slice($nameParts, 1)) . '%')
-                ->first();
-            if ($user) return $user;
+        if (!$value) return null;
+        $lower = strtolower(trim($value));
+        if (isset($this->usersByEmail[$lower]))  return $this->usersByEmail[$lower];
+        if (isset($this->usersByIdCard[$lower])) return $this->usersByIdCard[$lower];
+        $parts = explode(' ', $lower, 2);
+        if (count($parts) === 2) {
+            foreach ($this->usersByEmail as $user) {
+                if (strtolower($user->name) === $parts[0] && strtolower($user->last_name ?? '') === $parts[1]) {
+                    return $user;
+                }
+            }
         }
-
         return null;
     }
 
-    private function parseTime($value)
+    private function parseTime(?string $value): ?string
     {
-        if (empty($value)) return null;
-
+        if (!$value) return null;
         try {
             if (is_numeric($value)) {
-                $timestamp = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value);
-                return $timestamp->format('H:i:s');
+                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $value)->format('H:i:s');
             }
             return \Carbon\Carbon::parse($value)->format('H:i:s');
-        } catch (\Exception $e) {
-            return null;
-        }
+        } catch (\Throwable) { return null; }
     }
 
-    private function parseDate($value)
+    private function parseDate(?string $value): ?string
     {
-        if (empty($value)) return null;
-
+        if (!$value) return null;
         try {
             if (is_numeric($value)) {
-                $timestamp = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value);
-                return $timestamp->format('Y-m-d');
+                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $value)->format('Y-m-d');
             }
-
-            $formats = ['d/m/Y', 'd/m/y', 'Y-m-d', 'd-m-Y'];
-            foreach ($formats as $format) {
-                try {
-                    $date = \Carbon\Carbon::createFromFormat($format, $value);
-                    return $date->format('Y-m-d');
-                } catch (\Exception $e) {
-                    continue;
-                }
+            foreach (['d/m/Y', 'd/m/y', 'Y-m-d', 'd-m-Y'] as $fmt) {
+                try { return \Carbon\Carbon::createFromFormat($fmt, $value)->format('Y-m-d'); } catch (\Throwable) {}
             }
             return \Carbon\Carbon::parse($value)->format('Y-m-d');
-        } catch (\Exception $e) {
-            return null;
-        }
+        } catch (\Throwable) { return null; }
     }
 
-    public function getSuccessCount() { return $this->successCount; }
-    public function getErrors() { return $this->errors; }
-    public function getWarnings() { return $this->warnings; }
-    public function hasErrors() { return !empty($this->errors); }
+    private function fail(string $message): array
+    {
+        return ['success' => false, 'errors' => [$message], 'warnings' => [], 'success_count' => 0];
+    }
+
+    public function getSuccessCount(): int { return $this->successCount; }
+    public function getErrors(): array     { return $this->errors; }
+    public function getWarnings(): array   { return $this->warnings; }
+    public function hasErrors(): bool      { return !empty($this->errors); }
 }

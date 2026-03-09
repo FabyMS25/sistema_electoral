@@ -48,7 +48,6 @@ class ElectionType extends Model
         ];
     }
 
-
     public function geographicScope(): MorphTo
     {
         return $this->morphTo('geographic_scope');
