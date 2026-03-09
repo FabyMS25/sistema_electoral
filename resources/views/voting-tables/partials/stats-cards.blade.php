@@ -1,16 +1,13 @@
 {{-- resources/views/voting-tables/partials/stats-cards.blade.php --}}
 @php
     $collection = $votingTables->getCollection();
-
     $totalTables         = $votingTables->total();
     $totalExpectedVoters = $collection->sum('expected_voters');
     $totalActualVoters   = $collection->sum('display_total_voters');
-
     $pendingTables  = $collection->whereIn('display_status', ['configurada', 'en_espera', 'votacion'])->count();
     $computedTables = $collection->whereIn('display_status', ['escrutada', 'transmitida'])->count();
     $observedTables = $collection->where('display_status', 'observada')->count();
     $annulledTables = $collection->where('display_status', 'anulada')->count();
-
     $participationPct = $totalExpectedVoters > 0
         ? round(($totalActualVoters / $totalExpectedVoters) * 100, 1) : 0;
     $pendingPct  = $totalTables > 0 ? round(($pendingTables  / $totalTables) * 100, 1) : 0;
