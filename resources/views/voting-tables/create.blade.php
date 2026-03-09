@@ -1,45 +1,31 @@
 {{-- resources/views/voting-tables/create.blade.php --}}
 @extends('layouts.master')
-@section('title', 'Crear Mesa')
+
+@section('title', 'Crear Nueva Mesa de Votación')
 
 @section('content')
     @component('components.breadcrumb')
-        @slot('li_1') Mesas @endslot
-        @slot('li_2') <a href="{{ route('voting-tables.index') }}">Lista de Mesas</a> @endslot
+        @slot('li_1') <a href="{{ route('voting-tables.index') }}">Mesas</a> @endslot
         @slot('title') Crear Nueva Mesa @endslot
     @endcomponent
 
     <div class="row">
         <div class="col-lg-12">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header bg-primary text-white">
                     <h4 class="card-title mb-0">
                         <i class="ri-add-line me-1"></i>
                         Nueva Mesa de Votación
                     </h4>
                 </div>
                 <div class="card-body">
-                    {{--
-                        form-fields only collects voting_tables columns.
-                        Election-level data (ballots, status, times) is managed
-                        via "Configuración Electoral" after the table is created.
-                        The controller auto-creates a VotingTableElection row for
-                        every currently active ElectionType on store().
-                    --}}
-                    <div class="alert alert-info py-2">
-                        <i class="ri-information-line me-1"></i>
-                        Los campos marcados con <span class="text-danger">*</span> son obligatorios.
-                        El <strong>estado electoral</strong> (papeletas, votos, horarios) se gestiona desde
-                        <strong>Configuración Electoral</strong> en la vista de detalle, una vez creada la mesa.
-                    </div>
-
                     <form action="{{ route('voting-tables.store') }}" method="POST" id="votingTableForm">
                         @csrf
 
                         @include('voting-tables.partials.form-fields', [
-                            'votingTable'  => null,
+                            'votingTable' => null,
                             'institutions' => $institutions,
-                            'users'        => $users,
+                            'users' => $users,
                         ])
 
                         <hr class="my-4">
@@ -60,12 +46,6 @@
 @endsection
 
 @section('script')
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Init tooltips
-            [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-              .forEach(el => new bootstrap.Tooltip(el));
-        });
-    </script>
     @include('voting-tables.scripts.voting-table-js')
+    @stack('scripts')
 @endsection

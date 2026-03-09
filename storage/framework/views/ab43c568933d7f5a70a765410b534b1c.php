@@ -1,11 +1,9 @@
-{{-- resources/views/voting-tables/election-config.blade.php --}}
-@extends('layouts.master')
+<?php $__env->startSection('title'); ?>
+    Configuración Electoral - Mesa <?php echo e($votingTable->oep_code ?? $votingTable->internal_code); ?>
 
-@section('title')
-    Configuración Electoral - Mesa {{ $votingTable->oep_code ?? $votingTable->internal_code }}
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('css')
+<?php $__env->startSection('css'); ?>
     <style>
         .config-card {
             border: 1px solid #e9e9ef;
@@ -27,22 +25,23 @@
             border-radius: 0.25rem;
         }
     </style>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('content')
-    @component('components.breadcrumb')
-        @slot('li_1')
-            <a href="{{ route('voting-tables.index') }}">Mesas</a>
-        @endslot
-        @slot('li_2')
-            <a href="{{ route('voting-tables.show', $votingTable->id) }}">
-                Mesa {{ $votingTable->oep_code ?? $votingTable->internal_code }}
+<?php $__env->startSection('content'); ?>
+    <?php $__env->startComponent('components.breadcrumb'); ?>
+        <?php $__env->slot('li_1'); ?>
+            <a href="<?php echo e(route('voting-tables.index')); ?>">Mesas</a>
+        <?php $__env->endSlot(); ?>
+        <?php $__env->slot('li_2'); ?>
+            <a href="<?php echo e(route('voting-tables.show', $votingTable->id)); ?>">
+                Mesa <?php echo e($votingTable->oep_code ?? $votingTable->internal_code); ?>
+
             </a>
-        @endslot
-        @slot('title')
+        <?php $__env->endSlot(); ?>
+        <?php $__env->slot('title'); ?>
             Configuración Electoral
-        @endslot
-    @endcomponent
+        <?php $__env->endSlot(); ?>
+    <?php echo $__env->renderComponent(); ?>
 
     <div class="row">
         <div class="col-lg-12">
@@ -56,17 +55,18 @@
                 <div class="card-body">
                     <div class="alert alert-info">
                         <i class="ri-information-line me-1"></i>
-                        <strong>Mesa:</strong> {{ $votingTable->institution->name }} - N° {{ $votingTable->number }}
-                        @if($votingTable->letter)
-                            ({{ $votingTable->letter }})
-                        @endif
+                        <strong>Mesa:</strong> <?php echo e($votingTable->institution->name); ?> - N° <?php echo e($votingTable->number); ?>
+
+                        <?php if($votingTable->letter): ?>
+                            (<?php echo e($votingTable->letter); ?>)
+                        <?php endif; ?>
                         <br>
                         <small>Configure los datos electorales para cada tipo de elección. La fecha de elección está definida por el tipo de elección y no puede modificarse por mesa.</small>
                     </div>
 
                     <div class="row">
-                        @forelse($electionTypes as $electionType)
-                            @php
+                        <?php $__empty_1 = true; $__currentLoopData = $electionTypes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $electionType): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                            <?php
                                 $config = $votingTable->elections->firstWhere('election_type_id', $electionType->id);
                                 $statusColors = [
                                     'configurada' => 'secondary',
@@ -79,106 +79,109 @@
                                     'transmitida' => 'success',
                                     'anulada' => 'dark'
                                 ];
-                            @endphp
+                            ?>
                             <div class="col-md-6 mb-4">
                                 <div class="card config-card">
                                     <div class="card-header bg-light">
                                         <h5 class="card-title mb-0">
-                                            {{ $electionType->name }}
-                                            <small class="text-muted d-block">{{ $electionType->short_name ?? '' }}</small>
+                                            <?php echo e($electionType->name); ?>
+
+                                            <small class="text-muted d-block"><?php echo e($electionType->short_name ?? ''); ?></small>
                                         </h5>
                                     </div>
                                     <div class="card-body">
-                                        {{-- Información fija del tipo de elección --}}
+                                        
                                         <div class="election-info">
                                             <div class="row">
                                                 <div class="col-6">
                                                     <small class="text-muted d-block">Fecha de Elección:</small>
-                                                    <strong>{{ $electionType->election_date ? \Carbon\Carbon::parse($electionType->election_date)->format('d/m/Y') : 'No definida' }}</strong>
+                                                    <strong><?php echo e($electionType->election_date ? \Carbon\Carbon::parse($electionType->election_date)->format('d/m/Y') : 'No definida'); ?></strong>
                                                 </div>
                                                 <div class="col-6">
                                                     <small class="text-muted d-block">Nivel:</small>
-                                                    <strong>{{ $electionType->level_label ?? $electionType->level }}</strong>
+                                                    <strong><?php echo e($electionType->level_label ?? $electionType->level); ?></strong>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <form action="{{ route('voting-tables.election-config.update', $votingTable->id) }}"
+                                        <form action="<?php echo e(route('voting-tables.election-config.update', $votingTable->id)); ?>"
                                               method="POST" class="election-config-form">
-                                            @csrf
-                                            <input type="hidden" name="election_type_id" value="{{ $electionType->id }}">
+                                            <?php echo csrf_field(); ?>
+                                            <input type="hidden" name="election_type_id" value="<?php echo e($electionType->id); ?>">
 
                                             <div class="row">
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label">Papeletas Recibidas</label>
                                                     <input type="number" name="ballots_received"
                                                            class="form-control"
-                                                           value="{{ old('ballots_received', $config->ballots_received ?? 0) }}"
+                                                           value="<?php echo e(old('ballots_received', $config->ballots_received ?? 0)); ?>"
                                                            min="0" required>
                                                 </div>
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label">Papeletas Usadas</label>
                                                     <input type="number" name="ballots_used"
                                                            class="form-control"
-                                                           value="{{ old('ballots_used', $config->ballots_used ?? 0) }}"
+                                                           value="<?php echo e(old('ballots_used', $config->ballots_used ?? 0)); ?>"
                                                            min="0" required>
                                                 </div>
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label">Papeletas Sobrantes</label>
                                                     <input type="number" name="ballots_leftover"
                                                            class="form-control"
-                                                           value="{{ old('ballots_leftover', $config->ballots_leftover ?? 0) }}"
+                                                           value="<?php echo e(old('ballots_leftover', $config->ballots_leftover ?? 0)); ?>"
                                                            min="0" required>
                                                 </div>
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label">Papeletas Deterioradas</label>
                                                     <input type="number" name="ballots_spoiled"
                                                            class="form-control"
-                                                           value="{{ old('ballots_spoiled', $config->ballots_spoiled ?? 0) }}"
+                                                           value="<?php echo e(old('ballots_spoiled', $config->ballots_spoiled ?? 0)); ?>"
                                                            min="0" required>
                                                 </div>
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label">Total Votantes</label>
                                                     <input type="number" name="total_voters"
                                                            class="form-control"
-                                                           value="{{ old('total_voters', $config->total_voters ?? 0) }}"
+                                                           value="<?php echo e(old('total_voters', $config->total_voters ?? 0)); ?>"
                                                            min="0" required>
                                                 </div>
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label">Estado</label>
                                                     <select name="status" class="form-select" required>
-                                                        @foreach(\App\Models\VotingTable::getStatuses() as $value => $label)
-                                                            <option value="{{ $value }}"
-                                                                {{ (old('status', $config->status ?? 'configurada') == $value) ? 'selected' : '' }}>
-                                                                {{ $label }}
+                                                        <?php $__currentLoopData = \App\Models\VotingTable::getStatuses(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $value => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                                            <option value="<?php echo e($value); ?>"
+                                                                <?php echo e((old('status', $config->status ?? 'configurada') == $value) ? 'selected' : ''); ?>>
+                                                                <?php echo e($label); ?>
+
                                                             </option>
-                                                        @endforeach
+                                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                                     </select>
                                                 </div>
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label">Hora Apertura</label>
                                                     <input type="time" name="opening_time"
                                                            class="form-control"
-                                                           value="{{ old('opening_time', $config->opening_time ?? '') }}">
+                                                           value="<?php echo e(old('opening_time', $config->opening_time ?? '')); ?>">
                                                 </div>
                                                 <div class="col-md-6 mb-3">
                                                     <label class="form-label">Hora Cierre</label>
                                                     <input type="time" name="closing_time"
                                                            class="form-control"
-                                                           value="{{ old('closing_time', $config->closing_time ?? '') }}">
+                                                           value="<?php echo e(old('closing_time', $config->closing_time ?? '')); ?>">
                                                 </div>
                                                 <div class="col-12 mb-3">
                                                     <label class="form-label">Observaciones</label>
-                                                    <textarea name="observations" class="form-control" rows="2">{{ old('observations', $config->observations ?? '') }}</textarea>
+                                                    <textarea name="observations" class="form-control" rows="2"><?php echo e(old('observations', $config->observations ?? '')); ?></textarea>
                                                 </div>
                                             </div>
 
                                             <div class="text-end">
-                                                @if($config)
-                                                    <span class="badge bg-{{ $statusColors[$config->status] ?? 'secondary' }} status-badge me-2">
-                                                        Estado actual: {{ \App\Models\VotingTable::getStatuses()[$config->status] ?? $config->status }}
+                                                <?php if($config): ?>
+                                                    <span class="badge bg-<?php echo e($statusColors[$config->status] ?? 'secondary'); ?> status-badge me-2">
+                                                        Estado actual: <?php echo e(\App\Models\VotingTable::getStatuses()[$config->status] ?? $config->status); ?>
+
                                                     </span>
-                                                @endif
+                                                <?php endif; ?>
                                                 <button type="submit" class="btn btn-primary">
                                                     <i class="ri-save-line me-1"></i>Guardar Configuración
                                                 </button>
@@ -187,14 +190,14 @@
                                     </div>
                                 </div>
                             </div>
-                        @empty
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                             <div class="col-12">
                                 <div class="alert alert-warning">
                                     <i class="ri-alert-line me-1"></i>
                                     No hay tipos de elección activos en el sistema.
                                 </div>
                             </div>
-                        @endforelse
+                        <?php endif; ?>
                     </div>
 
                     <div class="row mt-3">
@@ -213,7 +216,7 @@
 
                     <div class="row">
                         <div class="col-12 text-end">
-                            <a href="{{ route('voting-tables.show', $votingTable->id) }}" class="btn btn-secondary">
+                            <a href="<?php echo e(route('voting-tables.show', $votingTable->id)); ?>" class="btn btn-secondary">
                                 <i class="ri-arrow-left-line me-1"></i>Volver a la Mesa
                             </a>
                         </div>
@@ -222,9 +225,9 @@
             </div>
         </div>
     </div>
-@endsection
+<?php $__env->stopSection(); ?>
 
-@section('script')
+<?php $__env->startSection('script'); ?>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Auto-calculate ballot consistency
@@ -267,4 +270,6 @@
             });
         });
     </script>
-@endsection
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.master', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-tables/election-config.blade.php ENDPATH**/ ?>

@@ -18,7 +18,7 @@
     </div>
 @endif
 
-{{-- SECCIÓN 1 — IDENTIFICACIÓN --}}
+{{-- SECCIÓN 1 — IDENTIFICACIÓN DE LA MESA --}}
 <div class="card border-primary mb-4">
     <div class="card-header bg-primary text-white">
         <h5 class="card-title mb-0">
@@ -48,13 +48,13 @@
                 <div class="invalid-feedback">{{ $message }}</div>
             @else
                 <small class="text-muted">
-                    La mesa estará disponible para todos los tipos de elección activos.
+                    Seleccione el recinto donde se encuentra esta mesa.
                 </small>
             @enderror
         </div>
 
         <div class="row">
-            {{-- Número --}}
+            {{-- Número de Mesa --}}
             <div class="col-md-3">
                 <div class="mb-3">
                     <label for="number-field" class="form-label fw-bold">
@@ -71,30 +71,30 @@
                 </div>
             </div>
 
-            {{-- Letra --}}
+            {{-- Letra de Mesa --}}
             <div class="col-md-2">
                 <div class="mb-3">
                     <label for="letter-field" class="form-label">Letra</label>
                     <input type="text" id="letter-field" name="letter"
                         class="form-control @error('letter') is-invalid @enderror"
-                        placeholder="A, B…"
+                        placeholder="A, B, C..."
                         value="{{ old('letter', $votingTable->letter ?? '') }}"
                         maxlength="1" />
                     @error('letter')
                         <div class="invalid-feedback">{{ $message }}</div>
                     @else
-                        <small class="text-muted">Opcional</small>
+                        <small class="text-muted">Opcional (Ej: A, B, C)</small>
                     @enderror
                 </div>
             </div>
 
-            {{-- Tipo --}}
+            {{-- Tipo de Mesa --}}
             <div class="col-md-3">
                 <div class="mb-3">
                     <label for="type-field" class="form-label">Tipo de Mesa</label>
                     <select class="form-select @error('type') is-invalid @enderror"
                             name="type" id="type-field">
-                        <option value="mixta"     {{ old('type', $votingTable->type ?? 'mixta') == 'mixta'     ? 'selected' : '' }}>Mixta (H y M)</option>
+                        <option value="mixta"     {{ old('type', $votingTable->type ?? 'mixta') == 'mixta'     ? 'selected' : '' }}>Mixta (Hombres y Mujeres)</option>
                         <option value="masculina" {{ old('type', $votingTable->type ?? '')       == 'masculina' ? 'selected' : '' }}>Masculina</option>
                         <option value="femenina"  {{ old('type', $votingTable->type ?? '')       == 'femenina'  ? 'selected' : '' }}>Femenina</option>
                     </select>
@@ -103,27 +103,20 @@
                     @enderror
                 </div>
             </div>
-
-            {{-- Votantes esperados --}}
-            <div class="col-md-4">
-                <div class="mb-3">
-                    <label for="expected_voters-field" class="form-label">
-                        Votantes Esperados (Padrón)
-                    </label>
-                    <input type="number" id="expected_voters-field" name="expected_voters"
-                        class="form-control @error('expected_voters') is-invalid @enderror"
-                        value="{{ old('expected_voters', $votingTable->expected_voters ?? 0) }}"
-                        min="0" />
-                    @error('expected_voters')
-                        <div class="invalid-feedback">{{ $message }}</div>
-                    @else
-                        <small class="text-muted">Ciudadanos habilitados según padrón</small>
-                    @enderror
-                </div>
-            </div>
         </div>
+    </div>
+</div>
 
-        {{-- Códigos --}}
+{{-- SECCIÓN 2 — CÓDIGOS DE IDENTIFICACIÓN --}}
+<div class="card border-info mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="card-title mb-0">
+            <i class="ri-barcode-line me-1"></i>
+            Códigos de Identificación
+            <small class="text-white-50 ms-2">(Se generan automáticamente si se dejan vacíos)</small>
+        </h5>
+    </div>
+    <div class="card-body">
         <div class="row">
             <div class="col-md-6">
                 <div class="mb-3">
@@ -137,7 +130,7 @@
                     @else
                         <small class="text-muted">
                             <i class="ri-information-line"></i>
-                            Dejar vacío para generar (Ej: REC-001-1)
+                            Formato: [Código Recinto]-[N° Mesa][Letra] (Ej: REC001-1A)
                         </small>
                     @enderror
                 </div>
@@ -154,74 +147,93 @@
                     @else
                         <small class="text-muted">
                             <i class="ri-information-line"></i>
-                            Dejar vacío para generar (Ej: REC-001-M01)
+                            Formato: [Código Recinto]-M[N° Mesa][Letra] (Ej: REC001-M01A)
                         </small>
                     @enderror
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
-{{-- SECCIÓN 2 — RANGO DE VOTANTES --}}
-<div class="card border-info mb-4">
-    <div class="card-header bg-info text-white">
+{{-- SECCIÓN 3 — RANGO DE VOTANTES --}}
+<div class="card border-success mb-4">
+    <div class="card-header bg-success text-white">
         <h5 class="card-title mb-0">
             <i class="ri-group-line me-1"></i>
-            Rango de Votantes
-            <small class="text-white-50 ms-2">(Opcional)</small>
+            Rango de Votantes y Padrón
         </h5>
     </div>
     <div class="card-body">
         <div class="row">
+            {{-- Votantes Esperados --}}
+            <div class="col-md-12 mb-3">
+                <label for="expected_voters-field" class="form-label fw-bold">
+                    Votantes Esperados (Según Padrón)
+                </label>
+                <input type="number" id="expected_voters-field" name="expected_voters"
+                    class="form-control @error('expected_voters') is-invalid @enderror"
+                    value="{{ old('expected_voters', $votingTable->expected_voters ?? 0) }}"
+                    min="0" />
+                @error('expected_voters')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @else
+                    <small class="text-muted">Número total de ciudadanos habilitados para votar en esta mesa</small>
+                @enderror
+            </div>
+
+            {{-- Rango Desde --}}
             <div class="col-md-6">
                 <div class="mb-3">
                     <label for="voter_range_start_name-field" class="form-label">
-                        Primer Apellido del Rango
+                        Inicio del Rango (Apellido)
                     </label>
                     <input type="text" id="voter_range_start_name-field"
                         name="voter_range_start_name"
                         class="form-control"
                         placeholder="Ej: ACOSTA"
                         value="{{ old('voter_range_start_name', $votingTable->voter_range_start_name ?? '') }}" />
+                    <small class="text-muted">Primer apellido del rango alfabético</small>
                 </div>
             </div>
+
+            {{-- Rango Hasta --}}
             <div class="col-md-6">
                 <div class="mb-3">
                     <label for="voter_range_end_name-field" class="form-label">
-                        Último Apellido del Rango
+                        Fin del Rango (Apellido)
                     </label>
                     <input type="text" id="voter_range_end_name-field"
                         name="voter_range_end_name"
                         class="form-control"
                         placeholder="Ej: ZEBALLOS"
                         value="{{ old('voter_range_end_name', $votingTable->voter_range_end_name ?? '') }}" />
+                    <small class="text-muted">Último apellido del rango alfabético</small>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-{{-- SECCIÓN 3 — DELEGADOS DE MESA --}}
-<div class="card border-secondary mb-4">
-    <div class="card-header bg-secondary text-white">
+{{-- SECCIÓN 4 — DELEGADOS DE MESA --}}
+<div class="card border-warning mb-4">
+    <div class="card-header bg-warning text-dark">
         <h5 class="card-title mb-0">
             <i class="ri-user-star-line me-1"></i>
             Delegados de Mesa
-            <small class="text-white-50 ms-2">(Opcional — también se pueden asignar después)</small>
+            <small class="text-dark-50 ms-2">(Usuarios registrados en el sistema)</small>
         </h5>
     </div>
     <div class="card-body">
         <div class="row">
             @php
                 $delegates = [
-                    'president_id' => ['label' => 'Presidente',  'icon' => 'ri-user-star-line'],
-                    'secretary_id' => ['label' => 'Secretario',  'icon' => 'ri-user-line'],
-                    'vocal1_id'    => ['label' => 'Vocal 1',     'icon' => 'ri-user-line'],
-                    'vocal2_id'    => ['label' => 'Vocal 2',     'icon' => 'ri-user-line'],
-                    'vocal3_id'    => ['label' => 'Vocal 3',     'icon' => 'ri-user-line'],
-                    'vocal4_id'    => ['label' => 'Vocal 4',     'icon' => 'ri-user-line'],
+                    'president_id' => ['label' => 'Presidente',  'icon' => 'ri-user-star-line', 'color' => 'primary'],
+                    'secretary_id' => ['label' => 'Secretario',  'icon' => 'ri-user-settings-line', 'color' => 'success'],
+                    'vocal1_id'    => ['label' => 'Vocal 1',     'icon' => 'ri-user-line', 'color' => 'info'],
+                    'vocal2_id'    => ['label' => 'Vocal 2',     'icon' => 'ri-user-line', 'color' => 'secondary'],
+                    'vocal3_id'    => ['label' => 'Vocal 3',     'icon' => 'ri-user-line', 'color' => 'dark'],
+                    'vocal4_id'    => ['label' => 'Vocal 4',     'icon' => 'ri-user-line', 'color' => 'warning'],
                 ];
             @endphp
 
@@ -229,7 +241,7 @@
                 <div class="col-md-4">
                     <div class="mb-3">
                         <label for="{{ $field }}-field" class="form-label">
-                            <i class="{{ $info['icon'] }} me-1"></i>
+                            <i class="{{ $info['icon'] }} me-1 text-{{ $info['color'] }}"></i>
                             {{ $info['label'] }}
                         </label>
                         <select class="form-select @error($field) is-invalid @enderror"
@@ -237,8 +249,10 @@
                             <option value="">-- No asignado --</option>
                             @foreach($users as $user)
                                 <option value="{{ $user->id }}"
+                                    data-name="{{ $user->name }} {{ $user->last_name ?? '' }}"
                                     {{ old($field, $votingTable?->$field ?? '') == $user->id ? 'selected' : '' }}>
                                     {{ $user->name }} {{ $user->last_name ?? '' }}
+                                    @if($user->email) ({{ $user->email }}) @endif
                                 </option>
                             @endforeach
                         </select>
@@ -249,18 +263,28 @@
                 </div>
             @endforeach
         </div>
+
+        <div class="alert alert-light mt-2 mb-0">
+            <i class="ri-information-line me-1"></i>
+            <small>Los delegados deben estar registrados como usuarios en el sistema.</small>
+        </div>
     </div>
 </div>
 
-{{-- SECCIÓN 4 — OBSERVACIONES --}}
-<div class="card border-light mb-4">
+{{-- SECCIÓN 5 — OBSERVACIONES --}}
+<div class="card border-secondary mb-4">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="card-title mb-0">
+            <i class="ri-chat-1-line me-1"></i>
+            Observaciones Generales
+        </h5>
+    </div>
     <div class="card-body">
         <div class="mb-0">
-            <label for="observations" class="form-label">Observaciones</label>
             <textarea class="form-control @error('observations') is-invalid @enderror"
                       id="observations" name="observations"
                       rows="3"
-                      placeholder="Observaciones adicionales…">{{ old('observations', $votingTable->observations ?? '') }}</textarea>
+                      placeholder="Observaciones adicionales sobre la mesa (ubicación, accesibilidad, notas especiales, etc.)">{{ old('observations', $votingTable->observations ?? '') }}</textarea>
             @error('observations')
                 <div class="invalid-feedback">{{ $message }}</div>
             @enderror
@@ -268,10 +292,76 @@
     </div>
 </div>
 
-{{-- Info note --}}
+{{-- NOTA INFORMATIVA SOBRE DATOS ELECTORALES --}}
 <div class="alert alert-info">
-    <i class="ri-information-line me-1"></i>
-    <strong>Nota:</strong> Los datos electorales (papeletas, estado, horarios) se configuran
-    por separado en <strong>Configuración de Elección</strong> después de crear la mesa,
-    una vez por cada tipo de elección activo.
+    <div class="d-flex">
+        <div class="me-3">
+            <i class="ri-information-line fs-4"></i>
+        </div>
+        <div>
+            <h6 class="alert-heading">Información importante sobre la estructura de datos:</h6>
+            <p class="mb-2">
+                <strong>Esta mesa NO está limitada a un solo tipo de elección.</strong>
+                Los datos electorales específicos (papeletas recibidas, votantes, estado, horarios)
+                se configuran por separado para <strong>cada tipo de elección</strong> en la sección
+                "Configuración Electoral" después de crear la mesa.
+            </p>
+            <p class="mb-0">
+                <i class="ri-checkbox-circle-line text-success me-1"></i>
+                La mesa quedará automáticamente habilitada para <strong>TODOS los tipos de elección activos</strong>
+                en el sistema.
+            </p>
+        </div>
+    </div>
 </div>
+
+{{-- Script para auto-generar códigos basados en el recinto seleccionado --}}
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const institutionSelect = document.getElementById('institution_id-field');
+    const numberInput = document.getElementById('number-field');
+    const letterInput = document.getElementById('letter-field');
+    const oepCodeInput = document.getElementById('oep_code-field');
+    const internalCodeInput = document.getElementById('internal_code-field');
+
+    function generateCodes() {
+        if (!institutionSelect || !numberInput) return;
+
+        const selectedOption = institutionSelect.options[institutionSelect.selectedIndex];
+        const institutionCode = selectedOption?.dataset?.code || '';
+        const number = numberInput.value;
+        const letter = letterInput?.value?.toUpperCase() || '';
+
+        if (institutionCode && number) {
+            // Solo generar si los campos están vacíos o es creación nueva
+            if (!oepCodeInput.value || oepCodeInput.value === '') {
+                oepCodeInput.value = institutionCode + '-' + number + (letter || '');
+            }
+            if (!internalCodeInput.value || internalCodeInput.value === '') {
+                const paddedNumber = number.padStart(2, '0');
+                internalCodeInput.value = institutionCode + '-M' + paddedNumber + (letter || '');
+            }
+        }
+    }
+
+    if (institutionSelect) {
+        institutionSelect.addEventListener('change', generateCodes);
+    }
+    if (numberInput) {
+        numberInput.addEventListener('input', generateCodes);
+    }
+    if (letterInput) {
+        letterInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '');
+            generateCodes();
+        });
+    }
+
+    // Generar códigos iniciales si estamos en creación
+    @if(!isset($votingTable) || !$votingTable->exists)
+        generateCodes();
+    @endif
+});
+</script>
+@endpush

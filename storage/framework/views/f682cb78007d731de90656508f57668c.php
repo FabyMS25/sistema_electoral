@@ -87,7 +87,7 @@ $message = $__bag->first($__errorArgs[0]); ?>
                 <div class="invalid-feedback"><?php echo e($message); ?></div>
             <?php else: ?>
                 <small class="text-muted">
-                    La mesa estará disponible para todos los tipos de elección activos.
+                    Seleccione el recinto donde se encuentra esta mesa.
                 </small>
             <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
@@ -140,7 +140,7 @@ $message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>"
-                        placeholder="A, B…"
+                        placeholder="A, B, C..."
                         value="<?php echo e(old('letter', $votingTable->letter ?? '')); ?>"
                         maxlength="1" />
                     <?php $__errorArgs = ['letter'];
@@ -150,7 +150,7 @@ if (isset($message)) { $__messageOriginal = $message; }
 $message = $__bag->first($__errorArgs[0]); ?>
                         <div class="invalid-feedback"><?php echo e($message); ?></div>
                     <?php else: ?>
-                        <small class="text-muted">Opcional</small>
+                        <small class="text-muted">Opcional (Ej: A, B, C)</small>
                     <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
@@ -171,7 +171,7 @@ if (isset($__messageOriginal)) { $message = $__messageOriginal; }
 endif;
 unset($__errorArgs, $__bag); ?>"
                             name="type" id="type-field">
-                        <option value="mixta"     <?php echo e(old('type', $votingTable->type ?? 'mixta') == 'mixta'     ? 'selected' : ''); ?>>Mixta (H y M)</option>
+                        <option value="mixta"     <?php echo e(old('type', $votingTable->type ?? 'mixta') == 'mixta'     ? 'selected' : ''); ?>>Mixta (Hombres y Mujeres)</option>
                         <option value="masculina" <?php echo e(old('type', $votingTable->type ?? '')       == 'masculina' ? 'selected' : ''); ?>>Masculina</option>
                         <option value="femenina"  <?php echo e(old('type', $votingTable->type ?? '')       == 'femenina'  ? 'selected' : ''); ?>>Femenina</option>
                     </select>
@@ -187,41 +187,20 @@ endif;
 unset($__errorArgs, $__bag); ?>
                 </div>
             </div>
-
-            
-            <div class="col-md-4">
-                <div class="mb-3">
-                    <label for="expected_voters-field" class="form-label">
-                        Votantes Esperados (Padrón)
-                    </label>
-                    <input type="number" id="expected_voters-field" name="expected_voters"
-                        class="form-control <?php $__errorArgs = ['expected_voters'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>"
-                        value="<?php echo e(old('expected_voters', $votingTable->expected_voters ?? 0)); ?>"
-                        min="0" />
-                    <?php $__errorArgs = ['expected_voters'];
-$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
-if ($__bag->has($__errorArgs[0])) :
-if (isset($message)) { $__messageOriginal = $message; }
-$message = $__bag->first($__errorArgs[0]); ?>
-                        <div class="invalid-feedback"><?php echo e($message); ?></div>
-                    <?php else: ?>
-                        <small class="text-muted">Ciudadanos habilitados según padrón</small>
-                    <?php unset($message);
-if (isset($__messageOriginal)) { $message = $__messageOriginal; }
-endif;
-unset($__errorArgs, $__bag); ?>
-                </div>
-            </div>
         </div>
+    </div>
+</div>
 
-        
+
+<div class="card border-info mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="card-title mb-0">
+            <i class="ri-barcode-line me-1"></i>
+            Códigos de Identificación
+            <small class="text-white-50 ms-2">(Se generan automáticamente si se dejan vacíos)</small>
+        </h5>
+    </div>
+    <div class="card-body">
         <div class="row">
             <div class="col-md-6">
                 <div class="mb-3">
@@ -246,7 +225,7 @@ $message = $__bag->first($__errorArgs[0]); ?>
                     <?php else: ?>
                         <small class="text-muted">
                             <i class="ri-information-line"></i>
-                            Dejar vacío para generar (Ej: REC-001-1)
+                            Formato: [Código Recinto]-[N° Mesa][Letra] (Ej: REC001-1A)
                         </small>
                     <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
@@ -277,7 +256,7 @@ $message = $__bag->first($__errorArgs[0]); ?>
                     <?php else: ?>
                         <small class="text-muted">
                             <i class="ri-information-line"></i>
-                            Dejar vacío para generar (Ej: REC-001-M01)
+                            Formato: [Código Recinto]-M[N° Mesa][Letra] (Ej: REC001-M01A)
                         </small>
                     <?php unset($message);
 if (isset($__messageOriginal)) { $message = $__messageOriginal; }
@@ -286,43 +265,76 @@ unset($__errorArgs, $__bag); ?>
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
 
-<div class="card border-info mb-4">
-    <div class="card-header bg-info text-white">
+<div class="card border-success mb-4">
+    <div class="card-header bg-success text-white">
         <h5 class="card-title mb-0">
             <i class="ri-group-line me-1"></i>
-            Rango de Votantes
-            <small class="text-white-50 ms-2">(Opcional)</small>
+            Rango de Votantes y Padrón
         </h5>
     </div>
     <div class="card-body">
         <div class="row">
+            
+            <div class="col-md-12 mb-3">
+                <label for="expected_voters-field" class="form-label fw-bold">
+                    Votantes Esperados (Según Padrón)
+                </label>
+                <input type="number" id="expected_voters-field" name="expected_voters"
+                    class="form-control <?php $__errorArgs = ['expected_voters'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?> is-invalid <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>"
+                    value="<?php echo e(old('expected_voters', $votingTable->expected_voters ?? 0)); ?>"
+                    min="0" />
+                <?php $__errorArgs = ['expected_voters'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                    <div class="invalid-feedback"><?php echo e($message); ?></div>
+                <?php else: ?>
+                    <small class="text-muted">Número total de ciudadanos habilitados para votar en esta mesa</small>
+                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+            </div>
+
+            
             <div class="col-md-6">
                 <div class="mb-3">
                     <label for="voter_range_start_name-field" class="form-label">
-                        Primer Apellido del Rango
+                        Inicio del Rango (Apellido)
                     </label>
                     <input type="text" id="voter_range_start_name-field"
                         name="voter_range_start_name"
                         class="form-control"
                         placeholder="Ej: ACOSTA"
                         value="<?php echo e(old('voter_range_start_name', $votingTable->voter_range_start_name ?? '')); ?>" />
+                    <small class="text-muted">Primer apellido del rango alfabético</small>
                 </div>
             </div>
+
+            
             <div class="col-md-6">
                 <div class="mb-3">
                     <label for="voter_range_end_name-field" class="form-label">
-                        Último Apellido del Rango
+                        Fin del Rango (Apellido)
                     </label>
                     <input type="text" id="voter_range_end_name-field"
                         name="voter_range_end_name"
                         class="form-control"
                         placeholder="Ej: ZEBALLOS"
                         value="<?php echo e(old('voter_range_end_name', $votingTable->voter_range_end_name ?? '')); ?>" />
+                    <small class="text-muted">Último apellido del rango alfabético</small>
                 </div>
             </div>
         </div>
@@ -330,24 +342,24 @@ unset($__errorArgs, $__bag); ?>
 </div>
 
 
-<div class="card border-secondary mb-4">
-    <div class="card-header bg-secondary text-white">
+<div class="card border-warning mb-4">
+    <div class="card-header bg-warning text-dark">
         <h5 class="card-title mb-0">
             <i class="ri-user-star-line me-1"></i>
             Delegados de Mesa
-            <small class="text-white-50 ms-2">(Opcional — también se pueden asignar después)</small>
+            <small class="text-dark-50 ms-2">(Usuarios registrados en el sistema)</small>
         </h5>
     </div>
     <div class="card-body">
         <div class="row">
             <?php
                 $delegates = [
-                    'president_id' => ['label' => 'Presidente',  'icon' => 'ri-user-star-line'],
-                    'secretary_id' => ['label' => 'Secretario',  'icon' => 'ri-user-line'],
-                    'vocal1_id'    => ['label' => 'Vocal 1',     'icon' => 'ri-user-line'],
-                    'vocal2_id'    => ['label' => 'Vocal 2',     'icon' => 'ri-user-line'],
-                    'vocal3_id'    => ['label' => 'Vocal 3',     'icon' => 'ri-user-line'],
-                    'vocal4_id'    => ['label' => 'Vocal 4',     'icon' => 'ri-user-line'],
+                    'president_id' => ['label' => 'Presidente',  'icon' => 'ri-user-star-line', 'color' => 'primary'],
+                    'secretary_id' => ['label' => 'Secretario',  'icon' => 'ri-user-settings-line', 'color' => 'success'],
+                    'vocal1_id'    => ['label' => 'Vocal 1',     'icon' => 'ri-user-line', 'color' => 'info'],
+                    'vocal2_id'    => ['label' => 'Vocal 2',     'icon' => 'ri-user-line', 'color' => 'secondary'],
+                    'vocal3_id'    => ['label' => 'Vocal 3',     'icon' => 'ri-user-line', 'color' => 'dark'],
+                    'vocal4_id'    => ['label' => 'Vocal 4',     'icon' => 'ri-user-line', 'color' => 'warning'],
                 ];
             ?>
 
@@ -355,7 +367,7 @@ unset($__errorArgs, $__bag); ?>
                 <div class="col-md-4">
                     <div class="mb-3">
                         <label for="<?php echo e($field); ?>-field" class="form-label">
-                            <i class="<?php echo e($info['icon']); ?> me-1"></i>
+                            <i class="<?php echo e($info['icon']); ?> me-1 text-<?php echo e($info['color']); ?>"></i>
                             <?php echo e($info['label']); ?>
 
                         </label>
@@ -371,9 +383,11 @@ unset($__errorArgs, $__bag); ?>"
                             <option value="">-- No asignado --</option>
                             <?php $__currentLoopData = $users; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $user): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                                 <option value="<?php echo e($user->id); ?>"
+                                    data-name="<?php echo e($user->name); ?> <?php echo e($user->last_name ?? ''); ?>"
                                     <?php echo e(old($field, $votingTable?->$field ?? '') == $user->id ? 'selected' : ''); ?>>
                                     <?php echo e($user->name); ?> <?php echo e($user->last_name ?? ''); ?>
 
+                                    <?php if($user->email): ?> (<?php echo e($user->email); ?>) <?php endif; ?>
                                 </option>
                             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                         </select>
@@ -391,14 +405,24 @@ unset($__errorArgs, $__bag); ?>
                 </div>
             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
         </div>
+
+        <div class="alert alert-light mt-2 mb-0">
+            <i class="ri-information-line me-1"></i>
+            <small>Los delegados deben estar registrados como usuarios en el sistema.</small>
+        </div>
     </div>
 </div>
 
 
-<div class="card border-light mb-4">
+<div class="card border-secondary mb-4">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="card-title mb-0">
+            <i class="ri-chat-1-line me-1"></i>
+            Observaciones Generales
+        </h5>
+    </div>
     <div class="card-body">
         <div class="mb-0">
-            <label for="observations" class="form-label">Observaciones</label>
             <textarea class="form-control <?php $__errorArgs = ['observations'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -409,7 +433,7 @@ endif;
 unset($__errorArgs, $__bag); ?>"
                       id="observations" name="observations"
                       rows="3"
-                      placeholder="Observaciones adicionales…"><?php echo e(old('observations', $votingTable->observations ?? '')); ?></textarea>
+                      placeholder="Observaciones adicionales sobre la mesa (ubicación, accesibilidad, notas especiales, etc.)"><?php echo e(old('observations', $votingTable->observations ?? '')); ?></textarea>
             <?php $__errorArgs = ['observations'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -426,9 +450,75 @@ unset($__errorArgs, $__bag); ?>
 
 
 <div class="alert alert-info">
-    <i class="ri-information-line me-1"></i>
-    <strong>Nota:</strong> Los datos electorales (papeletas, estado, horarios) se configuran
-    por separado en <strong>Configuración de Elección</strong> después de crear la mesa,
-    una vez por cada tipo de elección activo.
+    <div class="d-flex">
+        <div class="me-3">
+            <i class="ri-information-line fs-4"></i>
+        </div>
+        <div>
+            <h6 class="alert-heading">Información importante sobre la estructura de datos:</h6>
+            <p class="mb-2">
+                <strong>Esta mesa NO está limitada a un solo tipo de elección.</strong>
+                Los datos electorales específicos (papeletas recibidas, votantes, estado, horarios)
+                se configuran por separado para <strong>cada tipo de elección</strong> en la sección
+                "Configuración Electoral" después de crear la mesa.
+            </p>
+            <p class="mb-0">
+                <i class="ri-checkbox-circle-line text-success me-1"></i>
+                La mesa quedará automáticamente habilitada para <strong>TODOS los tipos de elección activos</strong>
+                en el sistema.
+            </p>
+        </div>
+    </div>
 </div>
+
+
+<?php $__env->startPush('scripts'); ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const institutionSelect = document.getElementById('institution_id-field');
+    const numberInput = document.getElementById('number-field');
+    const letterInput = document.getElementById('letter-field');
+    const oepCodeInput = document.getElementById('oep_code-field');
+    const internalCodeInput = document.getElementById('internal_code-field');
+
+    function generateCodes() {
+        if (!institutionSelect || !numberInput) return;
+
+        const selectedOption = institutionSelect.options[institutionSelect.selectedIndex];
+        const institutionCode = selectedOption?.dataset?.code || '';
+        const number = numberInput.value;
+        const letter = letterInput?.value?.toUpperCase() || '';
+
+        if (institutionCode && number) {
+            // Solo generar si los campos están vacíos o es creación nueva
+            if (!oepCodeInput.value || oepCodeInput.value === '') {
+                oepCodeInput.value = institutionCode + '-' + number + (letter || '');
+            }
+            if (!internalCodeInput.value || internalCodeInput.value === '') {
+                const paddedNumber = number.padStart(2, '0');
+                internalCodeInput.value = institutionCode + '-M' + paddedNumber + (letter || '');
+            }
+        }
+    }
+
+    if (institutionSelect) {
+        institutionSelect.addEventListener('change', generateCodes);
+    }
+    if (numberInput) {
+        numberInput.addEventListener('input', generateCodes);
+    }
+    if (letterInput) {
+        letterInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '');
+            generateCodes();
+        });
+    }
+
+    // Generar códigos iniciales si estamos en creación
+    <?php if(!isset($votingTable) || !$votingTable->exists): ?>
+        generateCodes();
+    <?php endif; ?>
+});
+</script>
+<?php $__env->stopPush(); ?>
 <?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-tables/partials/form-fields.blade.php ENDPATH**/ ?>

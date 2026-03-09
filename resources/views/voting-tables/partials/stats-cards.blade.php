@@ -1,11 +1,4 @@
 {{-- resources/views/voting-tables/partials/stats-cards.blade.php --}}
-{{--
-  The controller's index() transform attaches two transient attributes:
-    $table->display_status        (from latest VotingTableElection)
-    $table->display_total_voters  (from latest VotingTableElection)
-  These are used here for stats. The raw $table->status column does NOT exist
-  on voting_tables; status lives on voting_table_elections.
---}}
 @php
     $collection = $votingTables->getCollection();
 

@@ -1,3 +1,6 @@
+
+
+
 <?php $__env->startSection('title'); ?>
     Mesa <?php echo e($votingTable->oep_code ?? $votingTable->internal_code); ?>
 
@@ -131,7 +134,6 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <!-- Estado y Progreso -->
                     <div class="row mb-4">
                         <div class="col-md-4">
                             <div class="info-box">

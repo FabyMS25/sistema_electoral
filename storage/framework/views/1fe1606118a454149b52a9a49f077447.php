@@ -1,5 +1,4 @@
 
-
 <?php
     $collection = $votingTables->getCollection();
 
