@@ -1,7 +1,6 @@
 
 <script>
 function createObservationWithSelected(tableId) {
-    // Only consider checkboxes that have a real saved vote ID
     const allChecked = document.querySelectorAll(
         `#table-${tableId} .observe-checkbox:checked:not(:disabled)`
     );
@@ -20,10 +19,7 @@ function createObservationWithSelected(tableId) {
         });
         return;
     }
-
-    // Build a readable list of selected votes
     const selected = Array.from(checkboxes).map(cb => ({
-        // data-vote-id is set on the checkbox (see table-rows.blade.php)
         voteId:        cb.dataset.voteId ?? cb.value,
         candidateName: cb.dataset.candidateName ?? '—',
         category:      cb.dataset.category ?? '',
@@ -91,10 +87,7 @@ function createObservationWithSelected(tableId) {
         formData.append('type',             result.value.type);
         formData.append('severity',         result.value.severity);
         formData.append('description',      result.value.description);
-
-        // Send vote IDs (not candidate IDs) — the controller expects vote_ids[]
         selected.forEach(s => formData.append('vote_ids[]', parseInt(s.voteId)));
-
         fetch('/observations', {
             method: 'POST',
             headers: {
@@ -106,9 +99,7 @@ function createObservationWithSelected(tableId) {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                // Visually lock the checkboxes
                 checkboxes.forEach(cb => { cb.checked = true; cb.disabled = true; });
-
                 Swal.fire({
                     icon: 'success', title: '✅ Observación creada',
                     text: data.message,
@@ -128,8 +119,6 @@ function createObservationWithSelected(tableId) {
         });
     });
 }
-
-// ─── Bind buttons ─────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.create-observation-btn').forEach(btn => {

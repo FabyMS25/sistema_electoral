@@ -11,7 +11,7 @@ return new class extends Migration
     {
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained();
+            $table->foreignId('user_id')->nullable()->constrained();
             $table->string('action'); // 'create', 'update', 'delete', 'validate', 'observe', 'correct'
             $table->string('model_type'); // 'Vote', 'Acta', 'Observation', etc.
             $table->unsignedBigInteger('model_id');

@@ -199,8 +199,6 @@ class InstitutionController extends Controller
     public function store(Request $request)
     {
         try {
-            Log::info('=== STORE: Datos completos del formulario ===', $request->all());
-
             $validated = $request->validate(
                 $this->validationRules(),
                 $this->validationMessages()
@@ -221,16 +219,12 @@ class InstitutionController extends Controller
             try {
                 Institution::create($validated);
                 DB::commit();
-
-                Log::info('=== STORE: Recinto creado exitosamente ===');
-
                 return redirect()->route('institutions.index')
                                 ->with('success', '✅ El recinto fue creado exitosamente.');
             } catch (\Exception $e) {
                 DB::rollBack();
                 throw $e;
             }
-
         } catch (ValidationException $e) {
             Log::error('=== STORE: Errores de validación ===', $e->errors());
             return redirect()->back()
@@ -299,7 +293,6 @@ class InstitutionController extends Controller
     {
         try {
             $institution = Institution::findOrFail($id);
-            Log::info('=== UPDATE: Datos completos del formulario ===', $request->all());
             $validated = $request->validate(
                 $this->validationRules($id),
                 $this->validationMessages()

@@ -18,8 +18,6 @@ class AuthServiceProvider extends ServiceProvider
                 return true;
             }
         });
-
-        // Gate dinámico para permisos
         Gate::define('has-permission', function ($user, $permission, $scope = null, $scopeId = null) {
             return $user->hasPermissionTo($permission, $scope, $scopeId);
         });
@@ -30,7 +28,7 @@ class AuthServiceProvider extends ServiceProvider
         //     if (app()->runningInConsole()) {
         //         return;
         //     }
-            
+
         //     $permissions = Permission::all();
         //     foreach ($permissions as $permission) {
         //         Gate::define($permission->name, function (User $user) use ($permission) {

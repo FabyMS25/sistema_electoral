@@ -38,29 +38,22 @@ class ActaCategoryResult extends Model
         'ocr_confidence'   => 'float',
     ];
 
-    // ===== RELATIONSHIPS =====
-
     public function acta(): BelongsTo
     {
         return $this->belongsTo(Acta::class);
     }
-
     public function electionTypeCategory(): BelongsTo
     {
         return $this->belongsTo(ElectionTypeCategory::class);
     }
-
-    // ===== HELPERS =====
     public function getCategoryNameAttribute(): string
     {
         return $this->electionTypeCategory?->electionCategory?->name ?? 'N/A';
     }
-
     public function isInternallyConsistent(): bool
     {
         return ($this->valid_votes + $this->blank_votes + $this->null_votes) === $this->total_votes;
     }
-
     public function hasOcrDiscrepancy(): bool
     {
         if ($this->ocr_valid_votes === null) return false;

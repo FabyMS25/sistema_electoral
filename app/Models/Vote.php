@@ -4,7 +4,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-
+use App\Models\VotingTableCategoryResult;
+use App\Models\ValidationHistory;
 class Vote extends Model
 {
     use HasFactory, SoftDeletes;
@@ -146,7 +147,6 @@ class Vote extends Model
     public function scopeByCategory($query, $id)      { return $query->where('election_type_category_id', $id); }
     public function scopeWithVoteStatus($query, $s)   { return $query->where('vote_status', $s); }
 
-    // ===== ACTIONS =====
     public function markAsObserved(int $userId, int $observationId, ?string $notes = null): void
     {
         $old = $this->vote_status;

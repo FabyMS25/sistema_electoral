@@ -1,15 +1,4 @@
-{{--
-    resources/views/voting-table-votes/partials/table-footer.blade.php
-
-    Variables expected:
-      $table            – VotingTable (with results_by_category and ballots_leftover)
-      $permissions      – global permissions array
-      $candidatesByCategory – [categoryCode => Collection]
-      $categoryColorMap – [categoryCode => Bootstrap colour string]
-      $isDisabled       – bool: inputs are read-only
---}}
-
-{{-- ── Selection bar for observe-by-vote (only shown to users who can observe) ── --}}
+{{--  resources/views/voting-table-votes/partials/table-footer.blade.php ── --}}
 @if(($permissions['can_observe'] ?? false) && !$isDisabled)
 <div class="p-2 bg-light border-top">
     <div class="row align-items-center">
@@ -34,8 +23,6 @@
     </div>
 </div>
 @endif
-
-{{-- ── Vote summary row ── --}}
 <div class="row g-0 bg-light p-2 border-top small">
     @php
         $totalValid  = array_sum(array_column($table->results_by_category ?? [], 'valid_votes'));
@@ -60,8 +47,6 @@
         <span class="fw-bold ms-1">{{ $table->ballots_leftover ?? 0 }}</span>
     </div>
 </div>
-
-{{-- ── Inconsistency details row ── --}}
 @php
     $hasInconsistencies = collect($table->results_by_category ?? [])
         ->contains(fn($r) => !($r['is_consistent'] ?? true));

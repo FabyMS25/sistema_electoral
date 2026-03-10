@@ -15,7 +15,6 @@ class UserAssignment extends Model
     protected $fillable = [
         'user_id',
         'institution_id',
-        'election_type_id',
         'delegate_type',
         'voting_table_id',
         'assignment_date',
@@ -78,11 +77,6 @@ class UserAssignment extends Model
         return $this->belongsTo(Institution::class);
     }
 
-    public function electionType(): BelongsTo
-    {
-        return $this->belongsTo(ElectionType::class);
-    }
-
     public function votingTable(): BelongsTo
     {
         return $this->belongsTo(VotingTable::class);
@@ -93,15 +87,9 @@ class UserAssignment extends Model
         return $this->belongsTo(User::class, 'assigned_by');
     }
 
-    // ===== SCOPES =====
     public function scopeActive($query)
     {
         return $query->where('status', self::STATUS_ACTIVO);
-    }
-
-    public function scopeByElectionType($query, $electionTypeId)
-    {
-        return $query->where('election_type_id', $electionTypeId);
     }
 
     public function scopeByInstitution($query, $institutionId)
@@ -119,7 +107,6 @@ class UserAssignment extends Model
         return $query->where('delegate_type', $type);
     }
 
-    // ===== MÉTODOS =====
     public function isValid(): bool
     {
         return $this->status === self::STATUS_ACTIVO &&

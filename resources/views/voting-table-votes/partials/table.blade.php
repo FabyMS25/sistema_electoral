@@ -1,20 +1,16 @@
 {{-- resources/views/voting-table-votes/partials/table.blade.php --}}
 @php
-    $isDisabled = in_array($table->current_status, ['cerrada', 'escrutada', 'transmitida', 'anulada']) ||
-                  !($permissions['can_register'] ?? false);
-
-    // Colores para las categorías (cíclico)
+    $isDisabled = in_array($table->current_status, [
+                  'en_escrutinio', 'escrutada', 'transmitida', 'anulada'
+              ]) || !($permissions['can_register'] ?? false);
     $categoryColors = ['primary', 'success', 'warning', 'info', 'danger', 'secondary', 'dark'];
     $categoryColorMap = [];
     $index = 0;
-
     $categoryCodes = array_keys($candidatesByCategory ?? []);
     foreach ($categoryCodes as $code) {
         $categoryColorMap[$code] = $categoryColors[$index % count($categoryColors)];
         $index++;
     }
-
-    // Verificar inconsistencias
     $hasInconsistencies = false;
     if (isset($table->results_by_category)) {
         foreach ($table->results_by_category as $result) {
@@ -30,8 +26,6 @@
      id="table-{{ $table->id }}"
      data-table-id="{{ $table->id }}"
      data-expected-voters="{{ $table->expected_voters }}">
-
-    {{-- Header de la mesa --}}
     <div class="card-header bg-light position-relative">
         @if($hasInconsistencies)
             <span class="badge bg-danger role-badge" title="Tiene inconsistencias">
@@ -49,10 +43,6 @@
             <span class="badge bg-primary role-badge">
                 <i class="ri-check-double-line me-1"></i>Transmitida
             </span>
-        @elseif($table->current_status === 'cerrada')
-            <span class="badge bg-secondary role-badge">
-                <i class="ri-lock-line me-1"></i>Cerrada
-            </span>
         @endif
 
         <div class="row align-items-center">
@@ -69,7 +59,6 @@
                         'configurada' => 'secondary',
                         'en_espera' => 'info',
                         'votacion' => 'primary',
-                        'cerrada' => 'secondary',
                         'en_escrutinio' => 'warning',
                         'escrutada' => 'success',
                         'observada' => 'danger',
@@ -98,8 +87,6 @@
                 @include('voting-table-votes.partials.table-actions', ['table' => $table])
             </div>
         </div>
-
-        {{-- Totales por categoría --}}
         <div class="row mt-2">
             <div class="col-12">
                 <div class="d-flex gap-3 flex-wrap align-items-center">
@@ -127,8 +114,6 @@
             </div>
         </div>
     </div>
-
-    {{-- Tabla de votos dinámica --}}
     <div class="card-body p-0">
         @if(empty($candidatesByCategory))
             <div class="text-center py-5">
@@ -169,8 +154,6 @@
                 </table>
             </div>
         @endif
-
-        {{-- Footer con selección de observaciones --}}
         @if(($permissions['can_observe'] ?? false) && !$isDisabled && !empty($candidatesByCategory))
         <div class="p-2 bg-light border-top">
             <div class="row align-items-center">
@@ -191,8 +174,6 @@
             </div>
         </div>
         @endif
-
-        {{-- Resumen de votos --}}
         <div class="row g-0 bg-light p-2 border-top small">
             <div class="col-md-3">
                 <span class="text-muted">Votos Válidos:</span>
@@ -211,8 +192,6 @@
                 <span class="fw-bold ms-1">{{ $table->ballots_leftover ?? 0 }}</span>
             </div>
         </div>
-
-        {{-- Detalle de inconsistencias si las hay --}}
         @if($hasInconsistencies && isset($table->results_by_category))
             <div class="p-2 border-top bg-warning bg-opacity-10">
                 @foreach($table->results_by_category as $categoryCode => $result)

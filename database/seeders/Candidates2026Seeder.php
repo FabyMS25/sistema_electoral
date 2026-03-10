@@ -115,7 +115,6 @@ class Candidates2026Seeder extends Seeder
                         'department_id'             => $quillacollo->province->department_id ?? null,
                     ]
                 );
-                $this->command->info("  ✅ {$data['name']} ({$data['party']}) - Franja {$ordenFranjas[$data['party']]}");
             }
             DB::commit();
         } catch (\Exception $e) {

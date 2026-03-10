@@ -1,20 +1,8 @@
 {{-- resources/views/partials/dashboard-filters.blade.php --}}
-{{--
-    Variables expected (all passed by HomeController via buildDashboardData):
-      $dashboard            — Dashboard model (show_election_switcher, show_category_filter)
-      $electionTypes        — all active ElectionType records
-      $selectedElectionType — current ElectionType|null
-      $departments, $provinces, $municipalities
-      $selectedDepartment, $selectedProvince, $selectedMunicipality
-      $typeCategories       — ElectionTypeCategory collection for the selected election type
-      $activeCategoryCode   — currently selected category CODE string
---}}
 <div class="card mb-3 border-0 shadow-sm">
     <div class="card-body py-2 px-3">
         <form method="GET" action="{{ url()->current() }}" id="dashboardFilterForm">
             <div class="row g-2 align-items-end">
-
-                {{-- ── Election type switcher (controlled by show_election_switcher) ── --}}
                 @if($dashboard?->show_election_switcher !== false)
                 <div class="col-lg-3 col-md-6">
                     <label class="form-label form-label-sm fw-semibold mb-1 text-muted text-uppercase"
@@ -32,11 +20,8 @@
                     </select>
                 </div>
                 @else
-                {{-- Hidden — keeps value in form even when select is hidden --}}
                 <input type="hidden" name="election_type" value="{{ $selectedElectionType?->id ?? '' }}">
                 @endif
-
-                {{-- ── Category filter (controlled by show_category_filter) ── --}}
                 @if($dashboard?->show_category_filter !== false && $typeCategories->count() > 1)
                 <div class="col-lg-3 col-md-6">
                     <label class="form-label form-label-sm fw-semibold mb-1 text-muted text-uppercase"
@@ -60,15 +45,12 @@
                         </button>
                         @endforeach
                     </div>
-                    {{-- Hidden input carries the active category on form submit --}}
                     <input type="hidden" name="category" id="filter-category-input"
                            value="{{ $activeCategoryCode ?? '' }}">
                 </div>
                 @else
                 <input type="hidden" name="category" value="{{ $activeCategoryCode ?? '' }}">
                 @endif
-
-                {{-- ── Geography ── --}}
                 <div class="col-lg-2 col-md-4 col-6">
                     <label class="form-label form-label-sm fw-semibold mb-1 text-muted text-uppercase"
                            style="font-size:.68rem;letter-spacing:.04em;">
@@ -83,7 +65,6 @@
                         @endforeach
                     </select>
                 </div>
-
                 <div class="col-lg-1 col-md-4 col-6">
                     <label class="form-label form-label-sm fw-semibold mb-1 text-muted text-uppercase"
                            style="font-size:.68rem;letter-spacing:.04em;">
@@ -98,7 +79,6 @@
                         @endforeach
                     </select>
                 </div>
-
                 <div class="col-lg-1 col-md-4">
                     <label class="form-label form-label-sm fw-semibold mb-1 text-muted text-uppercase"
                            style="font-size:.68rem;letter-spacing:.04em;">
@@ -114,8 +94,6 @@
                         @endforeach
                     </select>
                 </div>
-
-                {{-- ── Actions + timestamp ── --}}
                 <div class="col-lg-2 col-md-12 d-flex align-items-end gap-2 justify-content-end">
                     <span class="text-muted small me-1 d-none d-lg-block text-end lh-1">
                         @if($selectedElectionType?->election_date)
@@ -141,27 +119,19 @@
 
 <script>
 (function () {
-    // ── Category pill: update hidden input + sync content tabs ────────────────
     window.setCategoryAndSync = function (code) {
-        // Update hidden input so form submission carries the right category
         const inp = document.getElementById('filter-category-input');
         if (inp) inp.value = code;
-
-        // Highlight the clicked pill
         document.querySelectorAll('.category-pill-btn').forEach(btn => {
             const active = btn.dataset.category === code;
             btn.classList.toggle('btn-primary',          active);
             btn.classList.toggle('btn-outline-secondary', !active);
         });
-
-        // Switch the Bootstrap tab in dashboard-content (no page reload needed)
         const tabLink = document.querySelector(`#categoryTabs [data-category="${code}"]`);
         if (tabLink) {
             const bsTab = bootstrap.Tab.getOrCreateInstance(tabLink);
             bsTab.show();
         }
-
-        // Sync chart pickers (locality + donut) if they exist
         ['locality-category-picker', 'donut-category-picker'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
@@ -170,27 +140,21 @@
             }
         });
     };
-
-    // ── Tab click → sync filter pills back ───────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('#categoryTabs [data-category]').forEach(link => {
             link.addEventListener('shown.bs.tab', e => {
                 const code = e.target.dataset.category;
                 if (!code) return;
-                // Sync pill buttons
                 document.querySelectorAll('.category-pill-btn').forEach(btn => {
                     const active = btn.dataset.category === code;
                     btn.classList.toggle('btn-primary',           active);
                     btn.classList.toggle('btn-outline-secondary', !active);
                 });
-                // Sync hidden input
                 const inp = document.getElementById('filter-category-input');
                 if (inp) inp.value = code;
             });
         });
     });
-
-    // ── Geography cascade ─────────────────────────────────────────────────────
     document.getElementById('dept-select')?.addEventListener('change', function () {
         fetch(`/api/provinces/${this.value}`)
             .then(r => r.json())
@@ -207,7 +171,6 @@
             })
             .catch(console.warn);
     });
-
     document.getElementById('prov-select')?.addEventListener('change', function () {
         fetch(`/api/municipalities/${this.value}`)
             .then(r => r.json())

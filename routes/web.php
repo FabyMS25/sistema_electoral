@@ -14,6 +14,7 @@ use App\Http\Controllers\ObservationController;
 Auth::routes();
 Route::get('index/{locale}', [HomeController::class, 'lang']);
 Route::get('/', [HomeController::class, 'root'])->name('root');
+Route::get('/refresh-dashboard', [HomeController::class, 'refreshDashboard'])->name('dashboard.refresh');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/refresh-dashboard', [HomeController::class, 'getDashboardData'])->name('refresh-dashboard');
@@ -44,7 +45,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ===== INSTITUCIONES (RECINTOS) =====
     Route::prefix('institutions')->name('institutions.')->group(function () {
-        // Export/Import
         Route::get('/export-all', [InstitutionController::class, 'exportAll'])->name('export-all');
         Route::post('/export-selected', [InstitutionController::class, 'exportSelected'])->name('export-selected');
         Route::get('/template', [InstitutionController::class, 'downloadTemplate'])->name('template');
@@ -127,7 +127,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('{id}/approve', [ActaController::class, 'approve'])->name('approve');
         Route::get('table/{tableId}', [ActaController::class, 'getTableActas'])->name('table');
     });
-
     // ===== PERFIL =====
     Route::prefix('profile')->name('profile.')->group(function () {
         Route::get('/', [ProfileController::class, 'index'])->name('index');

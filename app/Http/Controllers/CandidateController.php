@@ -35,24 +35,18 @@ class CandidateController extends Controller
                       ->orWhere('candidates.list_name', 'like', "%{$search}%");
                 });
             }
-
             if ($request->filled('election_type_category_id')) {
                 $query->where('candidates.election_type_category_id', $request->election_type_category_id);
             }
-
             if ($request->filled('department_id')) {
                 $query->where('candidates.department_id', $request->department_id);
             }
-
             if ($request->filled('province_id')) {
                 $query->where('candidates.province_id', $request->province_id);
             }
-
             if ($request->filled('municipality_id')) {
                 $query->where('candidates.municipality_id', $request->municipality_id);
             }
-
-            // ── Sorting ───────────────────────────
             $sort      = $request->get('sort', 'name');
             $direction = in_array($request->get('direction', 'asc'), ['asc', 'desc'])
                 ? $request->get('direction', 'asc')
@@ -77,8 +71,6 @@ class CandidateController extends Controller
             $perPage    = (int) $request->get('per_page', 20);
             $perPage    = in_array($perPage, [20, 50, 100, 200]) ? $perPage : 20;
             $candidates = $query->paginate($perPage)->withQueryString();
-
-            // ── Dropdown data ─────────────────────
             $electionTypeCategories = $this->getActiveElectionTypeCategories();
             $departments            = Department::orderBy('name')->get();
             $provinces              = $request->filled('department_id')
@@ -87,10 +79,7 @@ class CandidateController extends Controller
             $municipalities         = $request->filled('province_id')
                 ? Municipality::where('province_id', $request->province_id)->orderBy('name')->get()
                 : collect();
-
-            // ── Stats (computed here, NOT in the view) ───
             $stats = $this->buildStats();
-
         } catch (\Exception $e) {
             Log::error('Error loading candidates: ' . $e->getMessage());
             $candidates             = collect();
@@ -353,8 +342,6 @@ class CandidateController extends Controller
                 fputcsv($f, ['  4. Deje en blanco los campos geográficos si el candidato es de ámbito nacional.']);
                 fputcsv($f, ['  5. Si llena "municipio", el sistema auto-completa provincia y departamento.']);
                 fputcsv($f, []);
-
-                // ── SECTION 2: Import data (actual header + example row) ──
                 fputcsv($f, [
                     'nombre', 'partido', 'nombre_completo_partido', 'color',
                     'tipo_eleccion', 'codigo_categoria',
@@ -376,11 +363,8 @@ class CandidateController extends Controller
                     'Quillacollo',
                     'Quillacollo',
                 ]);
-
                 fputcsv($f, []);
                 fputcsv($f, []);
-
-                // ── SECTION 3: Combo reference ───────────────────────────
                 fputcsv($f, ['=== REFERENCIA: Valores válidos para tipo_eleccion + codigo_categoria ===']);
                 fputcsv($f, [
                     'tipo_eleccion (copiar exacto)',
@@ -391,7 +375,6 @@ class CandidateController extends Controller
                     'ambito_geografico',
                     'nota_geografica',
                 ]);
-
                 $scopeNotes = [
                     'nacional'      => 'Dejar departamento/provincia/municipio en blanco',
                     'departamental' => 'Completar departamento (mínimo)',
@@ -412,56 +395,41 @@ class CandidateController extends Controller
                         $scopeNotes[$scope] ?? '',
                     ]);
                 }
-
                 fputcsv($f, []);
                 fputcsv($f, []);
-
-                // ── SECTION 4: Department reference ─────────────────────
                 fputcsv($f, ['=== REFERENCIA: Nombres exactos de departamentos ===']);
                 fputcsv($f, ['departamento (copiar exacto)']);
                 foreach ($departments as $dept) {
                     fputcsv($f, [$dept->name]);
                 }
-
                 fclose($f);
             }, 'plantilla_candidatos.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
-
         } catch (\Exception $e) {
             Log::error('Error generating template: ' . $e->getMessage());
             return redirect()->back()->with('error', '❌ Error al generar la plantilla.');
         }
     }
 
-    // ═══════════════════════════════════════════════════════
-    //  IMPORT — name-based, full validation + duplicate checks
-    // ═══════════════════════════════════════════════════════
     public function import(Request $request)
     {
         try {
             $request->validate([
                 'import_file' => 'required|file|mimes:csv,txt|max:5120',
             ]);
-
             $path   = $request->file('import_file')->getRealPath();
             $handle = fopen($path, 'r');
-
-            // ── Strip UTF-8 BOM ─────────────────────────────────────────
             $bom = fread($handle, 3);
             if ($bom !== chr(0xEF) . chr(0xBB) . chr(0xBF)) {
                 rewind($handle);
             }
-
-            // ── Locate header row (skip instruction/comment rows) ────────
             $expectedHeaders = [
                 'nombre', 'partido', 'nombre_completo_partido', 'color',
                 'tipo_eleccion', 'codigo_categoria',
                 'orden_lista', 'nombre_lista',
                 'departamento', 'provincia', 'municipio',
             ];
-
             $headers        = null;
             $headerRowFound = false;
-
             while (($row = fgetcsv($handle, 0, ',')) !== false) {
                 $cleaned = array_map(
                     fn($h) => trim(strtolower(str_replace("\xEF\xBB\xBF", '', $h))),
@@ -473,7 +441,6 @@ class CandidateController extends Controller
                     break;
                 }
             }
-
             if (!$headerRowFound) {
                 fclose($handle);
                 return redirect()->back()
@@ -481,10 +448,6 @@ class CandidateController extends Controller
                         '❌ No se encontró la fila de encabezados. '
                         . 'Asegúrese de usar la plantilla oficial sin modificar los nombres de columna.');
             }
-
-            // ── Pre-load lookup tables (one query each) ──────────────────
-
-            // ETC lookup: "tipo_lower|CODE_UPPER" → ['id', 'scope', 'allows_list']
             $etcLookup = ElectionTypeCategory::with(['electionType', 'electionCategory'])
                 ->whereHas('electionType', fn($q) => $q->where('active', true))
                 ->get()
@@ -497,11 +460,8 @@ class CandidateController extends Controller
                         'allows_list' => (bool) ($etc->electionCategory?->allows_list ?? false),
                     ],
                 ]);
-
-            // Geo lookups
             $deptLookup = \App\Models\Department::get()
                 ->mapWithKeys(fn($d) => [strtolower(trim($d->name)) => $d->id]);
-
             $provLookup = \App\Models\Province::get()
                 ->mapWithKeys(fn($p) => [
                     strtolower(trim($p->name)) => [
@@ -509,7 +469,6 @@ class CandidateController extends Controller
                         'dept_id' => $p->department_id,
                     ],
                 ]);
-
             $munLookup = \App\Models\Municipality::with('province')
                 ->get()
                 ->mapWithKeys(fn($m) => [
@@ -519,9 +478,6 @@ class CandidateController extends Controller
                         'dept_id' => $m->province?->department_id,
                     ],
                 ]);
-
-            // ── Pre-load existing active candidates for duplicate checks ─
-            // Key: "name_lower|party_lower|etc_id"
             $existingCandidates = \App\Models\Candidate::where('active', true)
                 ->get(['name', 'party', 'election_type_category_id',
                        'list_order', 'list_name', 'municipality_id',
@@ -531,8 +487,6 @@ class CandidateController extends Controller
                     . '|' . strtolower(trim($c->party))
                     . '|' . $c->election_type_category_id => true,
                 ]);
-
-            // list_order uniqueness per (etc_id, list_name) already in DB
             $existingListOrders = \App\Models\Candidate::where('active', true)
                 ->whereNotNull('list_order')
                 ->get(['election_type_category_id', 'list_name', 'list_order'])
@@ -540,35 +494,21 @@ class CandidateController extends Controller
                     . '|' . strtolower(trim($c->list_name ?? ''))
                     . '|' . $c->list_order)
                 ->flip()
-                ->all(); // ['etc_id|list_name|order' => 0]
-
-            // ── Tracking sets for intra-file duplicate detection ─────────
+                ->all();
             $seenInFile       = [];   // "name_lower|party_lower|etc_id"
             $seenListOrders   = [];   // "etc_id|list_name_lower|order"
-
-            // ── Result counters ──────────────────────────────────────────
             $toImport   = [];   // rows that passed all validation
             $errors     = [];   // ['row' => N, 'messages' => [...], 'data' => $data]
             $skipped    = [];   // duplicate skips (informational)
             $rowNumber  = 1;    // header = row 1
-
-            // ── First pass: validate every data row ──────────────────────
             while (($row = fgetcsv($handle, 0, ',')) !== false) {
                 $rowNumber++;
-
-                // Skip blank rows
                 if (count(array_filter($row, fn($v) => trim($v) !== '')) === 0) {
                     continue;
                 }
-
-                // Stop when we hit a reference section header
                 if (isset($row[0]) && str_starts_with(trim($row[0]), '===')) {
                     break;
                 }
-
-                $rowErrors = [];
-
-                // ── Column count ─────────────────────────────────────────
                 if (count($row) !== count($headers)) {
                     $errors[] = [
                         'row'      => $rowNumber,
@@ -580,10 +520,7 @@ class CandidateController extends Controller
                     ];
                     continue;
                 }
-
                 $data = array_map('trim', array_combine($headers, $row));
-
-                // ── Field-level validation ───────────────────────────────
                 $validator = \Illuminate\Support\Facades\Validator::make($data, [
                     'nombre'  => [
                         'required', 'string', 'max:255',
@@ -613,7 +550,6 @@ class CandidateController extends Controller
                     'orden_lista.min'             => 'El orden de lista debe ser mayor a 0.',
                     'orden_lista.max'             => 'El orden de lista no puede superar 9999.',
                 ]);
-
                 if ($validator->fails()) {
                     $errors[] = [
                         'row'      => $rowNumber,
@@ -622,11 +558,8 @@ class CandidateController extends Controller
                     ];
                     continue;
                 }
-
-                // ── Resolve election_type_category ───────────────────────
                 $etcKey  = strtolower($data['tipo_eleccion']) . '|' . strtoupper($data['codigo_categoria']);
                 $etcMeta = $etcLookup[$etcKey] ?? null;
-
                 if (!$etcMeta) {
                     $errors[] = [
                         'row'      => $rowNumber,
@@ -639,16 +572,11 @@ class CandidateController extends Controller
                     ];
                     continue;
                 }
-
                 $etcId = $etcMeta['id'];
                 $scope = $etcMeta['scope'];
-
-                // ── Geographic resolution ────────────────────────────────
                 $departmentId   = null;
                 $provinceId     = null;
                 $municipalityId = null;
-
-                // Municipio
                 if ($data['municipio'] !== '') {
                     $munKey  = strtolower($data['municipio']);
                     $munData = $munLookup[$munKey] ?? null;
@@ -663,8 +591,6 @@ class CandidateController extends Controller
                     $municipalityId = $munData['id'];
                     $provinceId     = $munData['prov_id'];
                     $departmentId   = $munData['dept_id'];
-
-                    // Cross-check explicit province
                     if ($data['provincia'] !== '') {
                         $explicitProvKey = strtolower($data['provincia']);
                         $explicitProv    = $provLookup[$explicitProvKey] ?? null;
@@ -680,8 +606,6 @@ class CandidateController extends Controller
                             continue;
                         }
                     }
-
-                    // Cross-check explicit department
                     if ($data['departamento'] !== '') {
                         $explicitDeptKey = strtolower($data['departamento']);
                         $explicitDeptId  = $deptLookup[$explicitDeptKey] ?? null;
@@ -697,9 +621,7 @@ class CandidateController extends Controller
                             continue;
                         }
                     }
-
                 } elseif ($data['provincia'] !== '') {
-                    // Provincia (no municipio)
                     $provKey  = strtolower($data['provincia']);
                     $provData = $provLookup[$provKey] ?? null;
                     if (!$provData) {
@@ -712,8 +634,6 @@ class CandidateController extends Controller
                     }
                     $provinceId   = $provData['id'];
                     $departmentId = $provData['dept_id'];
-
-                    // Cross-check explicit department
                     if ($data['departamento'] !== '') {
                         $explicitDeptId = $deptLookup[strtolower($data['departamento'])] ?? null;
                         if ($explicitDeptId && $explicitDeptId != $departmentId) {
@@ -728,9 +648,7 @@ class CandidateController extends Controller
                             continue;
                         }
                     }
-
                 } elseif ($data['departamento'] !== '') {
-                    // Departamento only
                     $deptKey      = strtolower($data['departamento']);
                     $departmentId = $deptLookup[$deptKey] ?? null;
                     if (!$departmentId) {
@@ -745,9 +663,6 @@ class CandidateController extends Controller
                         continue;
                     }
                 }
-
-                // ── Geographic scope validation ───────────────────────────
-                // Ensures the geographic data provided matches what the category requires
                 $scopeError = $this->validateGeographicScope(
                     $scope,
                     $departmentId,
@@ -755,7 +670,6 @@ class CandidateController extends Controller
                     $municipalityId,
                     $data
                 );
-
                 if ($scopeError) {
                     $errors[] = [
                         'row'      => $rowNumber,
@@ -764,14 +678,10 @@ class CandidateController extends Controller
                     ];
                     continue;
                 }
-
-                // ── list_order uniqueness ─────────────────────────────────
                 if ($data['orden_lista'] !== '') {
                     $listKey = $etcId
                         . '|' . strtolower($data['nombre_lista'])
                         . '|' . $data['orden_lista'];
-
-                    // Already taken in DB?
                     if (isset($existingListOrders[$listKey])) {
                         $errors[] = [
                             'row'      => $rowNumber,
@@ -784,8 +694,6 @@ class CandidateController extends Controller
                         ];
                         continue;
                     }
-
-                    // Already seen in this file?
                     if (isset($seenListOrders[$listKey])) {
                         $errors[] = [
                             'row'      => $rowNumber,
@@ -800,12 +708,9 @@ class CandidateController extends Controller
                     }
                     $seenListOrders[$listKey] = $rowNumber;
                 }
-
-                // ── Duplicate: same candidate already in DB ───────────────
                 $dupKey = strtolower($data['nombre'])
                     . '|' . strtolower($data['partido'])
                     . '|' . $etcId;
-
                 if (isset($existingCandidates[$dupKey])) {
                     $skipped[] = [
                         'row'  => $rowNumber,
@@ -814,8 +719,6 @@ class CandidateController extends Controller
                     ];
                     continue;
                 }
-
-                // ── Duplicate: repeated within this file ──────────────────
                 if (isset($seenInFile[$dupKey])) {
                     $errors[] = [
                         'row'      => $rowNumber,
@@ -829,8 +732,6 @@ class CandidateController extends Controller
                     continue;
                 }
                 $seenInFile[$dupKey] = $rowNumber;
-
-                // ── Passed all checks — queue for import ──────────────────
                 $toImport[] = [
                     'name'                      => $data['nombre'],
                     'party'                     => $data['partido'],
@@ -845,13 +746,9 @@ class CandidateController extends Controller
                     'active'                    => true,
                 ];
             }
-
             fclose($handle);
-
-            // ── Second pass: bulk insert inside a transaction ─────────────
             $imported     = 0;
             $insertErrors = [];
-
             if (!empty($toImport)) {
                 \Illuminate\Support\Facades\DB::transaction(function () use (
                     $toImport, &$imported, &$insertErrors
@@ -870,13 +767,8 @@ class CandidateController extends Controller
                     }
                 });
             }
-
-            // Merge insert errors into main error list
             $allErrors = array_merge($errors, $insertErrors);
-
-            // ── Build response ────────────────────────────────────────────
             return $this->buildImportResponse($imported, $allErrors, $skipped);
-
         } catch (\Illuminate\Validation\ValidationException $e) {
             return redirect()->back()->withErrors($e->validator)->withInput();
         } catch (\Exception $e) {
@@ -885,10 +777,6 @@ class CandidateController extends Controller
                 ->with('error', '❌ Error al importar: ' . $e->getMessage());
         }
     }
-
-    // ───────────────────────────────────────────────────────
-    //  PRIVATE: validate geographic scope requirements
-    // ───────────────────────────────────────────────────────
     private function validateGeographicScope(
         string $scope,
         ?int $departmentId,
@@ -901,63 +789,49 @@ class CandidateController extends Controller
                 ? "La categoría \"{$data['codigo_categoria']}\" es de ámbito departamental. "
                   . "Debe indicar el departamento."
                 : null,
-
             'provincial' => !$provinceId
                 ? "La categoría \"{$data['codigo_categoria']}\" es de ámbito provincial. "
                   . "Debe indicar al menos la provincia."
                 : null,
-
             'municipal', 'indigena_ioc' => !$municipalityId
                 ? "La categoría \"{$data['codigo_categoria']}\" es de ámbito municipal. "
                   . "Debe indicar el municipio."
                 : null,
-
             'nacional' => ($departmentId || $provinceId || $municipalityId)
                 ? "La categoría \"{$data['codigo_categoria']}\" es de ámbito nacional. "
                   . "No debe indicar departamento, provincia ni municipio."
                 : null,
-
             default => null,
         };
     }
 
-    // ───────────────────────────────────────────────────────
-    //  PRIVATE: build the redirect response after import
-    // ───────────────────────────────────────────────────────
     private function buildImportResponse(int $imported, array $errors, array $skipped): \Illuminate\Http\RedirectResponse
     {
         $parts = [];
         if ($imported > 0) $parts[] = "✅ {$imported} candidato(s) importados correctamente.";
         if (!empty($skipped)) $parts[] = "⏭️ " . count($skipped) . " fila(s) omitidas por duplicado.";
         if (!empty($errors))  $parts[] = "❌ " . count($errors)  . " fila(s) con errores (ver detalle).";
-
-        // Attach skipped as informational errors so the user can see them
         $allNotices = array_merge(
             array_map(fn($s) => ['row' => $s['row'], 'messages' => [$s['info']], 'data' => '', 'type' => 'skip'], $skipped),
             array_map(fn($e) => array_merge($e, ['type' => 'error']), $errors)
         );
-
         usort($allNotices, fn($a, $b) => $a['row'] <=> $b['row']);
-
         $flashErrors = array_map(function ($notice) {
             $prefix = ($notice['type'] ?? 'error') === 'skip' ? '⏭️ [OMITIDA]' : '❌ [ERROR]';
             return $prefix . " Fila {$notice['row']}"
                 . ($notice['data'] ? " ({$notice['data']})" : '')
                 . ": " . implode(' | ', $notice['messages']);
         }, $allNotices);
-
         if ($imported > 0) {
             return redirect()->route('candidates.index')
                 ->with('success', implode(' ', $parts))
                 ->with('import_errors', $flashErrors);
         }
-
         return redirect()->route('candidates.index')
             ->with('error', implode(' ', $parts) ?: '❌ No se importó ningún candidato.')
             ->with('import_errors', $flashErrors);
     }
 
-    /** Shared validation rules for store / update */
     private function candidateRules(): array
     {
         return [
@@ -977,7 +851,6 @@ class CandidateController extends Controller
         ];
     }
 
-    /** Map validated data to DB columns */
     private function prepareData(array $v): array
     {
         return [
@@ -995,7 +868,6 @@ class CandidateController extends Controller
         ];
     }
 
-    /** Handle photo / party_logo uploads (and delete old files on update) */
     private function handleImages(Request $request, array $data, ?Candidate $existing = null): array
     {
         foreach (['photo' => 'candidates/photos', 'party_logo' => 'candidates/party-logos'] as $field => $folder) {
@@ -1009,7 +881,6 @@ class CandidateController extends Controller
         return $data;
     }
 
-    /** Write CSV rows to php://output (used by export* methods) */
     private function writeCsv($candidates): void
     {
         $file = fopen('php://output', 'w');
@@ -1043,11 +914,8 @@ class CandidateController extends Controller
                 $c->active ? 'Sí' : 'No',
             ]);
         }
-
         fclose($file);
     }
-
-    /** Eager-loaded election type categories for dropdowns */
     private function getActiveElectionTypeCategories()
     {
         return ElectionTypeCategory::with(['electionType', 'electionCategory'])
@@ -1056,7 +924,6 @@ class CandidateController extends Controller
             ->get();
     }
 
-    /** Build all stats arrays for the index view */
     private function buildStats(): array
     {
         try {
@@ -1066,27 +933,22 @@ class CandidateController extends Controller
                 ->groupBy('election_type_category_id')
                 ->with('electionTypeCategory.electionType', 'electionTypeCategory.electionCategory')
                 ->get();
-
             $byDepartment = Candidate::where('active', true)
                 ->select('department_id', DB::raw('count(*) as total'))
                 ->whereNotNull('department_id')
                 ->groupBy('department_id')
                 ->with('department')
                 ->get();
-
             $byElectionType = $byCategory
                 ->groupBy(fn ($i) => $i->electionTypeCategory?->electionType?->name ?? 'Sin tipo')
                 ->map(fn ($g) => $g->sum('total'));
-
             $geo = [
                 'nacional'      => Candidate::where('active', true)->whereNull('department_id')->whereNull('province_id')->whereNull('municipality_id')->count(),
                 'departamental' => Candidate::where('active', true)->whereNotNull('department_id')->whereNull('province_id')->whereNull('municipality_id')->count(),
                 'provincial'    => Candidate::where('active', true)->whereNotNull('province_id')->whereNull('municipality_id')->count(),
                 'municipal'     => Candidate::where('active', true)->whereNotNull('municipality_id')->count(),
             ];
-
             return compact('byCategory', 'byDepartment', 'byElectionType', 'geo');
-
         } catch (\Exception $e) {
             Log::warning('Could not build candidate stats: ' . $e->getMessage());
             return $this->emptyStats();

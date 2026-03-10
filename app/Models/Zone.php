@@ -22,4 +22,3 @@ class Zone extends Model
         return $this->hasMany(Institution::class);
     }
 }
-

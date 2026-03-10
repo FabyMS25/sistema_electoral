@@ -82,12 +82,11 @@ class Candidate extends Model
         return $query->byCategoryCode('GOB');
     }
 
-    // ===== HELPERS =====
     public function getPhotoUrlAttribute(): string
     {
         return $this->photo
             ? asset('storage/' . $this->photo)
-            : asset('build/images/default-candidate.jpg');
+            : asset('build/images/users/user-dummy-img.jpg');
     }
     public function getPartyLogoUrlAttribute(): string
     {

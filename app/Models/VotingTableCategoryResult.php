@@ -55,7 +55,7 @@ class VotingTableCategoryResult extends Model
 
     public function electionTypeCategory(): BelongsTo
     {
-        return $this->belongsTo(electionTypeCategory::class);
+        return $this->belongsTo(ElectionTypeCategory::class);
     }
 
     public function enteredBy(): BelongsTo
@@ -68,49 +68,26 @@ class VotingTableCategoryResult extends Model
         return $this->belongsTo(User::class, 'validated_by');
     }
 
-    // =========================================================================
-    // CONSISTENCY LOGIC
-    // =========================================================================
-
-    /**
-     * Runs all three consistency rules and persists the result.
-     * Call this after any vote quantity change for this franja+mesa.
-     *
-     * Rule 1: valid + blank + null == total_votes
-     * Rule 2: total_votes <= mesa expected_voters
-     * Rule 3: sum of candidate Vote.quantity == valid_votes
-     *
-     * @return bool  True if all rules pass.
-     */
     public function checkConsistency(): bool
     {
         $inconsistencies = [];
-
-        // Rule 1: totals must add up
         $sumCheck = $this->valid_votes + $this->blank_votes + $this->null_votes;
         if ($sumCheck !== $this->total_votes) {
             $inconsistencies[] = "Suma de votos ({$sumCheck}) ≠ total ({$this->total_votes})";
         }
-
-        // Rule 2: total must not exceed registered voters on this mesa
         $expected = $this->votingTable->expected_voters;
         if ($this->total_votes > $expected) {
             $inconsistencies[] = "Total votos ({$this->total_votes}) excede habilitados ({$expected})";
         }
-
-        // Rule 3: candidate vote sum must equal valid_votes
         $candidateSum = Vote::where('voting_table_id', $this->voting_table_id)
             ->where('election_type_category_id', $this->election_type_category_id)
             ->sum('quantity');
-
         if ($candidateSum !== $this->valid_votes) {
             $inconsistencies[] = "Suma candidatos ({$candidateSum}) ≠ votos válidos ({$this->valid_votes})";
         }
-
         $this->is_consistent   = empty($inconsistencies);
         $this->inconsistencies = empty($inconsistencies) ? null : $inconsistencies;
         $this->save();
-
         return $this->is_consistent;
     }
 

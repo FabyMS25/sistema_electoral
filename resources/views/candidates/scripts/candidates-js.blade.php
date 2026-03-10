@@ -333,7 +333,7 @@ function setupViewButton() {
             // Photo
             const photo = document.getElementById('view-photo');
             if (photo) {
-                photo.src           = (d.photoUrl && d.photoUrl !== 'null') ? d.photoUrl : '/build/images/default-candidate.jpg';
+                photo.src           = (d.photoUrl && d.photoUrl !== 'null') ? d.photoUrl : '/build/images/users/user-dummy-img.jpg';
                 photo.style.display = 'block';
             }
 

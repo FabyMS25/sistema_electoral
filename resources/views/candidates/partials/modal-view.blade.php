@@ -15,20 +15,14 @@
 
             <div class="modal-body">
                 <div class="row g-4">
-
-                    {{-- ── Left: images + colour ── --}}
                     <div class="col-md-3 text-center d-flex flex-column align-items-center gap-3">
-
-                        {{-- Candidate photo --}}
                         <div>
                             <img id="view-photo"
-                                 src="/build/images/default-candidate.jpg"
+                                 src="/build/images/users/user-dummy-img.jpg"
                                  alt="Foto del candidato"
                                  class="rounded-circle border border-3 border-info shadow-sm"
                                  style="width:120px; height:120px; object-fit:cover;">
                         </div>
-
-                        {{-- Party logo --}}
                         <div id="view-party-logo-wrap">
                             <img id="view-party-logo" src="" alt="Logo del partido"
                                  style="max-width:64px; max-height:64px; display:none;">

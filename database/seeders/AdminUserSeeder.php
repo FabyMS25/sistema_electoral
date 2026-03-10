@@ -56,11 +56,10 @@ class AdminUserSeeder extends Seeder
                 );
                 $user->roles()->syncWithoutDetaching([
                     $adminRole->id => [
-                        'scope' => 'global',
-                        'institution_id' => null,
+                        'scope'           => 'global',
+                        'institution_id'  => null,
                         'voting_table_id' => null,
-                        'election_type_id' => null,
-                        'scope_settings' => json_encode(['full_access' => true]),
+                        'scope_settings'  => json_encode(['full_access' => true]),
                     ]
                 ]);
             }

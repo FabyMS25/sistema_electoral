@@ -7,7 +7,7 @@
 
 @section('content')
     <div class="layout-wrapper landing">
-            <nav class="navbar navbar-expand-lg navbar-landing " id="navbar"><!-- fixed-top -->
+            <nav class="navbar navbar-expand-lg navbar-landing " id="navbar">
                 <div class="container">
                     <a class="navbar-brand" href="index">
                         <img src="{{ URL::asset('build/images/lofo_elections_large.png') }}" class="card-logo card-logo-dark" alt="logo dark"
@@ -42,7 +42,7 @@
                 </div>
             </nav>
             <div class="vertical-overlay" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent.show"></div>
-            
+
             <div class="row justify-content-center">
                 <div class="col-lg-11">
                     <div class="card">
@@ -61,7 +61,7 @@
                         <div class="col-lg-11">
                         <!-- @if($dashboard->is_public)
                         <div class="alert alert-info mb-4">
-                            <i class="ri-information-line me-2"></i> 
+                            <i class="ri-information-line me-2"></i>
                             Live election results are currently publicly available.
                         </div>
                         @endif -->
@@ -290,7 +290,7 @@
                     </div>
                 </div>
             </div>
-        </footer>            
+        </footer>
         <button onclick="topFunction()" class="btn btn-danger btn-icon landing-back-top" id="back-to-top">
             <i class="ri-arrow-up-line"></i>
         </button>
@@ -298,6 +298,6 @@
 @endsection
 @section('script')
     <script src="{{ URL::asset('build/libs/swiper/swiper-bundle.min.js') }}"></script>
-    <script src="{{ URL::asset('build/js/pages/landing.init.js') }}"></script>        
+    <script src="{{ URL::asset('build/js/pages/landing.init.js') }}"></script>
     @yield('dashboard-scripts')
 @endsection

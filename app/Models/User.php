@@ -50,7 +50,7 @@ class User extends Authenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'role_user')
-            ->withPivot('scope', 'institution_id', 'voting_table_id', 'election_type_id', 'scope_settings')
+            ->withPivot('scope', 'institution_id', 'voting_table_id', 'scope_settings')
             ->withTimestamps();
     }
 
@@ -112,17 +112,16 @@ class User extends Authenticatable
     {
         return $query->whereHas('roles', function ($q) use ($institutionId) {
             $q->wherePivot('scope', 'recinto')
-              ->wherePivot('institution_id', $institutionId);
+            ->wherePivot('institution_id', $institutionId);
         })->orWhereHas('assignments', function ($q) use ($institutionId) {
             $q->where('institution_id', $institutionId)->where('status', 'activo');
         });
     }
-
     public function scopeByMesa($query, $votingTableId)
     {
         return $query->whereHas('roles', function ($q) use ($votingTableId) {
             $q->wherePivot('scope', 'mesa')
-              ->wherePivot('voting_table_id', $votingTableId);
+            ->wherePivot('voting_table_id', $votingTableId);
         })->orWhereHas('assignments', function ($q) use ($votingTableId) {
             $q->where('voting_table_id', $votingTableId)->where('status', 'activo');
         });

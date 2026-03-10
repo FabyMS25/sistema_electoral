@@ -43,38 +43,30 @@ return new class extends Migration
             $table->enum('scope', ['global', 'recinto', 'mesa'])->default('global');
             $table->foreignId('institution_id')->nullable()->constrained();
             $table->foreignId('voting_table_id')->nullable()->constrained();
-            $table->foreignId('election_type_id')->nullable()->constrained();
             $table->json('scope_settings')->nullable();
             $table->timestamps();
-            $table->index(['user_id', 'election_type_id']);
-            $table->index(['institution_id', 'election_type_id']);
-            $table->index(['voting_table_id', 'election_type_id']);
+            $table->index(['user_id']);
+            $table->index(['institution_id']);
+            $table->index(['voting_table_id']);
         });
-
-        // Global scope: no institution, no table, no election
+        // Global: no institution, no table
         DB::statement('
             CREATE UNIQUE INDEX unique_role_user_global
             ON role_user (role_id, user_id)
-            WHERE institution_id IS NULL
-              AND voting_table_id IS NULL
-              AND election_type_id IS NULL
+            WHERE institution_id IS NULL AND voting_table_id IS NULL
         ');
-
-        // Recinto scope: institution set, no table
+        // Recinto: institution set, no table
         DB::statement('
             CREATE UNIQUE INDEX unique_role_user_recinto
-            ON role_user (role_id, user_id, institution_id, election_type_id)
-            WHERE institution_id IS NOT NULL
-              AND voting_table_id IS NULL
+            ON role_user (role_id, user_id, institution_id)
+            WHERE institution_id IS NOT NULL AND voting_table_id IS NULL
         ');
-
-        // Mesa scope: specific voting table
+        // Mesa: specific voting table
         DB::statement('
             CREATE UNIQUE INDEX unique_role_user_mesa
-            ON role_user (role_id, user_id, voting_table_id, election_type_id)
+            ON role_user (role_id, user_id, voting_table_id)
             WHERE voting_table_id IS NOT NULL
         ');
-
         Schema::create('permission_user', function (Blueprint $table) {
             $table->id();
             $table->foreignId('permission_id')->constrained()->onDelete('cascade');

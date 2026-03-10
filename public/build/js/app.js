@@ -141,12 +141,12 @@ File: Main Js File
             Array.from(choicesExamples).forEach(function (item) {
                 var choiceData = {};
                 var isChoicesVal = item.attributes;
-                
+
                 // Verificar que el select tenga opciones
                 if (item.tagName === 'SELECT' && item.options.length === 0) {
                     return; // Saltar si no hay opciones
                 }
-                
+
                 if (isChoicesVal["data-choices-groups"]) {
                     choiceData.placeholderValue = "This is a placeholder set in the config";
                 }
@@ -183,10 +183,10 @@ File: Main Js File
                 if (isChoicesVal["data-choices-text-disabled-true"]) {
                     choiceData.addItems = false;
                 }
-                
+
                 try {
-                    isChoicesVal["data-choices-text-disabled-true"] ? 
-                        new Choices(item, choiceData).disable() : 
+                    isChoicesVal["data-choices-text-disabled-true"] ?
+                        new Choices(item, choiceData).disable() :
                         new Choices(item, choiceData);
                 } catch (e) {
                     console.warn('Choices no pudo inicializarse para:', item, e);
@@ -384,7 +384,7 @@ File: Main Js File
                 document.querySelector(".navbar-menu").innerHTML = navbarMenuHTML;
             }
             var ul = document.createElement("ul");
-            ul.innerHTML = '<a href="#" class="logo"><img src="build/images/logo-sm.png" alt="" height="22"></a>';
+            ul.innerHTML = '<a href="#" class="logo"><img src="build/images/logo_elections.png" alt="" height="22"></a>';
             Array.from(document.getElementById("navbar-nav").querySelectorAll(".menu-link")).forEach(function (item) {
                 ul.className = "twocolumn-iconview";
                 var li = document.createElement("li");

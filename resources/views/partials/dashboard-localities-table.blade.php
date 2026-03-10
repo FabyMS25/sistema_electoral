@@ -1,8 +1,5 @@
 {{--
     resources/views/partials/dashboard-localities-table.blade.php
-    $localityResults has keys: alcalde[], concejal[], total_votes_alcalde, total_votes_concejal,
-                               blank_votes, null_votes, name, latitude, longitude
-    $localityStats has: total_tables, reported_tables, municipality_name
 --}}
 <div class="table-responsive">
     <table class="table table-hover align-middle mb-0" id="ds-locality-table">

@@ -202,7 +202,8 @@
     "isEntry": true
   },
   "resources/scss/custom.scss": {
-    "file": "css/custom.min.css",
+    "file": "js/custom.js",
+    "name": "custom",
     "src": "resources/scss/custom.scss",
     "isEntry": true
   },

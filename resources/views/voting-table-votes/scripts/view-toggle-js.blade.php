@@ -11,8 +11,6 @@ window.initViewToggle = function() {
             const tableEl = document.querySelector(`#table-${tableId} table`);
             if (!tableEl) return;
             tableEl.classList.remove('hide-primary', 'hide-secondary');
-
-            // Apply the selected view
             switch (view) {
                 case 'primary':
                     tableEl.classList.add('hide-secondary');

@@ -23,6 +23,12 @@
                         <div class="col-md-3">
                             <label class="form-label form-label-sm fw-semibold mb-1">
                                 <i class="ri-vote-line me-1 text-muted"></i>Tipo de Elección
+                                @if(isset($dashboard) && $dashboard?->default_election_type_id === $electionTypeId)
+                                    <span class="badge bg-primary-subtle text-primary ms-1"
+                                          style="font-size:0.65rem;" title="Configurado en Dashboard">
+                                        <i class="ri-dashboard-line"></i> predeterminado
+                                    </span>
+                                @endif
                             </label>
                             <select name="election_type_id" class="form-select form-select-sm select2"
                                     id="electionTypeFilter">
@@ -35,27 +41,24 @@
                                 @endforeach
                             </select>
                         </div>
-
-                        {{-- Estado — uses the REAL VotingTableElection status values --}}
                         <div class="col-md-2">
                             <label class="form-label form-label-sm fw-semibold mb-1">
                                 <i class="ri-flag-line me-1 text-muted"></i>Estado
                             </label>
+                            @php
+                                $statusOptions = [
+                                    'configurada'   => ['label' => 'Configurada',  'icon' => '⚙️'],
+                                    'en_espera'     => ['label' => 'En Espera',     'icon' => '⏳'],
+                                    'votacion'      => ['label' => 'En Votación',   'icon' => '🗳️'],
+                                    'en_escrutinio' => ['label' => 'En Escrutinio', 'icon' => '📊'],
+                                    'escrutada'     => ['label' => 'Escrutada',     'icon' => '✅'],
+                                    'observada'     => ['label' => 'Observada',     'icon' => '⚠️'],
+                                    'transmitida'   => ['label' => 'Transmitida',   'icon' => '📡'],
+                                    'anulada'       => ['label' => 'Anulada',       'icon' => '❌'],
+                                ];
+                            @endphp
                             <select name="status" class="form-select form-select-sm" id="statusFilter">
                                 <option value="">Todos</option>
-                                @php
-                                    $statusOptions = [
-                                        'configurada'   => ['label' => 'Configurada',    'icon' => '⚙️'],
-                                        'en_espera'     => ['label' => 'En Espera',       'icon' => '⏳'],
-                                        'votacion'      => ['label' => 'En Votación',     'icon' => '🗳️'],
-                                        'cerrada'       => ['label' => 'Cerrada',         'icon' => '🔒'],
-                                        'en_escrutinio' => ['label' => 'En Escrutinio',   'icon' => '📊'],
-                                        'escrutada'     => ['label' => 'Escrutada',       'icon' => '✅'],
-                                        'observada'     => ['label' => 'Observada',       'icon' => '⚠️'],
-                                        'transmitida'   => ['label' => 'Transmitida',     'icon' => '📡'],
-                                        'anulada'       => ['label' => 'Anulada',         'icon' => '❌'],
-                                    ];
-                                @endphp
                                 @foreach($statusOptions as $val => $opt)
                                     <option value="{{ $val }}"
                                         {{ request('status') === $val ? 'selected' : '' }}>
@@ -64,8 +67,6 @@
                                 @endforeach
                             </select>
                         </div>
-
-                        {{-- N° Mesa --}}
                         <div class="col-md-2">
                             <label class="form-label form-label-sm fw-semibold mb-1">
                                 <i class="ri-hashtag me-1 text-muted"></i>N° Mesa
@@ -74,20 +75,17 @@
                                    placeholder="Ej: 1, 2…" min="1"
                                    value="{{ request('table_number') }}">
                         </div>
-
-                        {{-- Buttons --}}
                         <div class="col-md-2 d-flex gap-2">
                             <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
                                 <i class="ri-search-line me-1"></i>Buscar
                             </button>
-                            <a href="{{ route('voting-table-votes.index', ['election_type_id' => $electionTypeId ?? '']) }}"
-                               class="btn btn-outline-secondary btn-sm" title="Limpiar filtros">
+                            <a href="{{ route('voting-table-votes.index') }}"
+                               class="btn btn-outline-secondary btn-sm"
+                               title="Limpiar todos los filtros">
                                 <i class="ri-refresh-line"></i>
                             </a>
                         </div>
                     </div>
-
-                    {{-- ── Active filter badges ── --}}
                     @php
                         $activeCount = collect([
                             'institution_id', 'status', 'table_number', 'table_code',
@@ -95,7 +93,6 @@
                             'max_votes', 'has_observations', 'participation',
                         ])->filter(fn($k) => request($k))->count();
                     @endphp
-
                     @if($activeCount > 0)
                     <div class="mt-2 d-flex flex-wrap gap-1 align-items-center">
                         <small class="text-muted me-1">Activos:</small>
@@ -148,32 +145,30 @@
                         @endif
                     </div>
                     @endif
-
-                    {{-- ── Advanced filters (collapsible) ── --}}
+                    @php
+                        $advancedKeys   = ['table_code','from_name','to_name','table_type','min_votes','max_votes','has_observations','participation','sort_by'];
+                        $advancedActive = collect($advancedKeys)->filter(fn($k) => request($k))->count();
+                    @endphp
                     <div class="mt-2">
                         <a class="text-muted small text-decoration-none" data-bs-toggle="collapse"
-                           href="#advancedFilters" role="button" aria-expanded="false">
-                            <i class="ri-equalizer-line me-1"></i>
-                            Filtros avanzados
-                            @if(collect(['table_code','from_name','to_name','table_type','min_votes','max_votes','has_observations','participation','sort_by'])->filter(fn($k)=>request($k))->count() > 0)
+                           href="#advancedFilters" role="button"
+                           aria-expanded="{{ $advancedActive > 0 ? 'true' : 'false' }}">
+                            <i class="ri-equalizer-line me-1"></i>Filtros avanzados
+                            @if($advancedActive > 0)
                                 <span class="badge bg-primary rounded-pill ms-1" style="font-size:10px;">
-                                    {{ collect(['table_code','from_name','to_name','table_type','min_votes','max_votes','has_observations','participation','sort_by'])->filter(fn($k)=>request($k))->count() }}
+                                    {{ $advancedActive }}
                                 </span>
                             @endif
                         </a>
                     </div>
-
-                    <div class="collapse {{ collect(['table_code','from_name','to_name','table_type','min_votes','max_votes','has_observations','participation','sort_by'])->filter(fn($k)=>request($k))->count() > 0 ? 'show' : '' }}"
-                         id="advancedFilters">
+                    <div class="collapse {{ $advancedActive > 0 ? 'show' : '' }}" id="advancedFilters">
                         <div class="border rounded p-3 mt-2 bg-light">
                             <div class="row g-2">
-
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Código Mesa</label>
                                     <input type="text" name="table_code" class="form-control form-control-sm"
                                            placeholder="OEP o interno" value="{{ request('table_code') }}">
                                 </div>
-
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Tipo de Mesa</label>
                                     <select name="table_type" class="form-select form-select-sm">
@@ -183,19 +178,16 @@
                                         <option value="femenina"  {{ request('table_type') == 'femenina'  ? 'selected' : '' }}>Femenina</option>
                                     </select>
                                 </div>
-
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Apellido desde</label>
                                     <input type="text" name="from_name" class="form-control form-control-sm"
                                            placeholder="Apellido inicial" value="{{ request('from_name') }}">
                                 </div>
-
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Apellido hasta</label>
                                     <input type="text" name="to_name" class="form-control form-control-sm"
                                            placeholder="Apellido final" value="{{ request('to_name') }}">
                                 </div>
-
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Observaciones</label>
                                     <select name="has_observations" class="form-select form-select-sm">
@@ -204,7 +196,6 @@
                                         <option value="0" {{ request('has_observations') == '0' ? 'selected' : '' }}>Sin observaciones</option>
                                     </select>
                                 </div>
-
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Participación</label>
                                     <select name="participation" class="form-select form-select-sm">
@@ -214,13 +205,11 @@
                                         <option value="baja"  {{ request('participation') == 'baja'  ? 'selected' : '' }}>Baja (&lt;50%)</option>
                                     </select>
                                 </div>
-
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Votos mín.</label>
                                     <input type="number" name="min_votes" class="form-control form-control-sm"
                                            placeholder="0" min="0" value="{{ request('min_votes') }}">
                                 </div>
-
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Votos máx.</label>
                                     <input type="number" name="max_votes" class="form-control form-control-sm"
@@ -230,18 +219,18 @@
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Ordenar por</label>
                                     <select name="sort_by" class="form-select form-select-sm">
-                                        <option value="number"          {{ request('sort_by','number') == 'number'          ? 'selected' : '' }}>N° Mesa</option>
-                                        <option value="expected_voters" {{ request('sort_by') == 'expected_voters'          ? 'selected' : '' }}>Habilitados</option>
-                                        <option value="institution"     {{ request('sort_by') == 'institution'              ? 'selected' : '' }}>Recinto</option>
-                                        <option value="status"          {{ request('sort_by') == 'status'                   ? 'selected' : '' }}>Estado</option>
+                                        <option value="number"          {{ request('sort_by', 'number') == 'number'          ? 'selected' : '' }}>N° Mesa</option>
+                                        <option value="expected_voters" {{ request('sort_by') == 'expected_voters'           ? 'selected' : '' }}>Habilitados</option>
+                                        <option value="institution"     {{ request('sort_by') == 'institution'               ? 'selected' : '' }}>Recinto</option>
+                                        <option value="status"          {{ request('sort_by') == 'status'                    ? 'selected' : '' }}>Estado</option>
                                     </select>
                                 </div>
 
                                 <div class="col-md-2">
                                     <label class="form-label form-label-sm fw-semibold mb-1">Dirección</label>
                                     <select name="sort_direction" class="form-select form-select-sm">
-                                        <option value="asc"  {{ request('sort_direction','asc') == 'asc'  ? 'selected' : '' }}>↑ Asc</option>
-                                        <option value="desc" {{ request('sort_direction') == 'desc'        ? 'selected' : '' }}>↓ Desc</option>
+                                        <option value="asc"  {{ request('sort_direction', 'asc') == 'asc'  ? 'selected' : '' }}>↑ Asc</option>
+                                        <option value="desc" {{ request('sort_direction') == 'desc'         ? 'selected' : '' }}>↓ Desc</option>
                                     </select>
                                 </div>
 
@@ -249,11 +238,12 @@
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <i class="ri-search-line me-1"></i>Aplicar filtros
                                     </button>
-                                    <a href="{{ route('voting-table-votes.index', ['election_type_id' => $electionTypeId ?? '']) }}"
+                                    <a href="{{ route('voting-table-votes.index') }}"
                                        class="btn btn-outline-secondary btn-sm">
                                         <i class="ri-delete-bin-line me-1"></i>Limpiar
                                     </a>
                                 </div>
+
                             </div>
                         </div>
                     </div>
@@ -277,7 +267,10 @@
     transition: opacity 0.15s;
 }
 .filter-badge:hover { opacity: 0.75; }
-.select2-container--bootstrap-5 .select2-selection { min-height: 31px; font-size: 0.875rem; }
+.select2-container--bootstrap-5 .select2-selection {
+    min-height: 31px;
+    font-size: 0.875rem;
+}
 </style>
 @endpush
 
@@ -285,20 +278,19 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Select2
-    $('.select2').select2({ theme: 'bootstrap-5', width: '100%', allowClear: true, placeholder: 'Seleccionar…' });
-
-    // Auto-submit on main filter change
+    $('.select2').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        allowClear: true,
+        placeholder: 'Seleccionar…',
+    });
     $('#institutionFilter, #electionTypeFilter, #statusFilter').on('change', function () {
         document.getElementById('filterForm').submit();
     });
-
-    // Click badge → remove that param
     document.querySelectorAll('.filter-badge').forEach(badge => {
         badge.addEventListener('click', function () {
             const param = this.dataset.param;
             const url   = new URL(window.location.href);
-            // Remove related params (e.g. min_votes badge also removes max_votes)
             if (param === 'min_votes') url.searchParams.delete('max_votes');
             url.searchParams.delete(param);
             window.location.href = url.toString();

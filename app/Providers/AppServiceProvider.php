@@ -16,8 +16,6 @@ class AppServiceProvider extends ServiceProvider
     {
         Schema::defaultStringLength(191);
         Paginator::useBootstrapFive();
-        
-        // Compartir datos con todas las vistas (opcional)
         view()->composer('*', function ($view) {
             if (auth()->check()) {
                 $view->with('currentUser', auth()->user());

@@ -10,6 +10,10 @@ window.observeTable = function(tableId, electionTypeIdOverride) {
     const evInput = document.getElementById('observationEvidence');
     if (evInput) evInput.value = '';
     loadVotesForObservationModal(tableId, etId);
+    if (typeof bootstrap === 'undefined') {
+        console.error('Bootstrap not loaded');
+        return;
+    }
     const modal = new bootstrap.Modal(document.getElementById('observationModal'));
     modal.show();
 };
@@ -34,8 +38,6 @@ function loadVotesForObservationModal(tableId, electionTypeId) {
                     '<p class="text-muted text-center py-3 mb-0">No hay votos registrados en esta mesa</p>';
                 return;
             }
-
-            // Group by category for readability
             const byCategory = {};
             votes.forEach(v => {
                 const cat = v.vote_status === 'observed'
@@ -52,7 +54,6 @@ function loadVotesForObservationModal(tableId, electionTypeId) {
                     <div class="row">`;
 
                 catVotes.forEach(v => {
-                    // FIX: compare against the string constant value directly
                     const isObserved = v.vote_status === 'observed';
                     html += `
                         <div class="col-md-6 mb-1">
@@ -87,8 +88,6 @@ function loadVotesForObservationModal(tableId, electionTypeId) {
                 '<p class="text-danger text-center py-3 mb-0">Error al cargar votos</p>';
         });
 }
-
-// ─── Save observation ─────────────────────────────────────────────────────────
 
 document.getElementById('saveObservationBtn')?.addEventListener('click', function() {
     const tableId      = document.getElementById('observationTableId').value;
@@ -163,8 +162,6 @@ document.getElementById('saveObservationBtn')?.addEventListener('click', functio
     });
 });
 
-// ─── View observations for a table ──────────────────────────────────────────
-
 window.showObservations = function(tableId) {
     Swal.fire({ title: 'Cargando observaciones...', allowOutsideClick: false,
                 didOpen: () => Swal.showLoading() });
@@ -237,8 +234,6 @@ window.showObservations = function(tableId) {
         });
 };
 
-// ─── Listeners ────────────────────────────────────────────────────────────────
-
 window.initObservationListeners = function() {
     document.querySelectorAll('.observe-table-general').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -255,8 +250,6 @@ window.initObservationListeners = function() {
         });
     });
 };
-
-// ─── Util ─────────────────────────────────────────────────────────────────────
 
 function escHtml(str) {
     return String(str ?? '')

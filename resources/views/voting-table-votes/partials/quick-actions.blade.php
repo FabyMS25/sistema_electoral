@@ -28,11 +28,9 @@
                         @endif
                     </div>
                 </div>
-
-                {{-- ── Right: action buttons ── --}}
                 <div class="col-md-7 col-lg-6 d-flex justify-content-end align-items-center gap-2 flex-wrap">
 
-                    {{-- Save all (only if can register) --}}
+                    {{-- Guardar todo --}}
                     @if($permissions['can_register'] ?? false)
                     <button class="btn btn-success btn-sm" id="saveAllBtn"
                             title="Guardar todas las mesas visibles (Ctrl+S)">
@@ -41,22 +39,29 @@
                     </button>
                     @endif
 
-                    {{-- Close all (only if can close) --}}
-                    @if($permissions['can_close'] ?? false)
-                    <button class="btn btn-dark btn-sm" id="closeAllBtn"
-                            title="Cerrar todas las mesas válidas">
-                        <i class="ri-lock-line me-1"></i>
-                        <span class="d-none d-md-inline">Cerrar todo</span>
+                    {{-- Validar todo (votacion → en_escrutinio) --}}
+                    @if($permissions['can_validate'] ?? false)
+                    <button class="btn btn-info text-white btn-sm" id="validateAllBtn"
+                            title="Validar todas las mesas en votación">
+                        <i class="ri-checkbox-circle-line me-1"></i>
+                        <span class="d-none d-md-inline">Validar todo</span>
                     </button>
                     @endif
 
-                    {{-- Refresh --}}
+                    {{-- Escrutar todo (en_escrutinio → escrutada) --}}
+                    @if($permissions['can_validate'] ?? false)
+                    <button class="btn btn-success btn-sm" id="escrutarAllBtn"
+                            title="Escrutar todas las mesas en escrutinio">
+                        <i class="ri-check-double-line me-1"></i>
+                        <span class="d-none d-md-inline">Escrutar todo</span>
+                    </button>
+                    @endif
+
                     <button class="btn btn-outline-secondary btn-sm" id="qaRefreshBtn"
                             title="Recargar página (F5)">
                         <i class="ri-refresh-line"></i>
                     </button>
 
-                    {{-- Keyboard shortcuts help --}}
                     <button class="btn btn-outline-secondary btn-sm" type="button"
                             data-bs-toggle="popover" data-bs-trigger="focus"
                             data-bs-placement="top" data-bs-html="true"
@@ -64,13 +69,13 @@
                             data-bs-content="
                                 <table class='table table-sm table-borderless mb-0 small'>
                                   <tr><td><kbd>Ctrl+S</kbd></td><td>Guardar todo</td></tr>
+                                  <tr><td><kbd>Ctrl+V</kbd></td><td>Validar todo</td></tr>
                                   <tr><td><kbd>Ctrl+Enter</kbd></td><td>Guardar mesa en foco</td></tr>
                                   <tr><td><kbd>F5</kbd></td><td>Actualizar</td></tr>
                                   <tr><td><kbd>Esc</kbd></td><td>Deseleccionar campo</td></tr>
                                 </table>">
                         <i class="ri-keyboard-line"></i>
                     </button>
-
                 </div>
             </div>
         </div>
@@ -96,19 +101,18 @@
 
 <script>
 (function () {
-    // ── Pending-changes counter ──────────────────────────────────────────
     window.pendingTables = window.pendingTables ?? new Set();
 
     function updatePendingDisplay() {
-        const count = window.pendingTables.size;
+        const count     = window.pendingTables.size;
         const indicator = document.getElementById('qa-pending-indicator');
         const badge     = document.getElementById('qa-pending-count');
         if (!indicator || !badge) return;
-        badge.textContent = count;
-        indicator.style.display = count > 0 ? '' : 'none';
+        badge.textContent        = count;
+        indicator.style.display  = count > 0 ? '' : 'none';
     }
 
-    // Watch for changes on any vote / blank / null input
+    // Track unsaved changes
     document.querySelectorAll('.vote-input, .blank-votes-input, .null-votes-input').forEach(input => {
         input.addEventListener('input', function () {
             const tableId = this.dataset.table;
@@ -119,7 +123,6 @@
         });
     });
 
-    // Remove from pending after a successful save
     document.addEventListener('tableSaved', function (e) {
         if (e.detail?.tableId) {
             window.pendingTables.delete(String(e.detail.tableId));
@@ -127,18 +130,21 @@
         }
     });
 
-    // ── Save all ─────────────────────────────────────────────────────────
+    // ── Guardar todo ────────────────────────────────────────────────────────
     document.getElementById('saveAllBtn')?.addEventListener('click', function () {
         const buttons = document.querySelectorAll('.save-table');
-        if (buttons.length === 0) return;
-
+        if (buttons.length === 0) {
+            Swal.fire({ icon: 'info', title: 'Sin mesas editables',
+                        text: 'No hay mesas en estado de votación en esta vista.' });
+            return;
+        }
         Swal.fire({
-            title: `¿Guardar ${buttons.length} mesa${buttons.length !== 1 ? 's' : ''}?`,
-            text: 'Se guardarán todas las mesas visibles con sus votos actuales.',
-            icon: 'question',
-            showCancelButton: true,
+            title:             `¿Guardar ${buttons.length} mesa${buttons.length !== 1 ? 's' : ''}?`,
+            text:              'Se guardarán todas las mesas visibles con sus votos actuales.',
+            icon:              'question',
+            showCancelButton:  true,
             confirmButtonText: 'Sí, guardar todo',
-            cancelButtonText: 'Cancelar',
+            cancelButtonText:  'Cancelar',
             confirmButtonColor: '#0ab39c',
         }).then(result => {
             if (!result.isConfirmed) return;
@@ -146,26 +152,52 @@
         });
     });
 
-    // ── Close all ─────────────────────────────────────────────────────────
-    document.getElementById('closeAllBtn')?.addEventListener('click', function () {
-        const buttons = document.querySelectorAll('.close-table');
+    // ── Validar todo (votacion → en_escrutinio) ──────────────────────────
+    document.getElementById('validateAllBtn')?.addEventListener('click', function () {
+        const buttons = document.querySelectorAll('.validate-table[data-action="validate"]');
         if (buttons.length === 0) {
-            Swal.fire({ icon: 'info', title: 'Sin mesas disponibles',
-                        text: 'No hay mesas abiertas para cerrar en esta vista.' });
+            Swal.fire({ icon: 'info', title: 'Sin mesas para validar',
+                        text: 'No hay mesas en estado Votación listas para validar.' });
             return;
         }
-
         Swal.fire({
-            title: `¿Cerrar ${buttons.length} mesa${buttons.length !== 1 ? 's' : ''}?`,
-            text: 'Solo se cerrarán las mesas que no tengan inconsistencias.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Sí, cerrar todo',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#405189',
+            title:             `¿Validar ${buttons.length} mesa${buttons.length !== 1 ? 's' : ''}?`,
+            text:              'Las mesas pasarán a En Escrutinio. Solo se validarán las que no tengan observaciones pendientes.',
+            icon:              'question',
+            showCancelButton:  true,
+            confirmButtonText: 'Sí, validar todo',
+            cancelButtonText:  'Cancelar',
+            confirmButtonColor: '#17a2b8',
         }).then(result => {
             if (!result.isConfirmed) return;
-            buttons.forEach(btn => btn.click());
+            // Fire sequentially with a small delay to avoid overwhelming the server
+            buttons.forEach((btn, i) => {
+                setTimeout(() => btn.click(), i * 300);
+            });
+        });
+    });
+
+    // ── Escrutar todo (en_escrutinio → escrutada) ────────────────────────
+    document.getElementById('escrutarAllBtn')?.addEventListener('click', function () {
+        const buttons = document.querySelectorAll('.validate-table[data-action="escrutar"]');
+        if (buttons.length === 0) {
+            Swal.fire({ icon: 'info', title: 'Sin mesas para escrutar',
+                        text: 'No hay mesas en estado En Escrutinio en esta vista.' });
+            return;
+        }
+        Swal.fire({
+            title:             `¿Escrutar ${buttons.length} mesa${buttons.length !== 1 ? 's' : ''}?`,
+            text:              'Las mesas quedarán como Escrutadas. Esta acción es definitiva.',
+            icon:              'warning',
+            showCancelButton:  true,
+            confirmButtonText: 'Sí, escrutar todo',
+            cancelButtonText:  'Cancelar',
+            confirmButtonColor: '#0ab39c',
+        }).then(result => {
+            if (!result.isConfirmed) return;
+            buttons.forEach((btn, i) => {
+                setTimeout(() => btn.click(), i * 300);
+            });
         });
     });
 
@@ -174,14 +206,16 @@
         location.reload();
     });
 
-    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    // ── Keyboard shortcuts ───────────────────────────────────────────────
     document.addEventListener('keydown', function (e) {
-        // Ctrl+S → save all
         if (e.ctrlKey && e.key === 's') {
             e.preventDefault();
             document.getElementById('saveAllBtn')?.click();
         }
-        // Ctrl+Enter → save the table whose input is focused
+        if (e.ctrlKey && e.key === 'v') {
+            e.preventDefault();
+            document.getElementById('validateAllBtn')?.click();
+        }
         if (e.ctrlKey && e.key === 'Enter') {
             e.preventDefault();
             const el = document.activeElement;
@@ -189,15 +223,8 @@
                 document.querySelector(`.save-table[data-table-id="${el.dataset.table}"]`)?.click();
             }
         }
-        // F5 → refresh
-        if (e.key === 'F5') { e.preventDefault(); location.reload(); }
-        // Esc → blur
-        if (e.key === 'Escape') document.activeElement?.blur();
-    });
-
-    // ── Bootstrap popover init ────────────────────────────────────────────
-    document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
-        new bootstrap.Popover(el, { sanitize: false });
+        if (e.key === 'F5')     { e.preventDefault(); location.reload(); }
+        if (e.key === 'Escape') { document.activeElement?.blur(); }
     });
 })();
 </script>

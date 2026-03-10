@@ -1,5 +1,6 @@
 {{-- resources/views/voting-table-votes/scripts/votes-table-js.blade.php --}}
 <script>
+
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 }
@@ -24,14 +25,19 @@ function setButtonLoading(btn, loading) {
     if (loading) {
         btn.dataset.originalHtml = btn.innerHTML;
         btn.innerHTML = '<i class="ri-loader-4-line ri-spin"></i>';
-        btn.disabled = true;
+        btn.disabled  = true;
     } else {
         btn.innerHTML = btn.dataset.originalHtml ?? btn.innerHTML;
-        btn.disabled = false;
+        btn.disabled  = false;
     }
 }
 
-// Collect all vote inputs for a given table into {candidateId: quantity}
+function escHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function collectVotes(tableId) {
     const votes = {};
     document.querySelectorAll(`#table-${tableId} .vote-input`).forEach(input => {
@@ -40,8 +46,7 @@ function collectVotes(tableId) {
     return votes;
 }
 
-// Collect blank/null inputs per category  {categoryCode: qty}
-function collectSpecialVotes(tableId, type) {  // type = 'blank' | 'null'
+function collectSpecialVotes(tableId, type) { // type = 'blank' | 'null'
     const result = {};
     document.querySelectorAll(`#table-${tableId} .${type}-votes-input`).forEach(input => {
         result[input.dataset.category] = parseInt(input.value) || 0;
@@ -49,19 +54,17 @@ function collectSpecialVotes(tableId, type) {  // type = 'blank' | 'null'
     return result;
 }
 
-// Re-render the totals row after a save
 function refreshTableTotals(tableId, categoryTotals) {
     Object.entries(categoryTotals).forEach(([code, total]) => {
         const el = document.getElementById(`total-${code}-${tableId}`);
         if (el) el.textContent = total;
     });
-    const totals = Object.values(categoryTotals);
-    const grand  = totals.length > 0 ? totals[0] : 0;
+    const counts  = Object.values(categoryTotals);
+    const grand   = counts.length > 0 ? counts[0] : 0;
     const totalEl = document.getElementById(`total-${tableId}`);
     if (totalEl) totalEl.textContent = grand;
 }
 
-// Update the left-border status class on a table card
 function setTableStatusClass(tableId, newStatus) {
     const card = document.getElementById(`table-${tableId}`);
     if (!card) return;
@@ -69,19 +72,59 @@ function setTableStatusClass(tableId, newStatus) {
     card.classList.add(`status-${newStatus}`);
 }
 
-// ─── SAVE VOTES ──────────────────────────────────────────────────────────────
+window.updateTableTotals = function(tableId) {
+    const catValid = {};
+    const catBlank = {};
+    const catNull  = {};
+    document.querySelectorAll(`#table-${tableId} .vote-input`).forEach(input => {
+        const cat = input.dataset.category;
+        catValid[cat] = (catValid[cat] ?? 0) + (parseInt(input.value) || 0);
+    });
+    document.querySelectorAll(`#table-${tableId} .blank-votes-input`).forEach(input => {
+        const cat = input.dataset.category;
+        catBlank[cat] = (catBlank[cat] ?? 0) + (parseInt(input.value) || 0);
+    });
+    document.querySelectorAll(`#table-${tableId} .null-votes-input`).forEach(input => {
+        const cat = input.dataset.category;
+        catNull[cat] = (catNull[cat] ?? 0) + (parseInt(input.value) || 0);
+    });
+    const allCats = new Set([
+        ...Object.keys(catValid),
+        ...Object.keys(catBlank),
+        ...Object.keys(catNull),
+    ]);
+    allCats.forEach(code => {
+        const total = (catValid[code] ?? 0) + (catBlank[code] ?? 0) + (catNull[code] ?? 0);
+        const el    = document.getElementById(`total-${code}-${tableId}`);
+        if (el) el.textContent = total;
+    });
+    const firstCatTotal = allCats.size > 0
+        ? (catValid[[...allCats][0]] ?? 0) + (catBlank[[...allCats][0]] ?? 0) + (catNull[[...allCats][0]] ?? 0)
+        : 0;
+    const totalEl = document.getElementById(`total-${tableId}`);
+    if (totalEl) totalEl.textContent = firstCatTotal;
+    let footerValid = 0, footerBlank = 0, footerNull = 0;
+    Object.values(catValid).forEach(v => { footerValid += v; });
+    Object.values(catBlank).forEach(v => { footerBlank += v; });
+    Object.values(catNull).forEach(v  => { footerNull  += v; });
+    const fv = document.getElementById(`footer-valid-${tableId}`);
+    const fb = document.getElementById(`footer-blank-${tableId}`);
+    const fn = document.getElementById(`footer-null-${tableId}`);
+    if (fv) fv.textContent = footerValid;
+    if (fb) fb.textContent = footerBlank;
+    if (fn) fn.textContent = footerNull;
+};
 
 async function saveTable(tableId, closeAfter = false) {
     const btn = document.querySelector(`[data-table-id="${tableId}"].save-table`);
     setButtonLoading(btn, true);
-
     try {
         const votes      = collectVotes(tableId);
         const blankVotes = collectSpecialVotes(tableId, 'blank');
         const nullVotes  = collectSpecialVotes(tableId, 'null');
         const body = {
             voting_table_id:  tableId,
-            election_type_id: electionTypeId,
+            election_type_id: window.electionTypeId,
             votes,
             blank_votes: Object.keys(blankVotes).length ? blankVotes : undefined,
             null_votes:  Object.keys(nullVotes).length  ? nullVotes  : undefined,
@@ -104,8 +147,12 @@ async function saveTable(tableId, closeAfter = false) {
             refreshTableTotals(tableId, data.category_totals ?? {});
             setTableStatusClass(tableId, data.table_status);
             showToast('success', data.message);
+            document.dispatchEvent(new CustomEvent('tableSaved', { detail: { tableId: String(tableId) } }));
         } else {
-            showError(data.message ?? 'Error al guardar votos');
+            const msg = data.errors
+                ? Object.values(data.errors).flat().join('\n')
+                : (data.message ?? 'Error al guardar votos');
+            showError(msg);
         }
     } catch (err) {
         console.error('saveTable error', err);
@@ -115,65 +162,74 @@ async function saveTable(tableId, closeAfter = false) {
     }
 }
 
-// ─── REVIEW TABLE ─────────────────────────────────────────────────────────────
-// Opens a modal/dialog letting the reviewer select which votes to observe
-// or confirm that everything is correct.
-
 async function reviewTable(tableId) {
-    // First load the current votes for this table
-    const votesResp = await fetch(
-        `/voting-table-votes/${tableId}/votes?election_type_id=${electionTypeId}`,
-        { headers: { 'Accept': 'application/json' } }
-    );
-    const votes = await votesResp.json();
+    let votes = [];
+    try {
+        const r = await fetch(
+            `/voting-table-votes/${tableId}/votes?election_type_id=${window.electionTypeId}`,
+            { headers: { 'Accept': 'application/json' } }
+        );
+        votes = await r.json();
+    } catch (e) {
+        showError('No se pudieron cargar los votos de la mesa');
+        return;
+    }
+    const byCategory = {};
+    votes.forEach(v => {
+        const cat = v.category_code || 'General';
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(v);
+    });
 
-    const voteRows = votes.map(v => `
-        <div class="form-check mb-1">
-            <input class="form-check-input review-observe-cb"
-                   type="checkbox"
-                   value="${v.id}"
-                   id="rev_${v.id}"
-                   ${v.vote_status === 'observed' ? 'checked disabled' : ''}>
-            <label class="form-check-label d-flex justify-content-between" for="rev_${v.id}">
-                <span>
-                    <strong>${escHtml(v.candidate_name)}</strong>
-                    <small class="text-muted ms-1">${escHtml(v.candidate_party)}</small>
-                </span>
-                <span class="badge bg-secondary">${v.quantity} votos</span>
-            </label>
-        </div>
-    `).join('');
+    let rows = '';
+    Object.entries(byCategory).forEach(([cat, catVotes]) => {
+        rows += `<div class="mb-2">
+            <div class="text-muted small fw-bold border-bottom pb-1 mb-1">${escHtml(cat)}</div>`;
+        catVotes.forEach(v => {
+            const isObs = v.vote_status === 'observed';
+            rows += `
+            <div class="form-check mb-1 ${isObs ? 'text-warning' : ''}">
+                <input class="form-check-input review-observe-cb"
+                       type="checkbox" value="${v.id}" id="rev_${v.id}"
+                       ${isObs ? 'checked disabled' : ''}>
+                <label class="form-check-label d-flex justify-content-between" for="rev_${v.id}">
+                    <span>
+                        <strong>${escHtml(v.candidate_name)}</strong>
+                        <small class="text-muted ms-1">${escHtml(v.candidate_party)}</small>
+                        ${isObs ? '<span class="badge bg-warning text-dark ms-1">Ya observado</span>' : ''}
+                    </span>
+                    <span class="badge bg-secondary">${v.quantity} votos</span>
+                </label>
+            </div>`;
+        });
+        rows += `</div>`;
+    });
 
     const { value: formValues } = await Swal.fire({
         title: `Revisión — Mesa ${tableId}`,
-        width: 600,
+        width: 620,
         html: `
             <p class="text-start text-muted small mb-2">
                 Marque los candidatos cuyos votos desea observar.
-                Si todo está correcto, deje todo sin marcar y confirme.
+                Si todo está correcto, deje sin marcar y confirme.
             </p>
-            <div class="text-start border rounded p-2 mb-3"
-                 style="max-height:300px;overflow-y:auto;">
-                ${voteRows || '<p class="text-muted">No hay votos registrados</p>'}
+            <div class="text-start border rounded p-2 mb-3" style="max-height:300px;overflow-y:auto;">
+                ${rows || '<p class="text-muted text-center py-3">No hay votos registrados</p>'}
             </div>
-            <div class="text-start mb-2">
-                <label class="form-label fw-bold">Notas de la revisión (opcional):</label>
+            <div class="text-start">
+                <label class="form-label fw-bold">Notas (opcional):</label>
                 <textarea id="review-notes" class="form-control" rows="2"
                           placeholder="Describa lo observado…"></textarea>
-            </div>
-        `,
+            </div>`,
         showCancelButton: true,
         confirmButtonText: 'Confirmar revisión',
-        cancelButtonText:  'Cancelar',
-        preConfirm: () => {
-            const selected = Array.from(
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => ({
+            observed_vote_ids: Array.from(
                 document.querySelectorAll('.review-observe-cb:checked:not(:disabled)')
-            ).map(cb => parseInt(cb.value));
-            return {
-                observed_vote_ids: selected,
-                observation_notes: document.getElementById('review-notes').value.trim(),
-            };
-        },
+            ).map(cb => parseInt(cb.value)),
+            observation_notes: document.getElementById('review-notes').value.trim(),
+        }),
     });
 
     if (!formValues) return;
@@ -190,12 +246,11 @@ async function reviewTable(tableId) {
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
-                election_type_id:  electionTypeId,
+                election_type_id:  window.electionTypeId,
                 observed_vote_ids: formValues.observed_vote_ids,
                 observation_notes: formValues.observation_notes || null,
             }),
         });
-
         const data = await resp.json();
 
         if (data.success) {
@@ -210,101 +265,94 @@ async function reviewTable(tableId) {
     }
 }
 
-// ─── CORRECT TABLE ───────────────────────────────────────────────────────────
-// Opens a modal pre-filled with observed votes so the corrector can edit quantities.
-
 async function correctTable(tableId) {
-    const votesResp = await fetch(
-        `/voting-table-votes/${tableId}/votes?election_type_id=${electionTypeId}`,
-        { headers: { 'Accept': 'application/json' } }
-    );
-    const votes = await votesResp.json();
+    let votes = [];
+    try {
+        const r = await fetch(
+            `/voting-table-votes/${tableId}/votes?election_type_id=${window.electionTypeId}`,
+            { headers: { 'Accept': 'application/json' } }
+        );
+        votes = await r.json();
+    } catch (e) {
+        showError('No se pudieron cargar los votos de la mesa');
+        return;
+    }
 
-    const observed = votes.filter(v => v.vote_status === 'observed');
-    const all      = votes;
-
-    // Group votes by category
     const byCategory = {};
-    all.forEach(v => {
-        const cat = v.category_code ?? String(v.category_id ?? 'General');
+    votes.forEach(v => {
+        const cat = v.category_code || 'General';
         if (!byCategory[cat]) byCategory[cat] = [];
         byCategory[cat].push(v);
     });
-
-    // Build blank/null rows from the DOM (current live values)
-    const blankInputs = document.querySelectorAll(`#table-${tableId} .blank-votes-input`);
-    const nullInputs  = document.querySelectorAll(`#table-${tableId} .null-votes-input`);
-
     const blankByCategory = {};
-    blankInputs.forEach(inp => { blankByCategory[inp.dataset.category] = parseInt(inp.value) || 0; });
-
-    const nullByCategory  = {};
-    nullInputs.forEach(inp => { nullByCategory[inp.dataset.category] = parseInt(inp.value) || 0; });
+    document.querySelectorAll(`#table-${tableId} .blank-votes-input`)
+        .forEach(inp => { blankByCategory[inp.dataset.category] = parseInt(inp.value) || 0; });
+    const nullByCategory = {};
+    document.querySelectorAll(`#table-${tableId} .null-votes-input`)
+        .forEach(inp => { nullByCategory[inp.dataset.category] = parseInt(inp.value) || 0; });
 
     let rows = '';
-
-    // Candidate vote rows grouped by category
     Object.entries(byCategory).forEach(([cat, catVotes]) => {
-        rows += `<div class="mb-2">
-            <div class="fw-bold small text-muted border-bottom pb-1 mb-1">${escHtml(cat)}</div>`;
+        rows += `<div class="mb-3">
+            <div class="fw-bold small text-muted border-bottom pb-1 mb-2">${escHtml(cat)}</div>`;
         catVotes.forEach(v => {
+            const isObs = v.vote_status === 'observed';
             rows += `
-            <div class="row align-items-center mb-1 ${v.vote_status === 'observed' ? 'bg-warning bg-opacity-10 rounded px-1' : ''}">
+            <div class="row align-items-center mb-1 ${isObs ? 'bg-warning bg-opacity-10 rounded px-1' : ''}">
                 <div class="col-7 small">
-                    ${v.vote_status === 'observed' ? '<i class="ri-alert-line text-warning me-1"></i>' : ''}
+                    ${isObs ? '<i class="ri-alert-line text-warning me-1"></i>' : ''}
                     <strong>${escHtml(v.candidate_name)}</strong>
                     <div class="text-muted">${escHtml(v.candidate_party)}</div>
                 </div>
                 <div class="col-5">
-                    <input type="number"
-                           class="form-control form-control-sm correction-input"
-                           data-vote-id="${v.id}"
-                           data-category="${escHtml(cat)}"
-                           value="${v.quantity}"
-                           min="0">
+                    <input type="number" class="form-control form-control-sm correction-input"
+                           data-vote-id="${v.id}" data-category="${escHtml(cat)}"
+                           value="${v.quantity}" min="0">
                 </div>
             </div>`;
         });
-
-        // Blank and null rows for this category
-        const blank = blankByCategory[cat] ?? 0;
-        const nul   = nullByCategory[cat]  ?? 0;
         rows += `
-            <div class="row align-items-center mb-1">
-                <div class="col-7 small text-muted"><i class="ri-subtract-line me-1"></i>Votos en Blanco — ${escHtml(cat)}</div>
+            <div class="row align-items-center mb-1 mt-2">
+                <div class="col-7 small text-muted">
+                    <i class="ri-subtract-line me-1"></i>Votos en Blanco
+                </div>
                 <div class="col-5">
                     <input type="number" class="form-control form-control-sm blank-correction-input"
-                           data-category="${escHtml(cat)}" value="${blank}" min="0">
+                           data-category="${escHtml(cat)}"
+                           value="${blankByCategory[cat] ?? 0}" min="0">
                 </div>
             </div>
             <div class="row align-items-center mb-2">
-                <div class="col-7 small text-muted"><i class="ri-close-line me-1"></i>Votos Nulos — ${escHtml(cat)}</div>
+                <div class="col-7 small text-muted">
+                    <i class="ri-close-line me-1"></i>Votos Nulos
+                </div>
                 <div class="col-5">
                     <input type="number" class="form-control form-control-sm null-correction-input"
-                           data-category="${escHtml(cat)}" value="${nul}" min="0">
+                           data-category="${escHtml(cat)}"
+                           value="${nullByCategory[cat] ?? 0}" min="0">
                 </div>
-            </div>`;
-
-        rows += '</div>';
+            </div>
+        </div>`;
     });
 
     const { value: formValues } = await Swal.fire({
         title: `Corrección — Mesa ${tableId}`,
-        width: 620,
+        width: 640,
         html: `
             <div class="text-start border rounded p-2 mb-3"
-                 style="max-height:320px;overflow-y:auto;">
-                ${rows || '<p class="text-muted">No hay votos registrados</p>'}
+                 style="max-height:340px;overflow-y:auto;">
+                ${rows || '<p class="text-muted text-center py-3">No hay votos registrados</p>'}
             </div>
             <div class="text-start">
-                <label class="fw-bold form-label">Motivo de la corrección <span class="text-danger">*</span></label>
+                <label class="fw-bold form-label">
+                    Motivo de la corrección <span class="text-danger">*</span>
+                </label>
                 <textarea id="correction-notes" class="form-control" rows="2"
                           placeholder="Describa el motivo…"></textarea>
-            </div>
-        `,
+            </div>`,
         showCancelButton: true,
         confirmButtonText: 'Aplicar correcciones',
-        cancelButtonText:  'Cancelar',
+        cancelButtonText: 'Cancelar',
         preConfirm: () => {
             const notes = document.getElementById('correction-notes').value.trim();
             if (!notes) {
@@ -312,8 +360,8 @@ async function correctTable(tableId) {
                 return false;
             }
             const corrections = {};
-            document.querySelectorAll('.correction-input').forEach(input => {
-                corrections[input.dataset.voteId] = parseInt(input.value) || 0;
+            document.querySelectorAll('.correction-input').forEach(inp => {
+                corrections[inp.dataset.voteId] = parseInt(inp.value) || 0;
             });
             const blank_votes = {};
             document.querySelectorAll('.blank-correction-input').forEach(inp => {
@@ -341,14 +389,13 @@ async function correctTable(tableId) {
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
-                election_type_id: electionTypeId,
+                election_type_id: window.electionTypeId,
                 corrections:      formValues.corrections,
                 blank_votes:      formValues.blank_votes,
                 null_votes:       formValues.null_votes,
                 notes:            formValues.notes,
             }),
         });
-
         const data = await resp.json();
 
         if (data.success) {
@@ -362,30 +409,55 @@ async function correctTable(tableId) {
     }
 }
 
-// ─── VALIDATE TABLE ───────────────────────────────────────────────────────────
-
 async function validateTable(tableId, action) {
-    const actionLabels = {
-        validate:        { label: 'Validar votos',       color: 'info',    icon: 'ri-check-line',        confirmText: '¿Validar los votos de esta mesa? Quedará En Escrutinio.' },
-        close_validated: { label: 'Validar y Escrutar', color: 'success', icon: 'ri-check-double-line',  confirmText: '¿Validar y escrutar esta mesa? Esta acción es final.' },
-        reject:          { label: 'Rechazar',            color: 'danger',  icon: 'ri-close-circle-line', confirmText: '¿Rechazar esta mesa? Se marcará como Observada.' },
-        reject:   { label: 'rechazar', color: 'danger', icon: 'ri-close-circle-line' },
+    const actionMeta = {
+        validate: {
+            icon:        'question',
+            label:       'Validar votos',
+            confirmText: 'Los votos quedarán validados y la mesa pasará a En Escrutinio.',
+            btnColor:    '#17a2b8',
+        },
+        escrutar: {
+            icon:        'warning',
+            label:       'Escrutar mesa',
+            confirmText: 'Se cerrará el conteo definitivamente. Esta acción no se puede revertir.',
+            btnColor:    '#0ab39c',
+        },
+        reject: {
+            icon:        'warning',
+            label:       'Rechazar mesa',
+            confirmText: 'La mesa volverá a estado Observada para corrección.',
+            btnColor:    '#f06548',
+        },
     };
-    const meta = actionLabels[action] ?? actionLabels.validate;
 
-    const { value: notes } = await Swal.fire({
-        title: `¿${meta.label.charAt(0).toUpperCase() + meta.label.slice(1)} la mesa?`,
-        input: 'textarea',
-        inputLabel: 'Notas (opcional)',
-        inputPlaceholder: 'Agregue notas si es necesario…',
-        showCancelButton: true,
-        confirmButtonText: `Sí, ${meta.label}`,
-        cancelButtonText: 'Cancelar',
+    const meta = actionMeta[action] ?? actionMeta.validate;
+
+    const { value: notes, isConfirmed } = await Swal.fire({
+        title:              meta.label,
+        text:               meta.confirmText,
+        icon:               meta.icon,
+        input:              'textarea',
+        inputLabel:         action === 'reject' ? 'Motivo (obligatorio)' : 'Notas (opcional)',
+        inputPlaceholder:   'Agregue notas…',
+        showCancelButton:   true,
+        confirmButtonText:  `Sí, ${meta.label.toLowerCase()}`,
+        confirmButtonColor: meta.btnColor,
+        cancelButtonText:   'Cancelar',
+        preConfirm: (val) => {
+            if (action === 'reject' && !val?.trim()) {
+                Swal.showValidationMessage('El motivo es obligatorio para rechazar');
+                return false;
+            }
+            return val;
+        },
     });
 
-    if (notes === undefined) return;   // cancelled
+    if (!isConfirmed) return;
 
-    const btn = document.querySelector(`[data-table-id="${tableId}"].validate-table[data-action="${action}"]`);
+    const btn = document.querySelector(
+        `[data-table-id="${tableId}"].validate-table[data-action="${action}"]`
+    );
     setButtonLoading(btn, true);
 
     try {
@@ -393,16 +465,15 @@ async function validateTable(tableId, action) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-                'Accept': 'application/json',
+                'X-CSRF-TOKEN':  csrfToken(),
+                'Accept':        'application/json',
             },
             body: JSON.stringify({
-                election_type_id: electionTypeId,
+                election_type_id: window.electionTypeId,
                 action,
                 notes: notes || null,
             }),
         });
-
         const data = await resp.json();
 
         if (data.success) {
@@ -417,52 +488,8 @@ async function validateTable(tableId, action) {
     }
 }
 
-// ─── CLOSE TABLE ─────────────────────────────────────────────────────────────
-
-async function closeTable(tableId) {
-    const confirm = await Swal.fire({
-        title: '¿Cerrar mesa?',
-        text: 'Se cerrará el período de registro de votos.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, cerrar',
-        cancelButtonText: 'Cancelar',
-    });
-
-    if (!confirm.isConfirmed) return;
-
-    const btn = document.querySelector(`[data-table-id="${tableId}"].close-table`);
-    setButtonLoading(btn, true);
-
-    try {
-        const resp = await fetch(`/voting-table-votes/${tableId}/close`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({ election_type_id: electionTypeId }),
-        });
-
-        const data = await resp.json();
-
-        if (data.success) {
-            setTableStatusClass(tableId, 'cerrada');
-            showToast('success', data.message);
-            setTimeout(() => location.reload(), 1800);
-        } else {
-            showError(data.message);
-        }
-    } finally {
-        setButtonLoading(btn, false);
-    }
-}
-
-// ─── REOPEN TABLE ────────────────────────────────────────────────────────────
-
 async function reopenTable(tableId) {
-    const confirm = await Swal.fire({
+    const result = await Swal.fire({
         title: '¿Reabrir mesa?',
         text: 'La mesa volverá al estado Votación y podrá editarse.',
         icon: 'question',
@@ -471,7 +498,7 @@ async function reopenTable(tableId) {
         cancelButtonText: 'Cancelar',
     });
 
-    if (!confirm.isConfirmed) return;
+    if (!result.isConfirmed) return;
 
     const btn = document.querySelector(`[data-table-id="${tableId}"].reopen-table`);
     setButtonLoading(btn, true);
@@ -484,9 +511,8 @@ async function reopenTable(tableId) {
                 'X-CSRF-TOKEN': csrfToken(),
                 'Accept': 'application/json',
             },
-            body: JSON.stringify({ election_type_id: electionTypeId }),
+            body: JSON.stringify({ election_type_id: window.electionTypeId }),
         });
-
         const data = await resp.json();
 
         if (data.success) {
@@ -501,8 +527,6 @@ async function reopenTable(tableId) {
     }
 }
 
-// ─── SAVE ALL TABLES ─────────────────────────────────────────────────────────
-
 window.saveAllTables = async function() {
     const saveBtns = document.querySelectorAll('.save-table');
     if (saveBtns.length === 0) {
@@ -510,7 +534,7 @@ window.saveAllTables = async function() {
         return;
     }
 
-    const confirm = await Swal.fire({
+    const result = await Swal.fire({
         title: `¿Guardar ${saveBtns.length} mesa(s)?`,
         text: 'Se guardarán todos los votos ingresados en esta página.',
         icon: 'question',
@@ -519,7 +543,7 @@ window.saveAllTables = async function() {
         cancelButtonText: 'Cancelar',
     });
 
-    if (!confirm.isConfirmed) return;
+    if (!result.isConfirmed) return;
 
     let ok = 0, fail = 0;
     for (const btn of saveBtns) {
@@ -534,77 +558,16 @@ window.saveAllTables = async function() {
     showToast('success', `${ok} mesa(s) guardada(s)${fail > 0 ? `, ${fail} con error` : ''}`);
 };
 
-// ─── LIVE INPUT TOTAL UPDATE ─────────────────────────────────────────────────
-
-window.updateTableTotals = function(tableId) {
-    const categoryTotals = {};
-
-    // Valid votes from candidate inputs
-    document.querySelectorAll(`#table-${tableId} .vote-input`).forEach(input => {
-        const cat = input.dataset.category;
-        const val = parseInt(input.value) || 0;
-        categoryTotals[cat] = (categoryTotals[cat] ?? 0) + val;
-    });
-
-    // Blank votes
-    document.querySelectorAll(`#table-${tableId} .blank-votes-input`).forEach(input => {
-        const cat = input.dataset.category;
-        const val = parseInt(input.value) || 0;
-        categoryTotals[cat] = (categoryTotals[cat] ?? 0) + val;
-    });
-
-    // Null votes
-    document.querySelectorAll(`#table-${tableId} .null-votes-input`).forEach(input => {
-        const cat = input.dataset.category;
-        const val = parseInt(input.value) || 0;
-        categoryTotals[cat] = (categoryTotals[cat] ?? 0) + val;
-    });
-
-    Object.entries(categoryTotals).forEach(([code, total]) => {
-        const el = document.getElementById(`total-${code}-${tableId}`);
-        if (el) el.textContent = total;
-    });
-
-    Object.entries(categoryTotals).forEach(([code, total]) => {
-        const el = document.getElementById(`total-${code}-${tableId}`);
-        if (el) el.textContent = total;
-    });
-
-    const counts = Object.values(categoryTotals);
-    const grand  = counts.length > 0 ? counts[0] : 0;
-    const totalEl = document.getElementById(`total-${tableId}`);
-    if (totalEl) totalEl.textContent = grand;
-
-    // ── Update footer summary row ──
-    let footerValid = 0, footerBlank = 0, footerNull = 0;
-    document.querySelectorAll(`#table-${tableId} .vote-input`).forEach(i => {
-        footerValid += parseInt(i.value) || 0;
-    });
-    document.querySelectorAll(`#table-${tableId} .blank-votes-input`).forEach(i => {
-        footerBlank += parseInt(i.value) || 0;
-    });
-    document.querySelectorAll(`#table-${tableId} .null-votes-input`).forEach(i => {
-        footerNull  += parseInt(i.value) || 0;
-    });
-    const fv = document.getElementById(`footer-valid-${tableId}`);
-    const fb = document.getElementById(`footer-blank-${tableId}`);
-    const fn = document.getElementById(`footer-null-${tableId}`);
-    if (fv) fv.textContent = footerValid;
-    if (fb) fb.textContent = footerBlank;
-    if (fn) fn.textContent = footerNull;
-};
-
-// ─── VOTE INPUT LISTENERS ────────────────────────────────────────────────────
-
 window.initVoteListeners = function() {
-    // Numeric inputs — live total update
     document.querySelectorAll('.vote-input').forEach(input => {
-        input.addEventListener('input', () => {
-            window.updateTableTotals(input.dataset.table);
-        });
-        // Tab / Enter navigation within a table
+
+        // ✅ Select all on focus so you can type directly
+        input.addEventListener('focus', function () { this.select(); });
+
+        input.addEventListener('input', () => window.updateTableTotals(input.dataset.table));
+
         input.addEventListener('keydown', e => {
-            if (e.key === 'Enter' || e.key === 'Tab') {
+            if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
                 const all = Array.from(
                     document.querySelectorAll(`#table-${input.dataset.table} .vote-input`)
                 );
@@ -616,67 +579,45 @@ window.initVoteListeners = function() {
             }
         });
     });
+    document.querySelectorAll('.blank-votes-input, .null-votes-input').forEach(input => {
+        input.addEventListener('focus', function () { this.select(); });
 
-    // ── Action buttons ──
-    document.querySelectorAll('.save-table').forEach(btn => {
-        btn.addEventListener('click', () => saveTable(parseInt(btn.dataset.tableId)));
+        input.addEventListener('input', () => window.updateTableTotals(input.dataset.table));
     });
-
-    document.querySelectorAll('.review-table').forEach(btn => {
-        btn.addEventListener('click', () => reviewTable(parseInt(btn.dataset.tableId)));
-    });
-
-    document.querySelectorAll('.correct-table').forEach(btn => {
-        btn.addEventListener('click', () => correctTable(parseInt(btn.dataset.tableId)));
-    });
-
-    document.querySelectorAll('.validate-table').forEach(btn => {
+    document.querySelectorAll('.save-table').forEach(btn =>
+        btn.addEventListener('click', () => saveTable(parseInt(btn.dataset.tableId)))
+    );
+    document.querySelectorAll('.review-table').forEach(btn =>
+        btn.addEventListener('click', () => reviewTable(parseInt(btn.dataset.tableId)))
+    );
+    document.querySelectorAll('.correct-table').forEach(btn =>
+        btn.addEventListener('click', () => correctTable(parseInt(btn.dataset.tableId)))
+    );
+    document.querySelectorAll('.validate-table').forEach(btn =>
         btn.addEventListener('click', () =>
             validateTable(parseInt(btn.dataset.tableId), btn.dataset.action ?? 'validate')
-        );
-    });
-
-    document.querySelectorAll('.close-table').forEach(btn => {
-        btn.addEventListener('click', () => closeTable(parseInt(btn.dataset.tableId)));
-    });
-
-    document.querySelectorAll('.reopen-table').forEach(btn => {
-        btn.addEventListener('click', () => reopenTable(parseInt(btn.dataset.tableId)));
-    });
-
-    // ── Blank / null vote inputs — live total update ──
-    document.querySelectorAll('.blank-votes-input, .null-votes-input').forEach(input => {
-        input.addEventListener('input', () => {
-            window.updateTableTotals(input.dataset.table);
-        });
-    });
-
-    // ── Observe-checkbox counter ──
-    // Only allow checking rows that have a saved vote (data-vote-id != "")
+        )
+    );
+    document.querySelectorAll('.reopen-table').forEach(btn =>
+        btn.addEventListener('click', () => reopenTable(parseInt(btn.dataset.tableId)))
+    );
     document.querySelectorAll('.observe-checkbox').forEach(cb => {
         cb.addEventListener('change', () => {
-            // Guard: if this vote hasn't been saved yet, block the check
             if (cb.checked && !cb.dataset.voteId) {
                 cb.checked = false;
                 showError('Guarde los votos antes de marcarlos como observados');
                 return;
             }
-
             const tableId    = cb.dataset.table;
-            // Only count boxes with a real vote ID
             const allChecked = Array.from(
                 document.querySelectorAll(`#table-${tableId} .observe-checkbox:checked`)
             ).filter(c => c.dataset.voteId);
-
             const countEl = document.getElementById(`selected-count-${tableId}`);
             if (countEl) countEl.textContent = allChecked.length;
-
-            // Per-category counts
             const cats = {};
             allChecked.forEach(c => {
                 cats[c.dataset.category] = (cats[c.dataset.category] ?? 0) + 1;
             });
-            // Reset all category counters first
             document.querySelectorAll(`#table-${tableId} [id^="selected-"]`).forEach(el => {
                 if (el.id !== `selected-count-${tableId}`) el.textContent = '';
             });
@@ -686,23 +627,5 @@ window.initVoteListeners = function() {
             });
         });
     });
-
-    // Global Ctrl+S shortcut
-    document.addEventListener('keydown', e => {
-        if (e.ctrlKey && e.key === 's') {
-            e.preventDefault();
-            document.getElementById('saveAllBtn')?.click();
-        }
-    });
 };
-
-// ─── UTILITY ─────────────────────────────────────────────────────────────────
-
-function escHtml(str) {
-    return String(str ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
 </script>

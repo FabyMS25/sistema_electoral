@@ -60,7 +60,6 @@ class VotingTableElection extends Model
         ];
     }
 
-    // RELATIONSHIPS
     public function votingTable(): BelongsTo
     {
         return $this->belongsTo(VotingTable::class);
@@ -74,7 +73,6 @@ class VotingTableElection extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-    // STATUS CHECKS
     public function isOpen(): bool
     {
         return $this->status === self::STATUS_VOTACION;
@@ -109,7 +107,6 @@ class VotingTableElection extends Model
         ]);
     }
 
-    // WORKFLOW ACTIONS
     public function open(int $updatedBy): void
     {
         $this->update([
@@ -178,7 +175,6 @@ class VotingTableElection extends Model
             'updated_by'   => $updatedBy,
         ]);
     }
-    // BALLOT VALIDATION
     public function validateBallots(): array
     {
         $errors = [];

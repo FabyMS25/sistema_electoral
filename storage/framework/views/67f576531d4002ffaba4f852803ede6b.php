@@ -478,15 +478,24 @@
     </div>
 </div>
 
-<div class="auto-refresh-controls" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+<div class="auto-refresh-controls"
+     style="position:fixed;bottom:20px;right:20px;z-index:1000;
+            background:white;padding:10px;border-radius:8px;
+            box-shadow:0 2px 10px rgba(0,0,0,.12);">
     <div class="btn-group btn-group-sm">
-        <button class="btn btn-outline-primary" onclick="refreshDashboard()" title="Actualizar ahora">
+        <button class="btn btn-outline-primary"
+                onclick="window.refreshDashboard && window.refreshDashboard()"
+                title="Actualizar ahora">
             <i class="ri-refresh-line"></i>
         </button>
-        <button class="btn btn-outline-success" onclick="startAutoRefresh()" title="Iniciar auto-actualización">
+        <button class="btn btn-outline-success"
+                onclick="window.startAutoRefresh && window.startAutoRefresh()"
+                title="Iniciar auto-actualización">
             <i class="ri-play-line"></i>
         </button>
-        <button class="btn btn-outline-secondary" onclick="stopAutoRefresh()" title="Pausar auto-actualización">
+        <button class="btn btn-outline-secondary"
+                onclick="window.stopAutoRefresh && window.stopAutoRefresh()"
+                title="Pausar auto-actualización">
             <i class="ri-pause-line"></i>
         </button>
     </div>
@@ -498,298 +507,338 @@
     </div>
 </div>
 <?php $__env->startSection('dashboard-scripts'); ?>
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.2/dist/apexcharts.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            if (typeof ApexCharts === 'undefined') {
-                console.error('❌ ApexCharts no está cargado');
-                return;
-            }
-            let refreshInterval = 120000;
-            let refreshTimer = null;
-            let isRefreshing = false;
-            let charts = {};
-            initializeCharts();
-            startAutoRefresh();
-            document.getElementById('exportLocalityTable')?.addEventListener('click', function() {
-                exportTableToCSV('locality-table', 'resultados_localidades.csv');
-            });
-            function initializeCharts() {
-                try {
-                    const candidateStats = <?php echo json_encode($candidateStats ?? [], 15, 512) ?>;
-                    if (Object.keys(candidateStats).length === 0) {
-                        console.warn('⚠️ No hay datos de candidatos para mostrar');
-                        return;
-                    }
-                    const sortedStats = Object.values(candidateStats).sort((a, b) => b.votes - a.votes);
-                    const candidateNames = sortedStats.map(stat => {
-                        const name = stat.candidate?.name || 'Sin nombre';
-                        return name.length > 20 ? name.substring(0, 18) + '...' : name;
-                    });
-                    const candidateColors = sortedStats.map(stat => stat.candidate?.color || '#3b5de7');
-                    const candidateVotes = sortedStats.map(stat => stat.votes || 0);
-                    const barContainer = document.querySelector("#candidates_chart");
-                    if (barContainer) {
-                        const barOptions = {
-                            series: [{ name: 'Votos', data: candidateVotes }],
-                            chart: { type: 'bar', height: 350, toolbar: { show: true } },
-                            plotOptions: { bar: { distributed: true, borderRadius: 4 } },
-                            xaxis: {
-                                categories: candidateNames,
-                                labels: { rotate: -45, trim: true, style: { fontSize: '11px' } }
-                            },
-                            colors: candidateColors,
-                            tooltip: { y: { formatter: val => val.toLocaleString() + ' votos' } },
-                            legend: { show: false }
-                        };
-                        charts.candidateChart = new ApexCharts(barContainer, barOptions);
-                        charts.candidateChart.render();
-                    }
-                    const donutContainer = document.querySelector("#party_distribution_chart");
-                    if (donutContainer && candidateVotes.length > 0) {
-                        const donutOptions = {
-                            series: candidateVotes,
-                            labels: candidateNames,
-                            colors: candidateColors,
-                            chart: { type: 'donut', height: 300 },
-                            legend: { position: 'bottom', fontSize: '11px' },
-                            plotOptions: {
-                                pie: {
-                                    donut: {
-                                        size: '60%',
-                                        labels: {
-                                            show: true,
-                                            total: {
-                                                show: true,
-                                                label: 'Total',
-                                                formatter: (w) => w.globals.seriesTotals.reduce((a, b) => a + b, 0).toLocaleString()
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            tooltip: { y: { formatter: val => val.toLocaleString() + ' votos' } }
-                        };
-                        charts.partyChart = new ApexCharts(donutContainer, donutOptions);
-                        charts.partyChart.render();
-                    }
-                    const localityContainer = document.querySelector("#projects-overview-chart");
-                    const localityResults = <?php echo json_encode($localityResults ?? [], 15, 512) ?>;
-                    const localities = Object.values(localityResults).map(l => l.name);
-
-                    if (localityContainer && localities.length > 0 && candidateNames.length > 0) {
-                        const series = candidateNames.map((name, index) => {
-                            return {
-                                name: name,
-                                type: 'bar',
-                                data: Object.values(localityResults).map(l => {
-                                    const candidate = (l.candidates || []).find(c => c.name === name);
-                                    return candidate ? candidate.votes : 0;
-                                })
-                            };
-                        });
-
-                        const localityOptions = {
-                            series: series,
-                            chart: { type: 'bar', height: 350, stacked: false, toolbar: { show: true } },
-                            xaxis: {
-                                categories: localities,
-                                labels: { rotate: -45, trim: true, style: { fontSize: '11px' } }
-                            },
-                            colors: candidateColors,
-                            legend: { position: 'bottom', horizontalAlign: 'center' },
-                            tooltip: { shared: true, intersect: false },
-                            plotOptions: { bar: { columnWidth: '70%' } }
-                        };
-                        charts.localityChart = new ApexCharts(localityContainer, localityOptions);
-                        charts.localityChart.render();
-                    }
-                    initializeMap(localityResults);
-                } catch (error) {
-                    console.error('❌ Error creando gráficos:', error);
-                }
-            }
-            function initializeMap(localityResults) {
-                const mapContainer = document.getElementById("votes-by-locations");
-                if (!mapContainer || !localityResults || Object.keys(localityResults).length === 0) return;
-                try {
-                    const markers = Object.values(localityResults).map(l => {
-                        return {
-                            name: l.name + " (" + (l.total_votes || 0) + " votos)",
-                            coords: [l.latitude || -17.4, l.longitude || -66.2],
-                            votes: l.total_votes || 0,
-                            candidates: l.candidates || []
-                        };
-                    });
-                    if (typeof jsVectorMap !== 'undefined') {
-                        mapContainer.innerHTML = "";
-                        charts.boliviaMap = new jsVectorMap({
-                            map: "world",
-                            selector: "#votes-by-locations",
-                            zoomOnScroll: true,
-                            zoomButtons: true,
-                            markers: markers,
-                            markerStyle: {
-                                initial: { fill: '#0ab39c' },
-                                hover: { fill: '#f06548' },
-                                selected: { fill: '#f06548' }
-                            },
-                            labels: {
-                                markers: {
-                                    render: function(marker) {
-                                        return marker.name;
-                                    }
-                                }
-                            },
-                            onMarkerClick: function(event, index) {
-                                const m = markers[index];
-                                showMarkerPopup(m);
-                            }
-                        });
-                    }
-                } catch (error) {
-                    console.error('❌ Error creando mapa:', error);
-                }
-            }
-            function showMarkerPopup(marker) {
-                const popup = document.createElement('div');
-                popup.className = 'custom-map-popup';
-                let candidatesHtml = '';
-                if (marker.candidates && marker.candidates.length > 0) {
-                    candidatesHtml = marker.candidates.map(c => `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            ${c.name} (${c.party})
-                            <span class="badge bg-primary rounded-pill">
-                                ${c.votes?.toLocaleString() || 0} (${c.percentage || 0}%)
-                            </span>
-                        </li>
-                    `).join('');
-                } else {
-                    candidatesHtml = '<li class="list-group-item">No hay datos</li>';
-                }
-                popup.innerHTML = `
-                    <div class="popup-header">
-                        <h5>${marker.name}</h5>
-                        <button type="button" class="btn-close" aria-label="Close"></button>
-                    </div>
-                    <div class="popup-body">
-                        <p><strong>Total votos:</strong> ${marker.votes?.toLocaleString() || 0}</p>
-                        <h6>Resultados:</h6>
-                        <ul class="list-group">
-                            ${candidatesHtml}
-                        </ul>
-                    </div>
-                `;
-                if (!document.querySelector('#map-popup-styles')) {
-                    const styles = document.createElement('style');
-                    styles.id = 'map-popup-styles';
-                    styles.textContent = `
-                        .custom-map-popup {
-                            position: fixed;
-                            top: 50%;
-                            left: 50%;
-                            transform: translate(-50%, -50%);
-                            background: white;
-                            border-radius: 8px;
-                            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-                            z-index: 10000;
-                            width: 320px;
-                            max-width: 90vw;
-                        }
-                        .popup-header {
-                            padding: 12px 16px;
-                            border-bottom: 1px solid #dee2e6;
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: center;
-                        }
-                        .popup-body {
-                            padding: 16px;
-                            max-height: 60vh;
-                            overflow-y: auto;
-                        }
-                    `;
-                    document.head.appendChild(styles);
-                }
-                popup.querySelector('.btn-close').addEventListener('click', function() {
-                    document.body.removeChild(popup);
-                });
-                document.body.appendChild(popup);
-            }
-            function exportTableToCSV(tableId, filename) {
-                const table = document.getElementById(tableId);
-                if (!table) return;
-                let csv = [];
-                let rows = table.querySelectorAll('tr');
-
-                for (let i = 0; i < rows.length; i++) {
-                    let row = [], cols = rows[i].querySelectorAll('td, th');
-                    for (let j = 0; j < cols.length; j++) {
-                        let data = cols[j].innerText.replace(/\n/g, ' ').replace(/"/g, '""');
-                        row.push('"' + data + '"');
-                    }
-                    csv.push(row.join(','));
-                }
-                let csvContent = csv.join('\n');
-                let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                let link = document.createElement('a');
-                let url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', filename);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
-            window.filterLocality = function(localityId) {
-                if (!charts.localityChart) return;
-                console.log('Filtrar por localidad:', localityId);
-            };
-            function refreshDashboard() {
-                if (isRefreshing) return;
-                isRefreshing = true;
-                showLoadingIndicator();
-                const electionType = document.querySelector('select[name="election_type"]')?.value || '';
-                const url = `/refresh-dashboard?election_type=${electionType}`;
-                fetch(url)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            location.reload();
-                        }
-                        isRefreshing = false;
-                        hideLoadingIndicator();
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        isRefreshing = false;
-                        hideLoadingIndicator();
-                    });
-            }
-            function startAutoRefresh() {
-                if (refreshTimer) clearInterval(refreshTimer);
-                refreshTimer = setInterval(refreshDashboard, refreshInterval);
-                document.getElementById('refresh-status').innerHTML = '<small class="text-success">● Activo</small>';
-            }
-            function stopAutoRefresh() {
-                if (refreshTimer) {
-                    clearInterval(refreshTimer);
-                    refreshTimer = null;
-                }
-                document.getElementById('refresh-status').innerHTML = '<small class="text-secondary">○ Pausado</small>';
-            }
-            function showLoadingIndicator() {
-                document.getElementById('loading-indicator').style.display = 'block';
-            }
-            function hideLoadingIndicator() {
-                document.getElementById('loading-indicator').style.display = 'none';
-            }
-            window.refreshDashboard = refreshDashboard;
-            window.startAutoRefresh = startAutoRefresh;
-            window.stopAutoRefresh = stopAutoRefresh;
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.2/dist/apexcharts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/js/jsvectormap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsvectormap@1.5.3/dist/maps/world.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    let refreshTimer   = null;
+    let isRefreshing   = false;
+    let charts         = {};
+    const REFRESH_MS   = 120_000; // 2 minutes
+    const initialStats = <?php echo json_encode($candidateStats ?? [], 15, 512) ?>;
+    const localityData = <?php echo json_encode($localityResults ?? [], 15, 512) ?>;
+    initCharts(initialStats, localityData);
+    startAutoRefresh();
+    document.getElementById('exportLocalityTable')?.addEventListener('click', () =>
+        exportTableToCSV('locality-table', 'resultados_localidades.csv')
+    );
+    window.refreshDashboard  = refreshDashboard;
+    window.startAutoRefresh  = startAutoRefresh;
+    window.stopAutoRefresh   = stopAutoRefresh;
+    window.filterLocality    = filterLocality;
+    function refreshDashboard() {
+        if (isRefreshing) return;
+        isRefreshing = true;
+        setRefreshIcon(true);
+        const electionType = document.querySelector('select[name="election_type"]')?.value ?? '';
+        const category     = document.querySelector('#filter-category-input')?.value ?? '';
+        const department   = document.querySelector('#dept-select')?.value ?? '';
+        const province     = document.querySelector('#prov-select')?.value ?? '';
+        const municipality = document.querySelector('#muni-select')?.value ?? '';
+        const params = new URLSearchParams({ election_type: electionType, category, department, province, municipality });
+        fetch(`/refresh-dashboard?${params}`, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(data => {
+            if (!data.success) throw new Error(data.message ?? 'Error del servidor');
+            updateCounters(data);
+            updateCharts(data.candidateStats ?? {});
+            updateLastUpdated(data.last_updated);
+        })
+        .catch(err => {
+            console.warn('Refresh failed, reloading page:', err.message);
+            location.reload();
+        })
+        .finally(() => {
+            isRefreshing = false;
+            setRefreshIcon(false);
         });
-    </script>
+    }
+
+    function startAutoRefresh() {
+        stopAutoRefresh();
+        refreshTimer = setInterval(refreshDashboard, REFRESH_MS);
+        setRefreshStatus(true);
+    }
+
+    function stopAutoRefresh() {
+        if (refreshTimer) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+        }
+        setRefreshStatus(false);
+    }
+
+    // ── UI helpers ────────────────────────────────────────────────────────────
+    function setRefreshStatus(active) {
+        const el = document.getElementById('refresh-status');
+        if (!el) return;
+        el.innerHTML = active
+            ? '<small class="text-success">● Activo</small>'
+            : '<small class="text-secondary">○ Pausado</small>';
+    }
+
+    function setRefreshIcon(loading) {
+        const btn = document.querySelector('.auto-refresh-controls .btn[onclick*="refreshDashboard"]');
+        if (!btn) return;
+        btn.innerHTML = loading
+            ? '<span class="spinner-border spinner-border-sm" role="status"></span>'
+            : '<i class="ri-refresh-line"></i>';
+        btn.disabled = loading;
+    }
+
+    function updateLastUpdated(ts) {
+        const el = document.querySelector('.card-header p.text-muted');
+        if (el && ts) el.textContent = 'Última actualización: ' + ts;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // COUNTER DOM UPDATES (no reload needed for numbers)
+    // ═════════════════════════════════════════════════════════════════════════
+    function updateCounters(data) {
+        setCounter('.total-votes-counter',    data.totalVotes);
+        setCounter('.reported-tables-counter', data.reportedTables);
+        setCounter('.total-tables-counter',   data.totalTables);
+        setCounter('.progress-counter',       data.progressPercentage);
+
+        // Progress bars
+        document.querySelectorAll('.general-progress-bar').forEach(bar => {
+            bar.style.width = data.progressPercentage + '%';
+            bar.textContent = data.progressPercentage + '%';
+            bar.setAttribute('aria-valuenow', data.progressPercentage);
+        });
+
+        // Table status counts
+        const pending = (data.totalTables ?? 0) - (data.reportedTables ?? 0);
+        setText('.total-tables-count',    data.totalTables);
+        setText('.reported-tables-count', data.reportedTables);
+        setText('.pending-tables-count',  pending);
+        setText('.progress-text',
+            `${data.reportedTables} de ${data.totalTables} mesas reportadas`
+        );
+
+        // Header progress bar
+        const headerBar = document.querySelector('.progress-bar.bg-info[role="progressbar"]');
+        if (headerBar) {
+            headerBar.style.width = data.progressPercentage + '%';
+        }
+    }
+
+    function setCounter(selector, value) {
+        document.querySelectorAll(selector).forEach(el => {
+            el.textContent = Number(value ?? 0).toLocaleString('es-BO');
+        });
+    }
+
+    function setText(selector, value) {
+        document.querySelectorAll(selector).forEach(el => {
+            el.textContent = value ?? '';
+        });
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // CHARTS
+    // ═════════════════════════════════════════════════════════════════════════
+    function buildChartArrays(candidateStats) {
+        const sorted = Object.values(candidateStats).sort((a, b) => b.votes - a.votes);
+        return {
+            names:  sorted.map(s => {
+                const n = s.candidate?.name ?? 'Sin nombre';
+                return n.length > 20 ? n.substring(0, 18) + '…' : n;
+            }),
+            colors: sorted.map(s => s.candidate?.color ?? '#3b5de7'),
+            votes:  sorted.map(s => s.votes ?? 0),
+        };
+    }
+
+    function initCharts(candidateStats, localityResults) {
+        if (!Object.keys(candidateStats).length) return;
+
+        const { names, colors, votes } = buildChartArrays(candidateStats);
+
+        // ── Bar chart ────────────────────────────────────────────────────────
+        const barEl = document.querySelector('#candidates_chart');
+        if (barEl) {
+            charts.bar = new ApexCharts(barEl, {
+                series: [{ name: 'Votos', data: votes }],
+                chart:  { type: 'bar', height: 350, toolbar: { show: true }, id: 'candidateBar' },
+                plotOptions: { bar: { distributed: true, borderRadius: 4 } },
+                xaxis: {
+                    categories: names,
+                    labels: { rotate: -45, trim: true, style: { fontSize: '11px' } }
+                },
+                colors,
+                tooltip: { y: { formatter: v => v.toLocaleString() + ' votos' } },
+                legend: { show: false },
+            });
+            charts.bar.render();
+        }
+
+        // ── Donut chart ──────────────────────────────────────────────────────
+        const donutEl = document.querySelector('#party_distribution_chart');
+        if (donutEl && votes.length) {
+            charts.donut = new ApexCharts(donutEl, {
+                series:  votes,
+                labels:  names,
+                colors,
+                chart:   { type: 'donut', height: 300, id: 'partyDonut' },
+                legend:  { position: 'bottom', fontSize: '11px' },
+                plotOptions: {
+                    pie: { donut: { size: '60%', labels: { show: true,
+                        total: { show: true, label: 'Total',
+                            formatter: w => w.globals.seriesTotals.reduce((a, b) => a + b, 0).toLocaleString()
+                        }
+                    }}}
+                },
+                tooltip: { y: { formatter: v => v.toLocaleString() + ' votos' } },
+            });
+            charts.donut.render();
+        }
+
+        // ── Locality stacked bar ─────────────────────────────────────────────
+        const localityEl = document.querySelector('#projects-overview-chart');
+        const localities  = Object.values(localityResults).map(l => l.name);
+        if (localityEl && localities.length && names.length) {
+            const series = names.map(name => ({
+                name,
+                type: 'bar',
+                data: Object.values(localityResults).map(l => {
+                    const found = Object.values(l.categories ?? {})
+                        .flatMap(cat => cat.candidates ?? [])
+                        .find(c => {
+                            const short = (c.name ?? '').length > 20
+                                ? c.name.substring(0, 18) + '…' : c.name;
+                            return short === name;
+                        });
+                    return found?.votes ?? 0;
+                }),
+            }));
+            charts.locality = new ApexCharts(localityEl, {
+                series,
+                chart:   { type: 'bar', height: 350, stacked: false, toolbar: { show: true } },
+                xaxis:   { categories: localities, labels: { rotate: -45, style: { fontSize: '11px' } } },
+                colors,
+                legend:  { position: 'bottom', horizontalAlign: 'center' },
+                tooltip: { shared: true, intersect: false },
+                plotOptions: { bar: { columnWidth: '70%' } },
+            });
+            charts.locality.render();
+        }
+
+        initMap(localityResults);
+    }
+
+    function updateCharts(candidateStats) {
+        if (!Object.keys(candidateStats).length) return;
+        const { names, colors, votes } = buildChartArrays(candidateStats);
+
+        // Update existing charts without re-rendering (smooth animation)
+        if (charts.bar) {
+            charts.bar.updateOptions({ colors }, false, false);
+            charts.bar.updateSeries([{ name: 'Votos', data: votes }]);
+        }
+        if (charts.donut) {
+            charts.donut.updateOptions({ labels: names, colors }, false, false);
+            charts.donut.updateSeries(votes);
+        }
+        // Locality chart requires a full reinit since locality data isn't in refresh payload
+        // It will update on the next full page filter change
+    }
+
+    // ── Map ──────────────────────────────────────────────────────────────────
+    function initMap(localityResults) {
+        const mapEl = document.getElementById('votes-by-locations');
+        if (!mapEl || !Object.keys(localityResults).length) return;
+        if (typeof jsVectorMap === 'undefined') return;
+
+        const markers = Object.values(localityResults).map(l => ({
+            name:   `${l.name} (${l.total_votes ?? 0} votos)`,
+            coords: [l.latitude ?? -17.4, l.longitude ?? -66.2],
+            votes:  l.total_votes ?? 0,
+            categories: l.categories ?? {},
+        }));
+
+        mapEl.innerHTML = '';
+        charts.map = new jsVectorMap({
+            map:         'world',
+            selector:    '#votes-by-locations',
+            zoomOnScroll: true,
+            zoomButtons:  true,
+            markers,
+            markerStyle: {
+                initial:  { fill: '#0ab39c' },
+                hover:    { fill: '#f06548' },
+                selected: { fill: '#f06548' },
+            },
+            onMarkerClick(event, index) { showMarkerPopup(markers[index]); },
+        });
+    }
+
+    function showMarkerPopup(marker) {
+        document.querySelector('.custom-map-popup')?.remove();
+
+        let rows = '';
+        Object.entries(marker.categories).forEach(([code, cat]) => {
+            rows += `<li class="list-group-item list-group-item-secondary small fw-bold">${cat.label ?? code}</li>`;
+            (cat.candidates ?? []).forEach(c => {
+                rows += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                        <span class="small">${c.name} <span class="text-muted">(${c.party})</span></span>
+                        <span class="badge bg-primary rounded-pill">${(c.votes ?? 0).toLocaleString()} · ${c.percentage ?? 0}%</span>
+                    </li>`;
+            });
+        });
+        if (!rows) rows = '<li class="list-group-item small text-muted">Sin datos</li>';
+
+        const popup = document.createElement('div');
+        popup.className = 'custom-map-popup position-fixed top-50 start-50 translate-middle bg-white rounded shadow-lg';
+        popup.style.cssText = 'z-index:10000;width:340px;max-width:92vw;';
+        popup.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+                <h6 class="mb-0 fw-bold">${marker.name}</h6>
+                <button type="button" class="btn-close btn-close-sm"></button>
+            </div>
+            <div class="p-2" style="max-height:60vh;overflow-y:auto;">
+                <ul class="list-group list-group-flush">${rows}</ul>
+            </div>`;
+        popup.querySelector('.btn-close').addEventListener('click', () => popup.remove());
+        document.body.appendChild(popup);
+    }
+
+    // ── Locality filter (button group above locality chart) ──────────────────
+    function filterLocality(localityId) {
+        document.querySelectorAll('.locality-progress-item').forEach(item => {
+            item.style.display = (localityId === 'all' || item.dataset.localityId == localityId)
+                ? '' : 'none';
+        });
+    }
+
+    // ── CSV export ────────────────────────────────────────────────────────────
+    function exportTableToCSV(tableId, filename) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        const rows = [...table.querySelectorAll('tr')].map(row =>
+            [...row.querySelectorAll('td,th')]
+                .map(cell => '"' + cell.innerText.replace(/\n/g, ' ').replace(/"/g, '""') + '"')
+                .join(',')
+        );
+        const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const link = Object.assign(document.createElement('a'), {
+            href:     URL.createObjectURL(blob),
+            download: filename,
+            style:    'display:none',
+        });
+        document.body.append(link);
+        link.click();
+        link.remove();
+    }
+
+});
+</script>
 <?php $__env->stopSection(); ?>
 <?php /**PATH D:\_Mine\sistema_electoral\resources\views/partials/dashboard-content.blade.php ENDPATH**/ ?>

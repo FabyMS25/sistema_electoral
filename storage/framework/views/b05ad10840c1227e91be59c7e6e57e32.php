@@ -4,18 +4,15 @@
         return;
     }
     $regularCandidates = [];
-    $voteMap           = [];  // [candidateId => Vote]
-
+    $voteMap           = [];
     foreach ($candidatesByCategory as $categoryCode => $categoryCandidates) {
         $regularCandidates[$categoryCode] = $categoryCandidates->values();
     }
-
     if (isset($table->votes)) {
         foreach ($table->votes as $vote) {
             $voteMap[$vote->candidate_id] = $vote;
         }
     }
-
     $maxRows = empty($regularCandidates)
         ? 0
         : max(array_map(fn($c) => $c->count(), $regularCandidates));
@@ -23,12 +20,9 @@
     $canObserve = ($permissions['can_observe'] ?? false) && !$isDisabled;
 ?>
 
-
 <?php for($i = 0; $i < $maxRows; $i++): ?>
 <tr>
     <td class="text-center fw-bold small"><?php echo e($i + 1); ?></td>
-
-    
     <td>
         <?php $firstCandidate = null; ?>
         <?php $__currentLoopData = $candidatesByCategory; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $categoryCode => $_): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -49,19 +43,14 @@
             </div>
         <?php endif; ?>
     </td>
-
-    
     <?php $__currentLoopData = $candidatesByCategory; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $categoryCode => $_): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
         <?php
             $candidate  = $regularCandidates[$categoryCode][$i] ?? null;
             $vote       = $candidate ? ($voteMap[$candidate->id] ?? null) : null;
             $quantity   = $vote?->quantity ?? 0;
-            // FIX: compare to the constant value ('observed'), NOT VotingTable::STATUS_*
             $isObserved = $vote && $vote->vote_status === \App\Models\Vote::VOTE_STATUS_OBSERVED;
             $colClass   = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
         ?>
-
-        
         <td class="<?php echo e($colClass); ?> col-<?php echo e(Str::slug($categoryCode)); ?>">
             <?php if($candidate): ?>
                 <div class="d-flex align-items-center gap-1">
@@ -78,8 +67,6 @@
                 <span class="text-muted fst-italic small">---</span>
             <?php endif; ?>
         </td>
-
-        
         <td class="<?php echo e($colClass); ?> col-<?php echo e(Str::slug($categoryCode)); ?> text-center">
             <?php if($candidate): ?>
                 <input type="number"
@@ -96,8 +83,6 @@
                        style="width:70px;margin:0 auto;<?php echo e($isObserved ? 'border-color:#f06548;' : ''); ?>">
             <?php endif; ?>
         </td>
-
-        
         <td class="<?php echo e($colClass); ?> col-<?php echo e(Str::slug($categoryCode)); ?> text-center">
             <?php if($candidate): ?>
                 <?php if($canObserve): ?>
@@ -119,66 +104,66 @@
     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
 </tr>
 <?php endfor; ?>
-
-
 <tr class="table-light">
-    <td colspan="2" class="text-end small fw-semibold text-muted">
-        <i class="ri-subtract-line me-1"></i>Votos en Blanco
+    <td class="text-center text-muted" style="font-size:0.7rem;">
+        <i class="ri-subtract-line"></i>
+    </td>
+    <td class="text-end small fw-semibold text-muted pe-2" style="white-space:nowrap; font-size:0.78rem;">
+        En Blanco
     </td>
     <?php $__currentLoopData = $candidatesByCategory; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $categoryCode => $_): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
         <?php
             $blankQty = $table->results_by_category[$categoryCode]['blank_votes'] ?? 0;
-            $colClass = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
+            $colClass  = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
         ?>
-        <td class="<?php echo e($colClass); ?>" colspan="2">
+        <td class="<?php echo e($colClass); ?>"></td>
+        <td class="<?php echo e($colClass); ?> text-center">
             <?php if(!$isDisabled && ($permissions['can_register'] ?? false)): ?>
                 <input type="number"
-                       class="form-control form-control-sm blank-votes-input text-center"
+                       class="form-control form-control-sm blank-votes-input text-center fw-bold"
                        data-table="<?php echo e($table->id); ?>"
                        data-category="<?php echo e($categoryCode); ?>"
                        value="<?php echo e($blankQty); ?>"
-                       min="0"
-                       step="1"
-                       style="width:70px;margin:0 auto;"
+                       min="0" step="1"
+                       style="width:70px; margin:0 auto;"
                        title="Votos en blanco — <?php echo e($categoryCode); ?>">
             <?php else: ?>
-                <span class="small fw-bold"><?php echo e($blankQty); ?></span>
+                <span class="fw-bold"><?php echo e($blankQty); ?></span>
             <?php endif; ?>
         </td>
         <td class="<?php echo e($colClass); ?>"></td>
     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
 </tr>
-
-
 <tr class="table-light">
-    <td colspan="2" class="text-end small fw-semibold text-muted">
-        <i class="ri-close-line me-1"></i>Votos Nulos
+    <td class="text-center text-muted" style="font-size:0.7rem;">
+        <i class="ri-close-line"></i>
+    </td>
+    <td class="text-end small fw-semibold text-muted pe-2" style="white-space:nowrap; font-size:0.78rem;">
+        Nulos
     </td>
     <?php $__currentLoopData = $candidatesByCategory; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $categoryCode => $_): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
         <?php
             $nullQty  = $table->results_by_category[$categoryCode]['null_votes'] ?? 0;
             $colClass = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
         ?>
-        <td class="<?php echo e($colClass); ?>" colspan="2">
+        <td class="<?php echo e($colClass); ?>"></td>
+        <td class="<?php echo e($colClass); ?> text-center">
             <?php if(!$isDisabled && ($permissions['can_register'] ?? false)): ?>
                 <input type="number"
-                       class="form-control form-control-sm null-votes-input text-center"
+                       class="form-control form-control-sm null-votes-input text-center fw-bold"
                        data-table="<?php echo e($table->id); ?>"
                        data-category="<?php echo e($categoryCode); ?>"
                        value="<?php echo e($nullQty); ?>"
-                       min="0"
-                       step="1"
-                       style="width:70px;margin:0 auto;"
+                       min="0" step="1"
+                       style="width:70px; margin:0 auto;"
                        title="Votos nulos — <?php echo e($categoryCode); ?>">
             <?php else: ?>
-                <span class="small fw-bold"><?php echo e($nullQty); ?></span>
+                <span class="fw-bold"><?php echo e($nullQty); ?></span>
             <?php endif; ?>
         </td>
         <td class="<?php echo e($colClass); ?>"></td>
     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
 </tr>
-
-
 <tr class="table-info fw-bold">
     <td colspan="2" class="text-end small">TOTALES</td>
     <?php $__currentLoopData = $candidatesByCategory; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $categoryCode => $_): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -192,4 +177,6 @@
         <td class="<?php echo e($colClass); ?>"></td>
     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
 </tr>
+
+
 <?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-table-votes/partials/table-rows.blade.php ENDPATH**/ ?>

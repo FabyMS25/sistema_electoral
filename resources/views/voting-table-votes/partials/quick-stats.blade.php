@@ -1,19 +1,19 @@
 {{-- resources/views/voting-table-votes/partials/quick-stats.blade.php --}}
 @if(isset($tableStats) && ($tableStats['total'] ?? 0) > 0)
 @php
-    $total = $tableStats['total'];
+    $total     = $tableStats['total'] ?? 0;
     $gPending  = ($tableStats['configurada'] ?? 0) + ($tableStats['en_espera'] ?? 0);
-    $gVoting   = $tableStats['votacion'] ?? 0;
-    $gCounting = ($tableStats['cerrada'] ?? 0) + ($tableStats['en_escrutinio'] ?? 0);
+    $gVoting   = $tableStats['votacion']      ?? 0;
+    $gCounting = $tableStats['en_escrutinio'] ?? 0;
     $gDone     = ($tableStats['escrutada'] ?? 0) + ($tableStats['transmitida'] ?? 0);
-    $gObserved = $tableStats['observada'] ?? 0;
-    $gAnnulled = $tableStats['anulada'] ?? 0;
+    $gObserved = $tableStats['observada']     ?? 0;
+    $gAnnulled = $tableStats['anulada']       ?? 0;
     $pct = fn($n) => $total > 0 ? round(($n / $total) * 100, 1) : 0;
 @endphp
+@if($total > 0)
 <div class="row mb-2">
     <div class="col-12">
         <div class="d-flex flex-wrap gap-2 align-items-center">
-
             @if(($tableStats['configurada'] ?? 0) > 0)
                 <a href="{{ request()->fullUrlWithQuery(['status' => 'configurada']) }}"
                    class="badge bg-secondary text-decoration-none p-2 stat-badge"
@@ -38,15 +38,6 @@
                    title="Mesas actualmente en votación">
                     <i class="ri-vote-line me-1"></i>
                     Votación: <strong>{{ $tableStats['votacion'] }}</strong>
-                </a>
-            @endif
-
-            @if(($tableStats['cerrada'] ?? 0) > 0)
-                <a href="{{ request()->fullUrlWithQuery(['status' => 'cerrada']) }}"
-                   class="badge bg-warning text-dark text-decoration-none p-2 stat-badge"
-                   title="Mesas cerradas, pendientes de escrutinio">
-                    <i class="ri-lock-line me-1"></i>
-                    Cerradas: <strong>{{ $tableStats['cerrada'] }}</strong>
                 </a>
             @endif
 
@@ -94,17 +85,13 @@
                     Anuladas: <strong>{{ $tableStats['anulada'] }}</strong>
                 </a>
             @endif
-
-            {{-- Divider + total --}}
             <span class="ms-auto text-muted small">
                 <strong>{{ $total }}</strong> mesas en total
             </span>
         </div>
     </div>
 </div>
-
-{{-- ── Progress bar ── --}}
-<div class="row mb-3">
+<div class="row mb-2">
     <div class="col-12">
         <div class="progress" style="height: 22px; border-radius: 6px;" title="{{ $total }} mesas">
 
@@ -157,8 +144,6 @@
             @endif
 
         </div>
-
-        {{-- Legend --}}
         <div class="d-flex flex-wrap gap-3 mt-1 small text-muted">
             <span><span class="badge bg-secondary">&nbsp;</span> Sin iniciar {{ $gPending }}</span>
             <span><span class="badge bg-primary">&nbsp;</span> Votación {{ $gVoting }}</span>
@@ -171,7 +156,7 @@
         </div>
     </div>
 </div>
-
+@endif
 <style>
 .stat-badge { transition: transform .15s, opacity .15s; }
 .stat-badge:hover { transform: translateY(-1px); opacity: .85; }

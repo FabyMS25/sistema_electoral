@@ -15,10 +15,10 @@ class LocalitiesSeeder extends Seeder
     public function run()
     {
         $municipalities = Municipality::all();
-        
+
         foreach ($municipalities as $municipality) {
             $localities = $this->getLocalitiesForMunicipality($municipality->name);
-            
+
             foreach ($localities as $localityData) {
                 Locality::updateOrCreate(
                     [
@@ -77,11 +77,8 @@ class LocalitiesSeeder extends Seeder
                 ['name' => 'Esquilan Grande', 'latitude' => -17.42, 'longitude' => -66.24],
                 ['name' => 'La Florida', 'latitude' => -17.4, 'longitude' => -66.24],
                 ['name' => 'Santa Rosa', 'latitude' => -17.40, 'longitude' => -66.23],
-                
-                ['name' => 'La Florida', 'latitude' => null, 'longitude' => null],
-                ['name' => 'Rumi Mayu (Colcapirhua)', 'latitude' => null, 'longitude' => null],
+                ['name' => 'Rumi Mayu', 'latitude' => null, 'longitude' => null],
                 ['name' => 'San Jose (Cuatro Esquinas)', 'latitude' => -17.395, 'longitude' => -66.239],
-                ['name' => 'Santa Rosa (Colcapirhua)', 'latitude' => null, 'longitude' => null],
                 ['name' => 'Sumumpaya', 'latitude' => -17.41, 'longitude' => -66.24],
             ],
             'Vinto' => [
@@ -132,7 +129,7 @@ class LocalitiesSeeder extends Seeder
                 ['name' => 'Paucarpata', 'latitude' => -17.4000, 'longitude' => -66.3000],
                 ['name' => 'Piñami', 'latitude' => -17.3833, 'longitude' => -66.2667],
                 ['name' => 'Quillacollo', 'latitude' => -17.39228, 'longitude' => -66.27838],
-            ],            
+            ],
         ];
 
         return $localitiesData[$municipalityName] ?? [];

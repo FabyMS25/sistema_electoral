@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class AuditLog extends Model
 {
     protected $table = 'audit_logs';
-
     protected $fillable = [
         'user_id',
         'action',

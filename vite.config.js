@@ -64,9 +64,7 @@ export default defineConfig({
         {
             name: 'copy-specific-packages',
             async writeBundle() {
-
                 try {
-                    // Copy images, json, fonts, and js
                     await Promise.all([
                         fs.copy(folder.src_assets + 'fonts', folder.dist_assets + 'fonts'),
                         fs.copy(folder.src_assets + 'images', folder.dist_assets + 'images'),
@@ -77,10 +75,8 @@ export default defineConfig({
                 } catch (error) {
                     console.error('Error copying assets:', error);
                 }
-
-                const outputPath = path.resolve(__dirname, folder.dist_assets); // Adjust the destination path
+                const outputPath = path.resolve(__dirname, folder.dist_assets);
                 const configPath = path.resolve(__dirname, 'package-copy-config.json');
-
                 try {
                     const configContent = await fs.readFile(configPath, 'utf-8');
                     const {

@@ -1,7 +1,5 @@
 {{--
     resources/views/partials/dashboard-candidates-table.blade.php
-    Receives: $stats (array from calculateStats)
-    Used inside the tab pane; tbody is replaced by AJAX.
 --}}
 <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">

@@ -12,14 +12,12 @@ use Illuminate\Support\Facades\Log;
 
 class VotingTablesExport
 {
-    // ─── Full export ──────────────────────────────────────────────────────────
-
     public function export(array $filters = []): string
     {
         try {
             $query = VotingTable::with([
                 'institution.locality.municipality.province.department',
-                'elections.electionType',   // voting_table_elections → election_types
+                'elections.electionType',
                 'president', 'secretary',
                 'vocal1', 'vocal2', 'vocal3', 'vocal4',
             ]);
@@ -42,8 +40,6 @@ class VotingTablesExport
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Mesas de Votación');
-
-            // Headers — matches the import template column names
             $headers = [
                 'A'  => 'Código OEP',
                 'B'  => 'Código Interno',
@@ -66,7 +62,6 @@ class VotingTablesExport
                 'S'  => 'Vocal 3',
                 'T'  => 'Vocal 4',
                 'U'  => 'Observaciones',
-                // Election-level (from voting_table_elections — latest row)
                 'V'  => 'Tipo Elección (último)',
                 'W'  => 'Estado (último)',
                 'X'  => 'Total Votantes (último)',
@@ -114,7 +109,6 @@ class VotingTablesExport
                 $sheet->setCellValue('S'  . $row, $this->delegateName($table->vocal3));
                 $sheet->setCellValue('T'  . $row, $this->delegateName($table->vocal4));
                 $sheet->setCellValue('U'  . $row, $table->observations ?? '');
-                // Election-level (from latest VotingTableElection)
                 $sheet->setCellValue('V'  . $row, $latest?->electionType?->name ?? '');
                 $sheet->setCellValue('W'  . $row, $this->statusLabel($latest?->status));
                 $sheet->setCellValue('X'  . $row, $latest?->total_voters      ?? 0);
@@ -143,8 +137,6 @@ class VotingTablesExport
             throw new \Exception('Error al generar el archivo de exportación: ' . $e->getMessage());
         }
     }
-
-    // ─── Import template ──────────────────────────────────────────────────────
 
     public function downloadTemplate(): string
     {
@@ -192,8 +184,6 @@ class VotingTablesExport
             $hRange  = "A1:{$lastCol}1";
             $sheet->getStyle($hRange)->getFont()->setBold(true);
             $sheet->getStyle($hRange)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E3F2FD');
-
-            // Sample rows
             $samples = [
                 ['', '', '1', 'A', 'mixta', 'UNIDAD EDUCATIVA ADELA ZAMUDIO', 'REC-QUI-001',
                  'Cochabamba', 'Quillacollo', 'Quillacollo', 'Quillacollo Urbano',
@@ -217,8 +207,6 @@ class VotingTablesExport
                 }
                 $r++;
             }
-
-            // Instructions
             $instrRow = $r + 2;
             $sheet->setCellValue('A' . $instrRow, 'INSTRUCCIONES:');
             $sheet->getStyle('A' . $instrRow)->getFont()->setBold(true);
@@ -252,8 +240,6 @@ class VotingTablesExport
             throw new \Exception('Error al generar la plantilla: ' . $e->getMessage());
         }
     }
-
-    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private function statusLabel(?string $status): string
     {

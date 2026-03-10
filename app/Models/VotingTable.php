@@ -44,8 +44,6 @@ class VotingTable extends Model
     public const TYPE_FEMENINA  = 'femenina';
     public const TYPE_MIXTA     = 'mixta';
 
-    // ─── Relationships ────────────────────────────────────────────────────────
-
     public function institution(): BelongsTo
     {
         return $this->belongsTo(Institution::class);
@@ -116,12 +114,16 @@ class VotingTable extends Model
     {
         return $this->hasMany(Observation::class, 'voting_table_id');
     }
+    public function tableElections(): HasMany
+    {
+        return $this->hasMany(VotingTableElection::class);
+    }
+
     public function getStatusAttribute(): ?string
     {
         $latest = $this->elections()->latest('updated_at')->first();
         return $latest?->status;
     }
-
     public function categoryResults(): HasMany
     {
         return $this->hasMany(VotingTableCategoryResult::class, 'voting_table_id');
@@ -174,11 +176,9 @@ class VotingTable extends Model
         $latest = $this->elections()->with('electionType')->latest('updated_at')->first();
         return $latest?->electionType;
     }
-
-    // Temporary for backward compatibility with old views
     public function getValidVotesAttribute(): int
     {
-        return 0; // This should be calculated from category results
+        return 0;
     }
 
     public function getBlankVotesAttribute(): int
@@ -231,15 +231,12 @@ class VotingTable extends Model
         return $this->vocal4?->name;
     }
 
-    // ─── Scopes ───────────────────────────────────────────────────────────────
-
     public function scopeForElections($query)
     {
         return $query->whereHas('institution', fn($q) =>
             $q->where('status', 'activo')->where('is_operative', true)
         );
     }
-
     public function scopeByInstitution($query, int $institutionId)
     {
         return $query->where('institution_id', $institutionId);
@@ -249,8 +246,6 @@ class VotingTable extends Model
     {
         return $query->where('type', $type);
     }
-
-    // ─── Helpers ──────────────────────────────────────────────────────────────
 
     public function electionStatus(int $electionTypeId): ?VotingTableElection
     {

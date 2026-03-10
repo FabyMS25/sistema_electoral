@@ -4,18 +4,15 @@
         return;
     }
     $regularCandidates = [];
-    $voteMap           = [];  // [candidateId => Vote]
-
+    $voteMap           = [];
     foreach ($candidatesByCategory as $categoryCode => $categoryCandidates) {
         $regularCandidates[$categoryCode] = $categoryCandidates->values();
     }
-
     if (isset($table->votes)) {
         foreach ($table->votes as $vote) {
             $voteMap[$vote->candidate_id] = $vote;
         }
     }
-
     $maxRows = empty($regularCandidates)
         ? 0
         : max(array_map(fn($c) => $c->count(), $regularCandidates));
@@ -23,12 +20,9 @@
     $canObserve = ($permissions['can_observe'] ?? false) && !$isDisabled;
 @endphp
 
-{{-- ── Candidate rows ── --}}
 @for($i = 0; $i < $maxRows; $i++)
 <tr>
     <td class="text-center fw-bold small">{{ $i + 1 }}</td>
-
-    {{-- Party (from first available candidate in this row) --}}
     <td>
         @php $firstCandidate = null; @endphp
         @foreach($candidatesByCategory as $categoryCode => $_)
@@ -49,19 +43,14 @@
             </div>
         @endif
     </td>
-
-    {{-- Per-category cells --}}
     @foreach($candidatesByCategory as $categoryCode => $_)
         @php
             $candidate  = $regularCandidates[$categoryCode][$i] ?? null;
             $vote       = $candidate ? ($voteMap[$candidate->id] ?? null) : null;
             $quantity   = $vote?->quantity ?? 0;
-            // FIX: compare to the constant value ('observed'), NOT VotingTable::STATUS_*
             $isObserved = $vote && $vote->vote_status === \App\Models\Vote::VOTE_STATUS_OBSERVED;
             $colClass   = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
         @endphp
-
-        {{-- Candidate name --}}
         <td class="{{ $colClass }} col-{{ Str::slug($categoryCode) }}">
             @if($candidate)
                 <div class="d-flex align-items-center gap-1">
@@ -78,8 +67,6 @@
                 <span class="text-muted fst-italic small">---</span>
             @endif
         </td>
-
-        {{-- Vote quantity input --}}
         <td class="{{ $colClass }} col-{{ Str::slug($categoryCode) }} text-center">
             @if($candidate)
                 <input type="number"
@@ -95,8 +82,6 @@
                        style="width:70px;margin:0 auto;{{ $isObserved ? 'border-color:#f06548;' : '' }}">
             @endif
         </td>
-
-        {{-- Observe checkbox --}}
         <td class="{{ $colClass }} col-{{ Str::slug($categoryCode) }} text-center">
             @if($candidate)
                 @if($canObserve)
@@ -117,66 +102,66 @@
     @endforeach
 </tr>
 @endfor
-
-{{-- ── Blank votes row ── --}}
 <tr class="table-light">
-    <td colspan="2" class="text-end small fw-semibold text-muted">
-        <i class="ri-subtract-line me-1"></i>Votos en Blanco
+    <td class="text-center text-muted" style="font-size:0.7rem;">
+        <i class="ri-subtract-line"></i>
+    </td>
+    <td class="text-end small fw-semibold text-muted pe-2" style="white-space:nowrap; font-size:0.78rem;">
+        En Blanco
     </td>
     @foreach($candidatesByCategory as $categoryCode => $_)
         @php
             $blankQty = $table->results_by_category[$categoryCode]['blank_votes'] ?? 0;
-            $colClass = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
+            $colClass  = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
         @endphp
-        <td class="{{ $colClass }}" colspan="2">
+        <td class="{{ $colClass }}"></td>
+        <td class="{{ $colClass }} text-center">
             @if(!$isDisabled && ($permissions['can_register'] ?? false))
                 <input type="number"
-                       class="form-control form-control-sm blank-votes-input text-center"
+                       class="form-control form-control-sm blank-votes-input text-center fw-bold"
                        data-table="{{ $table->id }}"
                        data-category="{{ $categoryCode }}"
                        value="{{ $blankQty }}"
-                       min="0"
-                       step="1"
-                       style="width:70px;margin:0 auto;"
+                       min="0" step="1"
+                       style="width:70px; margin:0 auto;"
                        title="Votos en blanco — {{ $categoryCode }}">
             @else
-                <span class="small fw-bold">{{ $blankQty }}</span>
+                <span class="fw-bold">{{ $blankQty }}</span>
             @endif
         </td>
         <td class="{{ $colClass }}"></td>
     @endforeach
 </tr>
-
-{{-- ── Null votes row ── --}}
 <tr class="table-light">
-    <td colspan="2" class="text-end small fw-semibold text-muted">
-        <i class="ri-close-line me-1"></i>Votos Nulos
+    <td class="text-center text-muted" style="font-size:0.7rem;">
+        <i class="ri-close-line"></i>
+    </td>
+    <td class="text-end small fw-semibold text-muted pe-2" style="white-space:nowrap; font-size:0.78rem;">
+        Nulos
     </td>
     @foreach($candidatesByCategory as $categoryCode => $_)
         @php
             $nullQty  = $table->results_by_category[$categoryCode]['null_votes'] ?? 0;
             $colClass = 'table-' . ($categoryColorMap[$categoryCode] ?? 'secondary');
         @endphp
-        <td class="{{ $colClass }}" colspan="2">
+        <td class="{{ $colClass }}"></td>
+        <td class="{{ $colClass }} text-center">
             @if(!$isDisabled && ($permissions['can_register'] ?? false))
                 <input type="number"
-                       class="form-control form-control-sm null-votes-input text-center"
+                       class="form-control form-control-sm null-votes-input text-center fw-bold"
                        data-table="{{ $table->id }}"
                        data-category="{{ $categoryCode }}"
                        value="{{ $nullQty }}"
-                       min="0"
-                       step="1"
-                       style="width:70px;margin:0 auto;"
+                       min="0" step="1"
+                       style="width:70px; margin:0 auto;"
                        title="Votos nulos — {{ $categoryCode }}">
             @else
-                <span class="small fw-bold">{{ $nullQty }}</span>
+                <span class="fw-bold">{{ $nullQty }}</span>
             @endif
         </td>
         <td class="{{ $colClass }}"></td>
     @endforeach
 </tr>
-
-{{-- ── Totals row ── --}}
 <tr class="table-info fw-bold">
     <td colspan="2" class="text-end small">TOTALES</td>
     @foreach($candidatesByCategory as $categoryCode => $_)
@@ -190,3 +175,5 @@
         <td class="{{ $colClass }}"></td>
     @endforeach
 </tr>
+
+
