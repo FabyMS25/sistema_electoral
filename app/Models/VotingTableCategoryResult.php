@@ -55,7 +55,7 @@ class VotingTableCategoryResult extends Model
 
     public function electionTypeCategory(): BelongsTo
     {
-        return $this->belongsTo(ElectionTypeCategory::class);
+        return $this->belongsTo(electionTypeCategory::class);
     }
 
     public function enteredBy(): BelongsTo

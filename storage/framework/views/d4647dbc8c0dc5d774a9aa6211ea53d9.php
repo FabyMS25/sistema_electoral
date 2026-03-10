@@ -1,4 +1,4 @@
-{{-- resources/views/voting-table-votes/scripts/observations-by-vote-js.blade.php --}}
+
 <script>
 function createObservationWithSelected(tableId) {
     // Only consider checkboxes that have a real saved vote ID
@@ -145,3 +145,4 @@ function escHtml(str) {
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
+<?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-table-votes/scripts/observations-by-vote-js.blade.php ENDPATH**/ ?>

@@ -89,7 +89,6 @@
             </div>
         </div>
     </div>
-
     <!-- Modales -->
     <?php echo $__env->make('voting-tables.partials.modal-delete', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
     <?php echo $__env->make('voting-tables.partials.modal-import', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>

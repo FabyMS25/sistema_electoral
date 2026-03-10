@@ -1,4 +1,4 @@
-{{-- resources/views/voting-table-votes/scripts/votes-table-js.blade.php --}}
+
 <script>
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
@@ -706,3 +706,4 @@ function escHtml(str) {
         .replace(/"/g, '&quot;');
 }
 </script>
+<?php /**PATH D:\_Mine\sistema_electoral\resources\views/voting-table-votes/scripts/votes-table-js.blade.php ENDPATH**/ ?>

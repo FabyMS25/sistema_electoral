@@ -112,15 +112,20 @@ class VotingTable extends Model
             'municipality_id'
         );
     }
-
-    // ─── Accessors for view compatibility ───────────────────────────────────
-
+    public function observations(): HasMany
+    {
+        return $this->hasMany(Observation::class, 'voting_table_id');
+    }
     public function getStatusAttribute(): ?string
     {
         $latest = $this->elections()->latest('updated_at')->first();
         return $latest?->status;
     }
 
+    public function categoryResults(): HasMany
+    {
+        return $this->hasMany(VotingTableCategoryResult::class, 'voting_table_id');
+    }
     public function getTotalVotersAttribute(): int
     {
         return $this->elections()->sum('total_voters');

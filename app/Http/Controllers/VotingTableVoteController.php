@@ -169,7 +169,7 @@ class VotingTableVoteController extends Controller
             $sortDir         = $request->input('sort_direction', 'asc');
             $query = $this->scopedTableQuery()->with([
                 'institution:id,name,code',
-                'tableElections' => fn($q) => $q->where('election_type_id', $electionTypeId),
+                'elections' => fn($q) => $q->where('election_type_id', $electionTypeId),
                 'categoryResults' => fn($q) => $q
                     ->whereIn('election_type_category_id', $typeCategoryIds)
                     ->with('electionTypeCategory.electionCategory'),
@@ -199,19 +199,20 @@ class VotingTableVoteController extends Controller
                 $query->where('voter_range_end_name', 'ilike', "%{$toName}%");
             }
             if ($status) {
-                $query->whereHas('tableElections', fn($q) => $q
+                $query->whereHas('elections', fn($q) => $q
                     ->where('election_type_id', $electionTypeId)
                     ->where('status', $status)
                 );
             }
             if ($minVotes) {
-                $query->whereHas('tableElections', fn($q) => $q
+                $query->whereHas('elections', fn($q) => $q
                     ->where('election_type_id', $electionTypeId)
                     ->where('total_voters', '>=', $minVotes)
                 );
             }
+
             if ($maxVotes) {
-                $query->whereHas('tableElections', fn($q) => $q
+                $query->whereHas('elections', fn($q) => $q  // Cambiado
                     ->where('election_type_id', $electionTypeId)
                     ->where('total_voters', '<=', $maxVotes)
                 );
@@ -230,7 +231,7 @@ class VotingTableVoteController extends Controller
             };
             $votingTables = $query->paginate(20)->withQueryString();
             $votingTables->getCollection()->transform(function (VotingTable $table) {
-                $te = $table->tableElections->first();
+                $te = $table->elections->first();
                 $table->current_status   = $te?->status ?? 'sin_configurar';
                 $table->total_voters     = $te?->total_voters ?? 0;
                 $table->ballots_received = $te?->ballots_received ?? 0;
@@ -897,62 +898,61 @@ class VotingTableVoteController extends Controller
         }
     }
 
-    public function getTableStats(Request $request, int $tableId)
-    {
-        try {
-            $electionTypeId = $request->query('election_type_id');
+public function getTableStats(Request $request, int $tableId)
+{
+    try {
+        $electionTypeId = $request->query('election_type_id');
 
-            $table = VotingTable::with([
-                'institution:id,name,code',
-                'tableElections' => fn($q) => $q->when($electionTypeId,
-                    fn($q2) => $q2->where('election_type_id', $electionTypeId)
-                ),
-                'categoryResults.electionTypeCategory.electionCategory',
-                'observations'   => fn($q) => $q->where('status', 'pending'),
-            ])->findOrFail($tableId);
+        $table = VotingTable::with([
+            'institution:id,name,code',
+            'elections' => fn($q) => $q->when($electionTypeId,  // CAMBIADO: tableElections → elections
+                fn($q2) => $q2->where('election_type_id', $electionTypeId)
+            ),
+            'categoryResults.electionTypeCategory.electionCategory',
+            'observations'   => fn($q) => $q->where('status', 'pending'),
+        ])->findOrFail($tableId);
 
-            $te = $table->tableElections->first();
+        $te = $table->elections->first(); // CAMBIADO: tableElections → elections
 
-            return response()->json([
-                'table'   => [
-                    'id'          => $table->id,
-                    'number'      => $table->number,
-                    'code'        => $table->full_code,
-                    'status'      => $te?->status ?? 'sin_configurar',
-                    'institution' => $table->institution->name,
-                ],
-                'voters'  => [
-                    'expected'      => $table->expected_voters,
-                    'total'         => $te?->total_voters ?? 0,
-                    'participation' => $table->expected_voters > 0 && $te
-                        ? round(($te->total_voters / $table->expected_voters) * 100, 1)
-                        : 0,
-                ],
-                'ballots' => [
-                    'received' => $te?->ballots_received ?? 0,
-                    'used'     => $te?->ballots_used ?? 0,
-                    'leftover' => $te?->ballots_leftover ?? 0,
-                    'spoiled'  => $te?->ballots_spoiled ?? 0,
-                ],
-                'observations_count' => $table->observations->count(),
-                'category_results'   => $table->categoryResults->map(fn($r) => [
-                    'category'      => $r->electionTypeCategory->electionCategory->name,
-                    'code'          => $r->electionTypeCategory->electionCategory->code,
-                    'valid_votes'   => $r->valid_votes,
-                    'blank_votes'   => $r->blank_votes,
-                    'null_votes'    => $r->null_votes,
-                    'total_votes'   => $r->total_votes,
-                    'is_consistent' => (bool) $r->is_consistent,
-                    'status'        => $r->status,
-                ]),
-            ]);
+        return response()->json([
+            'table'   => [
+                'id'          => $table->id,
+                'number'      => $table->number,
+                'code'        => $table->full_code,
+                'status'      => $te?->status ?? 'sin_configurar',
+                'institution' => $table->institution->name,
+            ],
+            'voters'  => [
+                'expected'      => $table->expected_voters,
+                'total'         => $te?->total_voters ?? 0,
+                'participation' => $table->expected_voters > 0 && $te
+                    ? round(($te->total_voters / $table->expected_voters) * 100, 1)
+                    : 0,
+            ],
+            'ballots' => [
+                'received' => $te?->ballots_received ?? 0,
+                'used'     => $te?->ballots_used ?? 0,
+                'leftover' => $te?->ballots_leftover ?? 0,
+                'spoiled'  => $te?->ballots_spoiled ?? 0,
+            ],
+            'observations_count' => $table->observations->count(),
+            'category_results'   => $table->categoryResults->map(fn($r) => [
+                'category'      => $r->electionTypeCategory->electionCategory->name,
+                'code'          => $r->electionTypeCategory->electionCategory->code,
+                'valid_votes'   => $r->valid_votes,
+                'blank_votes'   => $r->blank_votes,
+                'null_votes'    => $r->null_votes,
+                'total_votes'   => $r->total_votes,
+                'is_consistent' => (bool) $r->is_consistent,
+                'status'        => $r->status,
+            ]),
+        ]);
 
-        } catch (\Exception $e) {
-            Log::error('getTableStats: ' . $e->getMessage());
-            return response()->json(['error' => 'Error al cargar estadísticas'], 500);
-        }
+    } catch (\Exception $e) {
+        Log::error('getTableStats: ' . $e->getMessage());
+        return response()->json(['error' => 'Error al cargar estadísticas'], 500);
     }
-
+}
     private function safeReviewerRole($user): string
     {
         $allowed = ['revisor', 'fiscal', 'notario', 'coordinador'];
