@@ -12,13 +12,18 @@ use App\Http\Controllers\ActaController;
 use App\Http\Controllers\ObservationController;
 
 Auth::routes();
+
 Route::get('index/{locale}', [HomeController::class, 'lang']);
 Route::get('/', [HomeController::class, 'root'])->name('root');
+
+// Public — refreshDashboard() handles its own auth check for private dashboards
 Route::get('/refresh-dashboard', [HomeController::class, 'refreshDashboard'])->name('dashboard.refresh');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/refresh-dashboard', [HomeController::class, 'getDashboardData'])->name('refresh-dashboard');
-    Route::post('/toggle-dashboard-visibility', [HomeController::class, 'toggleDashboardVisibility'])->name('toggle-dashboard-visibility');
+
+    // Dashboard visibility toggle — single canonical route
+    Route::post('/dashboard/toggle', [HomeController::class, 'toggleDashboardVisibility'])
+        ->name('dashboard.toggle');
 
     // ===== GESTIÓN DE USUARIOS =====
     Route::prefix('users')->name('users.')->group(function () {
@@ -39,7 +44,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{user}/assign-table', [UserController::class, 'assignTableForm'])->name('assign-table.form');
         Route::post('/{user}/assign-table', [UserController::class, 'assignTable'])->name('assign-table');
         Route::delete('/{user}/assignment/{assignment}', [UserController::class, 'removeAssignment'])->name('remove-assignment');
-        // Route::get('/check-email', [UserController::class, 'checkEmail'])->name('users.check-email');
         Route::get('check-email', [UserController::class, 'checkEmail'])->name('check-email');
     });
 
@@ -107,19 +111,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', [VotingTableVoteController::class, 'index'])->name('index');
         Route::post('register', [VotingTableVoteController::class, 'registerVotes'])->name('register');
         Route::post('register-all', [VotingTableVoteController::class, 'registerAllVotes'])->name('register-all');
-        Route::post('{tableId}/review', [VotingTableVoteController::class, 'reviewTable'])->name('review');
         Route::post('{tableId}/validate', [VotingTableVoteController::class, 'validateTable'])->name('validate');
         Route::post('{tableId}/correct', [VotingTableVoteController::class, 'correctTable'])->name('correct');
-        Route::post('{tableId}/close', [VotingTableVoteController::class, 'closeTable'])->name('close');
         Route::get('{tableId}/votes', [VotingTableVoteController::class, 'getTableVotes'])->name('votes');
         Route::get('{tableId}/stats', [VotingTableVoteController::class, 'getTableStats'])->name('stats');
     });
+
+    // ===== OBSERVACIONES =====
     Route::prefix('observations')->name('observations.')->group(function () {
         Route::post('/', [ObservationController::class, 'store'])->name('store');
         Route::post('{id}/resolve', [ObservationController::class, 'resolve'])->name('resolve');
         Route::get('table/{tableId}', [ObservationController::class, 'getTableObservations'])->name('table');
         Route::get('stats', [ObservationController::class, 'getStats'])->name('stats');
     });
+
+    // ===== ACTAS =====
     Route::prefix('actas')->name('actas.')->group(function () {
         Route::post('/upload', [ActaController::class, 'store'])->name('upload');
         Route::post('{id}/verify', [ActaController::class, 'verify'])->name('verify');
@@ -127,6 +133,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('{id}/approve', [ActaController::class, 'approve'])->name('approve');
         Route::get('table/{tableId}', [ActaController::class, 'getTableActas'])->name('table');
     });
+
     // ===== PERFIL =====
     Route::prefix('profile')->name('profile.')->group(function () {
         Route::get('/', [ProfileController::class, 'index'])->name('index');
@@ -136,6 +143,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 });
 
+// ===== API =====
 Route::prefix('api')->middleware('auth')->group(function () {
     Route::get('/provinces/{department}', [HomeController::class, 'getProvinces'])->name('api.provinces');
     Route::get('/municipalities/{province}', [HomeController::class, 'getMunicipalities'])->name('api.municipalities');
@@ -146,4 +154,5 @@ Route::prefix('api')->middleware('auth')->group(function () {
     Route::post('/tables/{table}/validate', [VotingTableVoteController::class, 'validateTable']);
 });
 
+// Catch-all — must remain last
 Route::get('{any}', [HomeController::class, 'index'])->name('index')->where('any', '.*');

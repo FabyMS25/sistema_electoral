@@ -6,10 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * NOTE: No DB::insert() here — the row is created by DashboardSeeder which
-     * runs after ElectionTypeSeeder and ElectionCategorySeeder, so FK IDs exist.
-     */
     public function up(): void
     {
         Schema::create('dashboards', function (Blueprint $table) {
@@ -20,8 +16,16 @@ return new class extends Migration
                 ->constrained('election_types')->nullOnDelete();
             $table->foreignId('default_category_id')->nullable()
                 ->constrained('election_categories')->nullOnDelete();
+            $table->foreignId('default_department_id')->nullable()
+                ->constrained('departments')->nullOnDelete();
+            $table->foreignId('default_province_id')->nullable()
+                ->constrained('provinces')->nullOnDelete();
+            $table->foreignId('default_municipality_id')->nullable()
+                ->constrained('municipalities')->nullOnDelete();
+
             $table->boolean('show_election_switcher')->default(true);
             $table->boolean('show_category_filter')->default(true);
+
             $table->unsignedSmallInteger('auto_refresh_seconds')->default(60);
             $table->timestamps();
         });

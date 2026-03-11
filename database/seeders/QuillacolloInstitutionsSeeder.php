@@ -181,11 +181,6 @@ class QuillacolloInstitutionsSeeder extends Seeder
             $this->command->info("   • Ya existían: {$skipped}");
             $this->command->info("   • Localidades creadas: {$localitiesCreated}");
             $this->command->info("   • Total votantes registrados: " . number_format($totalVoters, 0, ',', '.'));
-            if ($created > 0) {
-                $this->command->info("\n✅ Seeder completado exitosamente!");
-            } else {
-                $this->command->warn("\n⚠️ No se crearon nuevas instituciones.");
-            }
         } catch (\Exception $e) {
             DB::rollBack();
             $this->command->error('❌ Error: ' . $e->getMessage());

@@ -6,6 +6,9 @@ use App\Models\ElectionCategory;
 use App\Models\ElectionType;
 use App\Models\ElectionTypeCategory;
 use Illuminate\Database\Seeder;
+use App\Models\Department;
+use App\Models\Province;
+use App\Models\Municipality;
 
 class DatabaseSeeder extends Seeder
 {
@@ -24,7 +27,7 @@ class DatabaseSeeder extends Seeder
             QuillacolloTablesSeeder::class,
         ]);
 
-        $defaultCat = ElectionCategory::where('code', 'ALC')->where('active', true)->first();
+        $defaultCat          = ElectionCategory::where('code', 'ALC')->where('active', true)->first();
         $defaultElectionType = null;
         if ($defaultCat) {
             $link = ElectionTypeCategory::where('election_category_id', $defaultCat->id)
@@ -33,6 +36,17 @@ class DatabaseSeeder extends Seeder
             $defaultElectionType = $link?->electionType;
         }
         $defaultElectionType ??= ElectionType::where('active', true)->first();
+        $defaultDept  = Department::whereRaw('LOWER(name) LIKE ?', ['%cochabamba%'])->first();
+        $defaultProv  = $defaultDept
+            ? Province::where('department_id', $defaultDept->id)
+                    ->whereRaw('LOWER(name) LIKE ?', ['%quillacollo%'])
+                    ->first()
+            : null;
+        $defaultMuni  = $defaultProv
+            ? Municipality::where('province_id', $defaultProv->id)
+                        ->whereRaw('LOWER(name) LIKE ?', ['%quillacollo%'])
+                        ->first()
+            : null;
         Dashboard::updateOrCreate(
             ['id' => 1],
             [
@@ -43,6 +57,9 @@ class DatabaseSeeder extends Seeder
                 'show_election_switcher'   => true,
                 'show_category_filter'     => true,
                 'auto_refresh_seconds'     => 60,
+                'default_department_id'    => $defaultDept?->id,
+                'default_province_id'      => $defaultProv?->id,
+                'default_municipality_id'  => $defaultMuni?->id,
             ]
         );
     }

@@ -6,19 +6,19 @@
                 <div class="navbar-brand-box horizontal-logo">
                     <a href="index" class="logo logo-dark">
                         <span class="logo-sm">
-                            <img src="<?php echo e(URL::asset('build/images/lofo_elections_large.png')); ?>" alt="" height="45">
+                            <img src="<?php echo e(URL::asset('build/images/logo_elections.png')); ?>" alt="" height="45">
                         </span>
                         <span class="logo-lg">
-                            <img src="<?php echo e(URL::asset('build/images/lofo_elections_large.png')); ?>" alt="" height="45">
+                            <img src="<?php echo e(URL::asset('build/images/logo_elections_large.png')); ?>" alt="" height="45">
                         </span>
                     </a>
 
                     <a href="index" class="logo logo-light">
                         <span class="logo-sm">
-                            <img src="<?php echo e(URL::asset('build/images/lofo_elections_large.png')); ?>" alt="" height="45">
+                            <img src="<?php echo e(URL::asset('build/images/logo_elections.png')); ?>" alt="" height="45">
                         </span>
                         <span class="logo-lg">
-                            <img src="<?php echo e(URL::asset('build/images/lofo_elections_large.png')); ?>" alt="" height="45">
+                            <img src="<?php echo e(URL::asset('build/images/logo_elections_large.png')); ?>" alt="" height="45">
                         </span>
                     </a>
                 </div>
@@ -131,48 +131,62 @@
                         </div>
                     </div>
                 </div>
-
+                <?php if(auth()->guard()->check()): ?>
                 <div class="dropdown ms-sm-3 header-item topbar-user">
-                    <button type="button" class="btn" id="page-header-user-dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <button type="button" class="btn" id="page-header-user-dropdown"
+                            data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         <span class="d-flex align-items-center">
-                            <img class="rounded-circle header-profile-user" src="<?php if(Auth::user()->avatar != ''): ?><?php echo e(URL::asset('build/images/users/' . Auth::user()->avatar)); ?><?php else: ?><?php echo e(URL::asset('build/images/users/avatar-1.jpg')); ?><?php endif; ?>" alt="Header Avatar">
+                            <img class="rounded-circle header-profile-user"
+                                src="<?php echo e(Auth::user()->avatar
+                                    ? URL::asset('build/images/users/' . Auth::user()->avatar)
+                                    : URL::asset('build/images/users/avatar-1.jpg')); ?>"
+                                alt="Header Avatar">
                             <span class="text-start ms-xl-2">
-                                <span class="d-none d-xl-inline-block ms-1 fw-medium user-name-text"><?php echo e(Auth::user()->name); ?></span>
-                                <span class="d-none d-xl-block ms-1 fs-12 user-name-sub-text"></span>
+                                <span class="d-none d-xl-inline-block ms-1 fw-medium user-name-text">
+                                    <?php echo e(Auth::user()->name); ?>
+
+                                </span>
+                                <span class="d-none d-xl-block ms-1 fs-12 text-muted user-name-sub-text">
+                                    <?php echo e(Auth::user()->roles->first()?->name ?? ''); ?>
+
+                                </span>
                             </span>
                         </span>
                     </button>
                     <div class="dropdown-menu dropdown-menu-end">
                         <h6 class="dropdown-header">Bienvenid@ <?php echo e(Auth::user()->name); ?>!</h6>
                         <a class="dropdown-item" href="<?php echo e(route('profile.index')); ?>">
-                            <i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i> 
+                            <i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i>
                             <span class="align-middle">Perfil</span>
-                        </a>
-                        <a class="dropdown-item" href="pages-faqs">
-                            <i class="mdi mdi-lifebuoy text-muted fs-16 align-middle me-1"></i> 
-                            <span class="align-middle">Ayuda</span>
                         </a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="<?php echo e(route('profile.settings')); ?>">
-                            <i class="mdi mdi-cog-outline text-muted fs-16 align-middle me-1"></i> 
+                            <i class="mdi mdi-cog-outline text-muted fs-16 align-middle me-1"></i>
                             <span class="align-middle">Configuraciones</span>
                         </a>
-                        
-                        <a class="dropdown-item" href="javascript:void();" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                            <i class="bx bx-power-off font-size-16 align-middle me-1"></i> 
-                            <span key="t-logout"><?php echo app('translator')->get('translation.logout'); ?></span>
+                        <a class="dropdown-item text-danger"
+                        href="javascript:void(0);"
+                        onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                            <i class="bx bx-power-off fs-16 align-middle me-1"></i>
+                            <span><?php echo app('translator')->get('translation.logout'); ?></span>
                         </a>
-                        <form id="logout-form" action="<?php echo e(route('logout')); ?>" method="POST" style="display: none;">
+                        <form id="logout-form" action="<?php echo e(route('logout')); ?>" method="POST" class="d-none">
                             <?php echo csrf_field(); ?>
                         </form>
                     </div>
                 </div>
+                <?php else: ?>
+                <div class="ms-sm-3 header-item">
+                    <a href="<?php echo e(route('login')); ?>" class="btn btn-sm btn-primary">
+                        <i class="ri-login-box-line me-1"></i> Ingresar
+                    </a>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 </header>
 
-<!-- removeNotificationModal -->
 <div id="removeNotificationModal" class="modal fade zoomIn" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -195,4 +209,5 @@
 
         </div><!-- /.modal-content -->
     </div><!-- /.modal-dialog -->
-</div><!-- /.modal --><?php /**PATH D:\_Mine\sistema_electoral\resources\views/layouts/topbar.blade.php ENDPATH**/ ?>
+</div><!-- /.modal -->
+<?php /**PATH D:\_Mine\sistema_electoral\resources\views/layouts/topbar.blade.php ENDPATH**/ ?>

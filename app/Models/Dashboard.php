@@ -33,4 +33,19 @@ class Dashboard extends Model
     {
         return $this->belongsTo(ElectionCategory::class, 'default_category_id');
     }
+
+    public function defaultDepartment()
+    {
+        return $this->belongsTo(\App\Models\Department::class, 'default_department_id');
+    }
+
+    public function defaultProvince()
+    {
+        return $this->belongsTo(\App\Models\Province::class, 'default_province_id');
+    }
+
+    public function defaultMunicipality()
+    {
+        return $this->belongsTo(\App\Models\Municipality::class, 'default_municipality_id');
+    }
 }

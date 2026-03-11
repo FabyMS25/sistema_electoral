@@ -73,57 +73,42 @@ class QuillacolloTablesSeeder extends Seeder
             ->where('active', true)
             ->first()
             ?? ElectionType::where('name', 'LIKE', '%Municipal%2026%')->first();
-
         $departamentalElection = ElectionType::where('name', 'LIKE', '%Departamental%2026%')
             ->where('active', true)
             ->first()
             ?? ElectionType::where('name', 'LIKE', '%Departamental%2026%')->first();
-
         if (!$municipalElection) {
             $this->command->error('❌ No se encontró el tipo de elección Municipal 2026');
             return;
         }
-
         if (!$departamentalElection) {
             $this->command->warn('⚠️  No se encontró elección Departamental 2026 — solo se crearán entradas municipales.');
         }
-
-        $this->command->info("📅 Municipal:      {$municipalElection->name}");
-        if ($departamentalElection) {
-            $this->command->info("📅 Departamental:  {$departamentalElection->name}");
-        }
-
         $municipality = Municipality::where('name', 'Quillacollo')->first();
         if (!$municipality) {
             $this->command->error('❌ No se encontró el municipio de Quillacollo');
             return;
         }
-
         $institutions = Institution::where('municipality_id', $municipality->id)->get();
         if ($institutions->isEmpty()) {
             $this->command->error('❌ No se encontraron recintos en Quillacollo');
             return;
         }
-
         DB::beginTransaction();
         try {
             $totalMesas     = 0;
             $totalPivots    = 0;
             $procesados     = 0;
             $errores        = [];
-
             foreach ($institutions as $institution) {
-                $this->command->info("📊 {$institution->name}");
+                $this->command->info("📊 {$institution->name}"); //
                 $numMesas = $this->getNumeroMesas($institution);
-
                 if (!$numMesas || $numMesas <= 0) {
                     $numMesas = $this->calcularMesasPorVotantes($institution->registered_citizens);
                     $this->command->warn("   ⚠️ Usando cálculo basado en votantes: {$numMesas}");
                 }
-
                 $votantesPorMesa = $this->calcularVotantesPorMesa($institution, $numMesas);
                 $mesasCreadas = 0;
-
                 for ($i = 1; $i <= $numMesas; $i++) {
                     try {
                         $mesa = VotingTable::updateOrCreate(
@@ -148,7 +133,6 @@ class QuillacolloTablesSeeder extends Seeder
                                 'observations'           => null,
                             ]
                         );
-
                         $this->createTableElection($mesa, $municipalElection);
                         if ($departamentalElection) {
                             $this->createTableElection($mesa, $departamentalElection);
@@ -161,22 +145,17 @@ class QuillacolloTablesSeeder extends Seeder
                         $errores[] = "{$institution->code} Mesa {$i}: " . $e->getMessage();
                     }
                 }
-
                 if ($mesasCreadas > 0) {
                     $institution->update(['total_voting_tables' => $mesasCreadas]);
                     $totalMesas += $mesasCreadas;
                     $procesados++;
-                    $this->command->info("   ✅ {$mesasCreadas} mesas creadas");
                 }
             }
-
             DB::commit();
-
             $this->command->info("\n📊 RESUMEN FINAL:");
             $this->command->info("   • Instituciones procesadas: {$procesados}");
             $this->command->info("   • Total mesas creadas: {$totalMesas}");
             $this->command->info("   • Total registros pivote: {$totalPivots}");
-
             if (!empty($errores)) {
                 $this->command->warn("\n⚠️  Errores:");
                 foreach ($errores as $e) {

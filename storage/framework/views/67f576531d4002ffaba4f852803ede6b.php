@@ -161,6 +161,71 @@
             </div>
         </div>
     </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-animate">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1 overflow-hidden">
+                        <p class="text-uppercase fw-medium text-muted text-truncate mb-0">Votos en Blanco</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <h5 class="text-secondary fs-14 mb-0">
+                            <?php echo e($totalVotes > 0 ? round(($totalBlankVotes / $totalVotes) * 100, 1) : 0); ?>%
+                        </h5>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end justify-content-between mt-4">
+                    <div>
+                        <h4 class="flex-grow-1">
+                            <span class="blank-votes-counter fw-bold">
+                                <?php echo e(number_format($totalBlankVotes)); ?>
+
+                            </span>
+                        </h4>
+                        <p class="text-muted text-truncate mb-0">Total votos en blanco</p>
+                    </div>
+                    <div class="avatar-sm flex-shrink-0">
+                        <span class="avatar-title bg-secondary-subtle rounded fs-3">
+                            <i class="ri-checkbox-blank-circle-line text-secondary"></i>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-animate">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1 overflow-hidden">
+                        <p class="text-uppercase fw-medium text-muted text-truncate mb-0">Votos Nulos</p>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <h5 class="text-danger fs-14 mb-0">
+                            <?php echo e($totalVotes > 0 ? round(($totalNullVotes / $totalVotes) * 100, 1) : 0); ?>%
+                        </h5>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end justify-content-between mt-4">
+                    <div>
+                        <h4 class="flex-grow-1">
+                            <span class="null-votes-counter fw-bold">
+                                <?php echo e(number_format($totalNullVotes)); ?>
+
+                            </span>
+                        </h4>
+                        <p class="text-muted text-truncate mb-0">Total votos nulos</p>
+                    </div>
+                    <div class="avatar-sm flex-shrink-0">
+                        <span class="avatar-title bg-danger-subtle rounded fs-3">
+                            <i class="ri-close-circle-line text-danger"></i>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
     <div class="row">
         <div class="card">
@@ -298,6 +363,8 @@
                                 <th>Partido</th>
                                 <th>Votos</th>
                                 <th>Porcentaje</th>
+                                <th class="text-center">Blancos</th>
+                                <th class="text-center">Nulos</th>
                                 <th>Progreso</th>
                             </tr>
                         </thead>
@@ -339,6 +406,35 @@
                                     </td>
                                 </tr>
                             <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            <?php if(isset($categoryStats[$activeCategoryCode])): ?>
+                            <?php
+                                $blankForCat = $categoryStats[$activeCategoryCode]['blankVotes'] ?? 0;
+                                $nullForCat  = $categoryStats[$activeCategoryCode]['nullVotes']  ?? 0;
+                                $totalForCat = $categoryStats[$activeCategoryCode]['totalVotes'] ?? 0;
+                            ?>
+                            <tr class="table-light fw-semibold">
+                                <td colspan="3" class="text-end text-muted small">Votos especiales:</td>
+                                <td>
+                                    <span class="badge bg-secondary-subtle text-secondary border">
+                                        <i class="ri-subtract-line me-1"></i>Blancos: <?php echo e(number_format($blankForCat)); ?>
+
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-danger-subtle text-danger border">
+                                        <i class="ri-close-line me-1"></i>Nulos: <?php echo e(number_format($nullForCat)); ?>
+
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php if($totalForCat > 0): ?>
+                                        <small class="text-muted">
+                                            <?php echo e(round((($blankForCat + $nullForCat) / $totalForCat) * 100, 1)); ?>% del total
+                                        </small>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -574,7 +670,6 @@ document.addEventListener('DOMContentLoaded', function () {
         setRefreshStatus(false);
     }
 
-    // ── UI helpers ────────────────────────────────────────────────────────────
     function setRefreshStatus(active) {
         const el = document.getElementById('refresh-status');
         if (!el) return;
@@ -596,24 +691,18 @@ document.addEventListener('DOMContentLoaded', function () {
         const el = document.querySelector('.card-header p.text-muted');
         if (el && ts) el.textContent = 'Última actualización: ' + ts;
     }
-
-    // ═════════════════════════════════════════════════════════════════════════
-    // COUNTER DOM UPDATES (no reload needed for numbers)
-    // ═════════════════════════════════════════════════════════════════════════
     function updateCounters(data) {
         setCounter('.total-votes-counter',    data.totalVotes);
         setCounter('.reported-tables-counter', data.reportedTables);
         setCounter('.total-tables-counter',   data.totalTables);
         setCounter('.progress-counter',       data.progressPercentage);
-
-        // Progress bars
+        setCounter('.blank-votes-counter',     data.totalBlankVotes);
+        setCounter('.null-votes-counter',      data.totalNullVotes);
         document.querySelectorAll('.general-progress-bar').forEach(bar => {
             bar.style.width = data.progressPercentage + '%';
             bar.textContent = data.progressPercentage + '%';
             bar.setAttribute('aria-valuenow', data.progressPercentage);
         });
-
-        // Table status counts
         const pending = (data.totalTables ?? 0) - (data.reportedTables ?? 0);
         setText('.total-tables-count',    data.totalTables);
         setText('.reported-tables-count', data.reportedTables);
@@ -621,8 +710,6 @@ document.addEventListener('DOMContentLoaded', function () {
         setText('.progress-text',
             `${data.reportedTables} de ${data.totalTables} mesas reportadas`
         );
-
-        // Header progress bar
         const headerBar = document.querySelector('.progress-bar.bg-info[role="progressbar"]');
         if (headerBar) {
             headerBar.style.width = data.progressPercentage + '%';
@@ -640,10 +727,6 @@ document.addEventListener('DOMContentLoaded', function () {
             el.textContent = value ?? '';
         });
     }
-
-    // ═════════════════════════════════════════════════════════════════════════
-    // CHARTS
-    // ═════════════════════════════════════════════════════════════════════════
     function buildChartArrays(candidateStats) {
         const sorted = Object.values(candidateStats).sort((a, b) => b.votes - a.votes);
         return {
@@ -658,10 +741,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function initCharts(candidateStats, localityResults) {
         if (!Object.keys(candidateStats).length) return;
-
         const { names, colors, votes } = buildChartArrays(candidateStats);
-
-        // ── Bar chart ────────────────────────────────────────────────────────
         const barEl = document.querySelector('#candidates_chart');
         if (barEl) {
             charts.bar = new ApexCharts(barEl, {
@@ -678,8 +758,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             charts.bar.render();
         }
-
-        // ── Donut chart ──────────────────────────────────────────────────────
         const donutEl = document.querySelector('#party_distribution_chart');
         if (donutEl && votes.length) {
             charts.donut = new ApexCharts(donutEl, {
@@ -699,23 +777,23 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             charts.donut.render();
         }
-
-        // ── Locality stacked bar ─────────────────────────────────────────────
         const localityEl = document.querySelector('#projects-overview-chart');
         const localities  = Object.values(localityResults).map(l => l.name);
         if (localityEl && localities.length && names.length) {
-            const series = names.map(name => ({
+            const series = names.map((name) => ({
                 name,
                 type: 'bar',
                 data: Object.values(localityResults).map(l => {
-                    const found = Object.values(l.categories ?? {})
-                        .flatMap(cat => cat.candidates ?? [])
-                        .find(c => {
+                    let votes = 0;
+                    Object.values(l.categories ?? {}).forEach(cat => {
+                        const found = (cat.candidates ?? []).find(c => {
                             const short = (c.name ?? '').length > 20
                                 ? c.name.substring(0, 18) + '…' : c.name;
-                            return short === name;
+                            return short === name || c.name === name;
                         });
-                    return found?.votes ?? 0;
+                        if (found) votes = found.votes;
+                    });
+                    return votes;
                 }),
             }));
             charts.locality = new ApexCharts(localityEl, {
@@ -729,15 +807,12 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             charts.locality.render();
         }
-
         initMap(localityResults);
     }
 
     function updateCharts(candidateStats) {
         if (!Object.keys(candidateStats).length) return;
         const { names, colors, votes } = buildChartArrays(candidateStats);
-
-        // Update existing charts without re-rendering (smooth animation)
         if (charts.bar) {
             charts.bar.updateOptions({ colors }, false, false);
             charts.bar.updateSeries([{ name: 'Votos', data: votes }]);
@@ -746,23 +821,18 @@ document.addEventListener('DOMContentLoaded', function () {
             charts.donut.updateOptions({ labels: names, colors }, false, false);
             charts.donut.updateSeries(votes);
         }
-        // Locality chart requires a full reinit since locality data isn't in refresh payload
-        // It will update on the next full page filter change
     }
 
-    // ── Map ──────────────────────────────────────────────────────────────────
     function initMap(localityResults) {
         const mapEl = document.getElementById('votes-by-locations');
         if (!mapEl || !Object.keys(localityResults).length) return;
         if (typeof jsVectorMap === 'undefined') return;
-
         const markers = Object.values(localityResults).map(l => ({
             name:   `${l.name} (${l.total_votes ?? 0} votos)`,
             coords: [l.latitude ?? -17.4, l.longitude ?? -66.2],
             votes:  l.total_votes ?? 0,
             categories: l.categories ?? {},
         }));
-
         mapEl.innerHTML = '';
         charts.map = new jsVectorMap({
             map:         'world',
@@ -781,7 +851,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function showMarkerPopup(marker) {
         document.querySelector('.custom-map-popup')?.remove();
-
         let rows = '';
         Object.entries(marker.categories).forEach(([code, cat]) => {
             rows += `<li class="list-group-item list-group-item-secondary small fw-bold">${cat.label ?? code}</li>`;
@@ -809,8 +878,6 @@ document.addEventListener('DOMContentLoaded', function () {
         popup.querySelector('.btn-close').addEventListener('click', () => popup.remove());
         document.body.appendChild(popup);
     }
-
-    // ── Locality filter (button group above locality chart) ──────────────────
     function filterLocality(localityId) {
         document.querySelectorAll('.locality-progress-item').forEach(item => {
             item.style.display = (localityId === 'all' || item.dataset.localityId == localityId)
@@ -818,7 +885,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ── CSV export ────────────────────────────────────────────────────────────
     function exportTableToCSV(tableId, filename) {
         const table = document.getElementById(tableId);
         if (!table) return;

@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta content="Elections App" name="description" />
     <meta content="" name="author" />
-    <link rel="shortcut icon" href="{{ URL::asset('build/images/lofo_elections.png')}}">
+    <link rel="shortcut icon" href="{{ URL::asset('build/images/logo_elections.png')}}">
         @include('layouts.head-css')
   </head>
 

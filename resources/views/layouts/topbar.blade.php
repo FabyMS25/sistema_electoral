@@ -6,19 +6,19 @@
                 <div class="navbar-brand-box horizontal-logo">
                     <a href="index" class="logo logo-dark">
                         <span class="logo-sm">
-                            <img src="{{ URL::asset('build/images/lofo_elections_large.png') }}" alt="" height="45">
+                            <img src="{{ URL::asset('build/images/logo_elections.png') }}" alt="" height="45">
                         </span>
                         <span class="logo-lg">
-                            <img src="{{ URL::asset('build/images/lofo_elections_large.png') }}" alt="" height="45">
+                            <img src="{{ URL::asset('build/images/logo_elections_large.png') }}" alt="" height="45">
                         </span>
                     </a>
 
                     <a href="index" class="logo logo-light">
                         <span class="logo-sm">
-                            <img src="{{ URL::asset('build/images/lofo_elections_large.png') }}" alt="" height="45">
+                            <img src="{{ URL::asset('build/images/logo_elections.png') }}" alt="" height="45">
                         </span>
                         <span class="logo-lg">
-                            <img src="{{ URL::asset('build/images/lofo_elections_large.png') }}" alt="" height="45">
+                            <img src="{{ URL::asset('build/images/logo_elections_large.png') }}" alt="" height="45">
                         </span>
                     </a>
                 </div>
@@ -131,48 +131,60 @@
                         </div>
                     </div>
                 </div>
-
+                @auth
                 <div class="dropdown ms-sm-3 header-item topbar-user">
-                    <button type="button" class="btn" id="page-header-user-dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <button type="button" class="btn" id="page-header-user-dropdown"
+                            data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         <span class="d-flex align-items-center">
-                            <img class="rounded-circle header-profile-user" src="@if (Auth::user()->avatar != ''){{ URL::asset('build/images/users/' . Auth::user()->avatar) }}@else{{ URL::asset('build/images/users/avatar-1.jpg') }}@endif" alt="Header Avatar">
+                            <img class="rounded-circle header-profile-user"
+                                src="{{ Auth::user()->avatar
+                                    ? URL::asset('build/images/users/' . Auth::user()->avatar)
+                                    : URL::asset('build/images/users/avatar-1.jpg') }}"
+                                alt="Header Avatar">
                             <span class="text-start ms-xl-2">
-                                <span class="d-none d-xl-inline-block ms-1 fw-medium user-name-text">{{Auth::user()->name}}</span>
-                                <span class="d-none d-xl-block ms-1 fs-12 user-name-sub-text"></span>
+                                <span class="d-none d-xl-inline-block ms-1 fw-medium user-name-text">
+                                    {{ Auth::user()->name }}
+                                </span>
+                                <span class="d-none d-xl-block ms-1 fs-12 text-muted user-name-sub-text">
+                                    {{ Auth::user()->roles->first()?->name ?? '' }}
+                                </span>
                             </span>
                         </span>
                     </button>
                     <div class="dropdown-menu dropdown-menu-end">
                         <h6 class="dropdown-header">Bienvenid@ {{ Auth::user()->name }}!</h6>
                         <a class="dropdown-item" href="{{ route('profile.index') }}">
-                            <i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i> 
+                            <i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i>
                             <span class="align-middle">Perfil</span>
-                        </a>
-                        <a class="dropdown-item" href="pages-faqs">
-                            <i class="mdi mdi-lifebuoy text-muted fs-16 align-middle me-1"></i> 
-                            <span class="align-middle">Ayuda</span>
                         </a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ route('profile.settings') }}">
-                            <i class="mdi mdi-cog-outline text-muted fs-16 align-middle me-1"></i> 
+                            <i class="mdi mdi-cog-outline text-muted fs-16 align-middle me-1"></i>
                             <span class="align-middle">Configuraciones</span>
                         </a>
-                        
-                        <a class="dropdown-item" href="javascript:void();" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                            <i class="bx bx-power-off font-size-16 align-middle me-1"></i> 
-                            <span key="t-logout">@lang('translation.logout')</span>
+                        <a class="dropdown-item text-danger"
+                        href="javascript:void(0);"
+                        onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                            <i class="bx bx-power-off fs-16 align-middle me-1"></i>
+                            <span>@lang('translation.logout')</span>
                         </a>
-                        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                        <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
                             @csrf
                         </form>
                     </div>
                 </div>
+                @else
+                <div class="ms-sm-3 header-item">
+                    <a href="{{ route('login') }}" class="btn btn-sm btn-primary">
+                        <i class="ri-login-box-line me-1"></i> Ingresar
+                    </a>
+                </div>
+                @endauth
             </div>
         </div>
     </div>
 </header>
 
-<!-- removeNotificationModal -->
 <div id="removeNotificationModal" class="modal fade zoomIn" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
