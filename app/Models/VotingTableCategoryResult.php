@@ -71,25 +71,59 @@ class VotingTableCategoryResult extends Model
     public function checkConsistency(): bool
     {
         $inconsistencies = [];
+
+        // ── 1. Internal sum: valid + blank + null must equal total ────────
         $sumCheck = $this->valid_votes + $this->blank_votes + $this->null_votes;
         if ($sumCheck !== $this->total_votes) {
-            $inconsistencies[] = "Suma de votos ({$sumCheck}) ≠ total ({$this->total_votes})";
+            $inconsistencies[] =
+                "Suma de votos ({$sumCheck}) ≠ total registrado ({$this->total_votes})";
         }
-        $expected = $this->votingTable->expected_voters;
-        if ($this->total_votes > $expected) {
-            $inconsistencies[] = "Total votos ({$this->total_votes}) excede habilitados ({$expected})";
+
+        // ── 2. Ceiling check: total_votes must not exceed registered voters
+        //    (papeletas en ánfora ≤ electores habilitados)
+        $expectedVoters = $this->votingTable->expected_voters ?? null;
+        if ($expectedVoters !== null && $this->total_votes > $expectedVoters) {
+            $inconsistencies[] =
+                "Total votos ({$this->total_votes}) excede electores habilitados ({$expectedVoters})";
         }
+
+        // ── 3. Candidate-sum check: sum of individual candidate votes
+        //    must equal valid_votes for this category ─────────────────────
         $candidateSum = Vote::where('voting_table_id', $this->voting_table_id)
             ->where('election_type_category_id', $this->election_type_category_id)
             ->sum('quantity');
+
         if ($candidateSum !== $this->valid_votes) {
-            $inconsistencies[] = "Suma candidatos ({$candidateSum}) ≠ votos válidos ({$this->valid_votes})";
+            $inconsistencies[] =
+                "Suma de candidatos ({$candidateSum}) ≠ votos válidos ({$this->valid_votes})";
         }
+
+        // ── 4. Cross-category check: total_votes for this category should
+        //    match VotingTableElection.total_voters (same ánfora for all
+        //    categories, since one ballot covers all franjas) ────────────
+        // We look up the election record for any active election_type on this table.
+        // We use the electionTypeCategory's election_type_id to be precise.
+        $electionTypeId = $this->electionTypeCategory?->election_type_id;
+        if ($electionTypeId) {
+            $tableElection = \App\Models\VotingTableElection::where('voting_table_id', $this->voting_table_id)
+                ->where('election_type_id', $electionTypeId)
+                ->first();
+
+            if ($tableElection && $tableElection->total_voters > 0
+                && $this->total_votes !== $tableElection->total_voters) {
+                $inconsistencies[] =
+                    "Total votos en esta categoría ({$this->total_votes}) ≠ " .
+                    "papeletas en ánfora ({$tableElection->total_voters})";
+            }
+        }
+
         $this->is_consistent   = empty($inconsistencies);
         $this->inconsistencies = empty($inconsistencies) ? null : $inconsistencies;
         $this->save();
+
         return $this->is_consistent;
     }
+
 
     public function getCategoryNameAttribute(): string
     {

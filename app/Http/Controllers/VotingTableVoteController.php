@@ -331,27 +331,39 @@ class VotingTableVoteController extends Controller
     {
         try {
             $validated = $request->validate([
-                'voting_table_id'  => 'required|integer|exists:voting_tables,id',
-                'election_type_id' => 'required|integer|exists:election_types,id',
-                'votes'            => 'required|array',
-                'votes.*'          => 'integer|min:0',
-                'blank_votes'      => 'nullable|array',
-                'blank_votes.*'    => 'integer|min:0',
-                'null_votes'       => 'nullable|array',
-                'null_votes.*'     => 'integer|min:0',
+                'voting_table_id'   => 'required|integer|exists:voting_tables,id',
+                'election_type_id'  => 'required|integer|exists:election_types,id',
+                'votes'             => 'required|array',
+                'votes.*'           => 'integer|min:0',
+                'blank_votes'       => 'nullable|array',
+                'blank_votes.*'     => 'integer|min:0',
+                'null_votes'        => 'nullable|array',
+                'null_votes.*'      => 'integer|min:0',
+                // ── Ballot / ánfora data (from the physical acta) ──
+                'ballots_received'  => 'nullable|integer|min:0',  // papeletas recibidas
+                'ballots_leftover'  => 'nullable|integer|min:0',  // papeletas no utilizadas
+                'ballots_spoiled'   => 'nullable|integer|min:0',  // papeletas deterioradas
             ]);
-            $user           = Auth::user();
-            $tableId        = $validated['voting_table_id'];
-            $electionTypeId = $validated['election_type_id'];
-            $votesData      = $validated['votes'];
-            $blankData      = $validated['blank_votes'] ?? [];
-            $nullData       = $validated['null_votes']  ?? [];
+
+            $user            = Auth::user();
+            $tableId         = $validated['voting_table_id'];
+            $electionTypeId  = $validated['election_type_id'];
+            $votesData       = $validated['votes'];
+            $blankData       = $validated['blank_votes'] ?? [];
+            $nullData        = $validated['null_votes']  ?? [];
+            $ballotsReceived = isset($validated['ballots_received']) ? (int) $validated['ballots_received'] : null;
+            $ballotsLeftover = isset($validated['ballots_leftover']) ? (int) $validated['ballots_leftover'] : null;
+            $ballotsSpoiled  = isset($validated['ballots_spoiled'])  ? (int) $validated['ballots_spoiled']  : null;
+
             DB::beginTransaction();
-            $votingTable   = VotingTable::lockForUpdate()->findOrFail($tableId);
-            $perms         = $this->resolvePermissions($votingTable);
+
+            $votingTable  = VotingTable::lockForUpdate()->findOrFail($tableId);
+            $perms        = $this->resolvePermissions($votingTable);
+
             if (! $perms['can_register']) {
                 throw new \Exception('No tiene permiso para registrar votos en esta mesa');
             }
+
             $tableElection = VotingTableElection::firstOrCreate(
                 ['voting_table_id' => $tableId, 'election_type_id' => $electionTypeId],
                 [
@@ -362,6 +374,7 @@ class VotingTableVoteController extends Controller
                     'election_date'    => now()->toDateString(),
                 ]
             );
+
             $blocked = [
                 VotingTableElection::STATUS_ESCRUTADA,
                 VotingTableElection::STATUS_TRANSMITIDA,
@@ -370,23 +383,29 @@ class VotingTableVoteController extends Controller
             if (in_array($tableElection->status, $blocked)) {
                 throw new \Exception("No se pueden modificar votos de una mesa {$tableElection->status}");
             }
+
             $typeCategories = ElectionTypeCategory::where('election_type_id', $electionTypeId)
                 ->with('electionCategory')
                 ->get()
                 ->keyBy(fn($tc) => $tc->electionCategory->code);
+
             $candidateIds = array_map('intval', array_keys($votesData));
             $candidates   = Candidate::whereIn('id', $candidateIds)
                 ->where('active', true)
                 ->with('electionTypeCategory.electionCategory')
                 ->get()
                 ->keyBy('id');
+
             $missing = array_diff($candidateIds, $candidates->keys()->toArray());
             if (! empty($missing)) {
                 throw new \Exception('Candidatos no válidos: ' . implode(', ', $missing));
             }
+
+            // ── Save individual candidate votes ───────────────────────────
             foreach ($votesData as $candidateId => $quantity) {
                 $quantity  = max(0, (int) $quantity);
                 $candidate = $candidates[(int) $candidateId];
+
                 if ($quantity > 0) {
                     Vote::updateOrCreate(
                         [
@@ -409,15 +428,19 @@ class VotingTableVoteController extends Controller
                         ->delete();
                 }
             }
+
+            // ── Compute per-category totals and save category results ─────
             $categoryTotals = [];
             foreach ($typeCategories as $code => $tc) {
                 $validVotes = Vote::where('voting_table_id', $tableId)
                     ->where('election_type_category_id', $tc->id)
                     ->where('election_type_id', $electionTypeId)
                     ->sum('quantity');
+
                 $blankVotes = max(0, (int) ($blankData[$code] ?? 0));
-                $nullVotes  = max(0, (int) ($nullData[$code] ?? 0));
+                $nullVotes  = max(0, (int) ($nullData[$code]  ?? 0));
                 $totalVotes = $validVotes + $blankVotes + $nullVotes;
+
                 $result = VotingTableCategoryResult::firstOrCreate(
                     ['voting_table_id' => $tableId, 'election_type_category_id' => $tc->id],
                     ['status' => 'pending']
@@ -434,38 +457,91 @@ class VotingTableVoteController extends Controller
 
                 $categoryTotals[$code] = $totalVotes;
             }
+
+            // ── Cross-category consistency: all categories must have the
+            //    same total (each voter casts one ballot per category) ──────
             $counts = array_values($categoryTotals);
-            $first  = $counts[0] ?? 0;
+            $first  = $counts[0] ?? 0;   // papeletas en ánfora / total voters
             foreach ($categoryTotals as $code => $total) {
                 if ($total !== $first) {
                     throw new \Exception(
-                        "Inconsistencia: la categoría {$code} tiene {$total} votos " .
-                        "pero se esperaban {$first}. Todas las categorías deben tener el mismo total de votantes."
+                        "Inconsistencia entre categorías: {$code} tiene {$total} votos " .
+                        "pero se esperaban {$first}. Todas las categorías deben tener el mismo total."
                     );
                 }
             }
-            if ($votingTable->expected_voters && $first > $votingTable->expected_voters) {
+
+            // ── Validate against registered voters (ceiling check) ────────
+            // "Papeletas en ánfora" can be LESS than "electores habilitados"
+            // (some registered voters may not have voted), but NEVER more.
+            $expectedVoters = $votingTable->expected_voters ?? null;
+            if ($expectedVoters && $first > $expectedVoters) {
                 throw new \Exception(
-                    "Los votos registrados ({$first}) exceden los votantes habilitados ({$votingTable->expected_voters})"
+                    "Las papeletas en ánfora ({$first}) exceden los electores habilitados ({$expectedVoters}). " .
+                    "Verifique los votos ingresados."
                 );
             }
+
+            // ── Validate ballot accounting (if ballot data was provided) ──
+            //    papeletas en ánfora + no utilizadas + deterioradas = recibidas
+            if ($ballotsReceived !== null) {
+                $ballotsAccounted = $first
+                    + ($ballotsLeftover ?? 0)
+                    + ($ballotsSpoiled  ?? 0);
+
+                if ($ballotsAccounted !== $ballotsReceived) {
+                    throw new \Exception(
+                        "Las papeletas no cuadran: " .
+                        "en ánfora ({$first}) + no utilizadas (" . ($ballotsLeftover ?? 0) . ") " .
+                        "+ deterioradas (" . ($ballotsSpoiled ?? 0) . ") = {$ballotsAccounted} " .
+                        "≠ recibidas ({$ballotsReceived})."
+                    );
+                }
+
+                // Also ensure received ≤ expected (received can't exceed the roll)
+                if ($expectedVoters && $ballotsReceived > $expectedVoters) {
+                    throw new \Exception(
+                        "Las papeletas recibidas ({$ballotsReceived}) exceden los electores habilitados ({$expectedVoters})."
+                    );
+                }
+            }
+
+            // ── Update VotingTableElection ────────────────────────────────
             if (in_array($tableElection->status, [
                 VotingTableElection::STATUS_CONFIGURADA,
                 VotingTableElection::STATUS_EN_ESPERA,
             ])) {
                 $tableElection->status = VotingTableElection::STATUS_VOTACION;
             }
-            $tableElection->total_voters = $first;
-            $tableElection->ballots_used = $first;
+
+            $tableElection->total_voters = $first;          // papeletas en ánfora
+            $tableElection->ballots_used = $first;          // same as ánfora
+
+            if ($ballotsReceived !== null) {
+                $tableElection->ballots_received = $ballotsReceived;
+            }
+            if ($ballotsLeftover !== null) {
+                $tableElection->ballots_leftover = $ballotsLeftover;
+            }
+            if ($ballotsSpoiled !== null) {
+                $tableElection->ballots_spoiled = $ballotsSpoiled;
+            }
+
             $tableElection->save();
+
             DB::commit();
+
             return response()->json([
-                'success'         => true,
-                'message'         => '✅ Votos registrados exitosamente',
-                'table_status'    => $tableElection->status,
-                'category_totals' => $categoryTotals,
-                'total_voters'    => $first,
+                'success'          => true,
+                'message'          => '✅ Votos registrados exitosamente',
+                'table_status'     => $tableElection->status,
+                'category_totals'  => $categoryTotals,
+                'total_voters'     => $first,               // papeletas en ánfora
+                'ballots_received' => $tableElection->ballots_received,
+                'ballots_leftover' => $tableElection->ballots_leftover,
+                'ballots_spoiled'  => $tableElection->ballots_spoiled,
             ]);
+
         } catch (ValidationException $e) {
             return response()->json(['success' => false, 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {

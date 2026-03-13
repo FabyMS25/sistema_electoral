@@ -24,7 +24,7 @@ class DatabaseSeeder extends Seeder
             Candidates2026Seeder::class,
             Concejales2026Seeder::class,
             QuillacolloInstitutionsSeeder::class,
-            QuillacolloTablesSeeder::class,
+            // QuillacolloTablesSeeder::class,
         ]);
 
         $defaultCat          = ElectionCategory::where('code', 'ALC')->where('active', true)->first();

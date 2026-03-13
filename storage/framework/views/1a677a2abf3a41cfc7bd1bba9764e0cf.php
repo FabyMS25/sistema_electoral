@@ -12,7 +12,6 @@
                             <img src="<?php echo e(URL::asset('build/images/logo_elections_large.png')); ?>" alt="" height="45">
                         </span>
                     </a>
-
                     <a href="index" class="logo logo-light">
                         <span class="logo-sm">
                             <img src="<?php echo e(URL::asset('build/images/logo_elections.png')); ?>" alt="" height="45">
@@ -22,7 +21,6 @@
                         </span>
                     </a>
                 </div>
-
                 <button type="button" class="btn btn-sm px-3 fs-16 header-item vertical-menu-btn topnav-hamburger" id="topnav-hamburger-icon">
                     <span class="hamburger-icon">
                         <span></span>

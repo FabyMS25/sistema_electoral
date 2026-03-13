@@ -21,12 +21,13 @@
         }
     }
 ?>
-
 <div class="card mb-3 table-card status-<?php echo e($table->current_status); ?>"
      id="table-<?php echo e($table->id); ?>"
      data-table-id="<?php echo e($table->id); ?>"
      data-expected-voters="<?php echo e($table->expected_voters); ?>">
+
     <div class="card-header bg-light position-relative">
+        
         <?php if($hasInconsistencies): ?>
             <span class="badge bg-danger role-badge" title="Tiene inconsistencias">
                 <i class="ri-alert-line me-1"></i>Inconsistente
@@ -57,15 +58,15 @@
             <div class="col-md-2">
                 <?php
                     $statusClasses = [
-                        'configurada' => 'secondary',
-                        'en_espera' => 'info',
-                        'votacion' => 'primary',
+                        'configurada'   => 'secondary',
+                        'en_espera'     => 'info',
+                        'votacion'      => 'primary',
                         'en_escrutinio' => 'warning',
-                        'escrutada' => 'success',
-                        'observada' => 'danger',
-                        'transmitida' => 'success',
-                        'anulada' => 'dark',
-                        'sin_configurar' => 'light'
+                        'escrutada'     => 'success',
+                        'observada'     => 'danger',
+                        'transmitida'   => 'success',
+                        'anulada'       => 'dark',
+                        'sin_configurar'=> 'light',
                     ];
                 ?>
                 <span class="badge bg-<?php echo e($statusClasses[$table->current_status] ?? 'secondary'); ?>">
@@ -75,31 +76,31 @@
             </div>
             <div class="col-md-2">
                 <span class="text-muted">
-                    <i class="ri-group-line me-1"></i>
-                    <?php echo e(number_format($table->expected_voters ?? 0)); ?>
-
-                </span>
-            </div>
-            <div class="col-md-2">
-                <span class="text-muted">
                     <i class="ri-bar-chart-line me-1"></i>
-                    Votos: <span class="total-votes fw-bold" id="total-<?php echo e($table->id); ?>"><?php echo e($table->total_voters); ?></span>
+                    Votos: <span class="fw-bold" id="total-<?php echo e($table->id); ?>"><?php echo e($table->total_voters); ?></span>
                 </span>
             </div>
-            <div class="col-md-3 text-end">
+            <div class="col-md-5 text-end">
                 <?php echo $__env->make('voting-table-votes.partials.table-actions', ['table' => $table], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
             </div>
         </div>
+        <?php echo $__env->make('voting-table-votes.partials.ballot-inputs', [
+            'table'          => $table,
+            'isDisabled'     => $isDisabled,
+            'permissions'    => $permissions,
+            'electionTypeId' => $electionTypeId,
+        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
         <div class="row mt-2">
             <div class="col-12">
                 <div class="d-flex gap-3 flex-wrap align-items-center">
                     <?php $__empty_1 = true; $__currentLoopData = $candidatesByCategory; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $categoryCode => $candidates): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                         <?php
                             $categoryTotal = $table->results_by_category[$categoryCode]['total_votes'] ?? 0;
-                            $isConsistent = $table->results_by_category[$categoryCode]['is_consistent'] ?? true;
+                            $isConsistent  = $table->results_by_category[$categoryCode]['is_consistent'] ?? true;
                         ?>
                         <span class="badge bg-<?php echo e($categoryColorMap[$categoryCode] ?? 'secondary'); ?> category-badge">
-                            <?php echo e($categoryCode); ?>: <span id="total-<?php echo e($categoryCode); ?>-<?php echo e($table->id); ?>"><?php echo e($categoryTotal); ?></span>
+                            <?php echo e($categoryCode); ?>:
+                            <span id="total-<?php echo e($categoryCode); ?>-<?php echo e($table->id); ?>"><?php echo e($categoryTotal); ?></span>
                             <?php if(!$isConsistent): ?>
                                 <i class="ri-alert-line text-warning ms-1" title="Inconsistente"></i>
                             <?php endif; ?>
@@ -107,7 +108,6 @@
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <span class="text-muted">No hay categorías disponibles</span>
                     <?php endif; ?>
-
                     <?php if($hasInconsistencies): ?>
                         <span class="inconsistency-warning">
                             <i class="ri-alert-line me-1"></i>Inconsistencias detectadas
@@ -117,6 +117,7 @@
             </div>
         </div>
     </div>
+
     <div class="card-body p-0">
         <?php if(empty($candidatesByCategory)): ?>
             <div class="text-center py-5">
@@ -148,22 +149,23 @@
                     </thead>
                     <tbody>
                         <?php echo $__env->make('voting-table-votes.partials.table-rows', [
-                            'table' => $table,
+                            'table'                => $table,
                             'candidatesByCategory' => $candidatesByCategory,
-                            'permissions' => $permissions,
-                            'isDisabled' => $isDisabled,
-                            'categoryColorMap' => $categoryColorMap
+                            'permissions'          => $permissions,
+                            'isDisabled'           => $isDisabled,
+                            'categoryColorMap'     => $categoryColorMap,
                         ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
                     </tbody>
                 </table>
             </div>
         <?php endif; ?>
+
         <?php if(($permissions['can_observe'] ?? false) && !$isDisabled && !empty($candidatesByCategory)): ?>
         <div class="p-2 bg-light border-top">
             <div class="row align-items-center">
                 <div class="col-md-8">
                     <span class="text-muted" id="selected-count-<?php echo e($table->id); ?>">0</span> votos seleccionados para observar
-                    <?php $__currentLoopData = $candidatesByCategory; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $categoryCode => $candidates): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <?php $__currentLoopData = $candidatesByCategory; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $categoryCode => $_): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <span class="badge bg-<?php echo e($categoryColorMap[$categoryCode] ?? 'secondary'); ?> ms-2"
                               id="selected-<?php echo e($categoryCode); ?>-<?php echo e($table->id); ?>">0 <?php echo e($categoryCode); ?></span>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
@@ -178,24 +180,40 @@
             </div>
         </div>
         <?php endif; ?>
+
+        
         <div class="row g-0 bg-light p-2 border-top small">
             <div class="col-md-3">
                 <span class="text-muted">Votos Válidos:</span>
-                <span class="fw-bold ms-1"><?php echo e(array_sum(array_column($table->results_by_category ?? [], 'valid_votes'))); ?></span>
+                <span class="fw-bold ms-1" id="footer-valid-<?php echo e($table->id); ?>">
+                    <?php echo e(array_sum(array_column($table->results_by_category ?? [], 'valid_votes'))); ?>
+
+                </span>
             </div>
             <div class="col-md-3">
                 <span class="text-muted">Votos en Blanco:</span>
-                <span class="fw-bold ms-1"><?php echo e(array_sum(array_column($table->results_by_category ?? [], 'blank_votes'))); ?></span>
+                <span class="fw-bold ms-1" id="footer-blank-<?php echo e($table->id); ?>">
+                    <?php echo e(array_sum(array_column($table->results_by_category ?? [], 'blank_votes'))); ?>
+
+                </span>
             </div>
             <div class="col-md-3">
                 <span class="text-muted">Votos Nulos:</span>
-                <span class="fw-bold ms-1"><?php echo e(array_sum(array_column($table->results_by_category ?? [], 'null_votes'))); ?></span>
+                <span class="fw-bold ms-1" id="footer-null-<?php echo e($table->id); ?>">
+                    <?php echo e(array_sum(array_column($table->results_by_category ?? [], 'null_votes'))); ?>
+
+                </span>
             </div>
             <div class="col-md-3">
-                <span class="text-muted">Papeletas Sobrantes:</span>
-                <span class="fw-bold ms-1"><?php echo e($table->ballots_leftover ?? 0); ?></span>
+                
+                <span class="text-muted">No Utilizadas:</span>
+                <span class="fw-bold ms-1">
+                    <?php echo e($table->elections->first()?->ballots_leftover ?? 0); ?>
+
+                </span>
             </div>
         </div>
+
         <?php if($hasInconsistencies && isset($table->results_by_category)): ?>
             <div class="p-2 border-top bg-warning bg-opacity-10">
                 <?php $__currentLoopData = $table->results_by_category; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $categoryCode => $result): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -206,7 +224,7 @@
                             <?php echo e($result['blank_votes']); ?> blancos + <?php echo e($result['null_votes']); ?> nulos =
                             <?php echo e($result['valid_votes'] + $result['blank_votes'] + $result['null_votes']); ?>
 
-                            (total: <?php echo e($result['total_votes']); ?>)
+                            (total guardado: <?php echo e($result['total_votes']); ?>)
                         </small>
                     <?php endif; ?>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>

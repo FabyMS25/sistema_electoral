@@ -53,6 +53,48 @@ function collectSpecialVotes(tableId, type) { // type = 'blank' | 'null'
     });
     return result;
 }
+function collectBallotData(tableId) {
+    const received = document.getElementById(`received-${tableId}`);
+    const leftover = document.getElementById(`leftover-${tableId}`);
+    const spoiled  = document.getElementById(`spoiled-${tableId}`);
+
+    const data = {};
+    if (leftover) data.ballots_leftover = parseInt(leftover.value) || 0;
+    if (spoiled)  data.ballots_spoiled  = parseInt(spoiled.value)  || 0;
+    if (received && received.value.trim() !== '') {
+        data.ballots_received = parseInt(received.value) || 0;
+    }
+    return data;
+}
+function updateBallotBalance(tableId, urnTotal) {
+    const balanceEl = document.getElementById(`ballot-balance-${tableId}`);
+    if (!balanceEl) return;
+
+    const leftover = parseInt(document.getElementById(`leftover-${tableId}`)?.value) || 0;
+    const spoiled  = parseInt(document.getElementById(`spoiled-${tableId}`)?.value)  || 0;
+    const received = parseInt(document.getElementById(`received-${tableId}`)?.value) || 0;
+
+    if (received === 0) {
+        balanceEl.innerHTML = `<small class="text-muted" style="font-size:0.65rem;">
+            <i class="ri-information-line"></i> Ingrese papeletas recibidas para verificar
+        </small>`;
+        return;
+    }
+
+    const accounted = urnTotal + leftover + spoiled;
+    const diff      = accounted - received;
+
+    if (diff === 0) {
+        balanceEl.innerHTML = `<span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:0.65rem;">
+            <i class="ri-checkbox-circle-line me-1"></i>Papeletas cuadran
+        </span>`;
+    } else {
+        balanceEl.innerHTML = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:0.65rem;"
+            title="${accounted} contados vs ${received} recibidas">
+            <i class="ri-alert-line me-1"></i>No cuadran (${diff > 0 ? '+' : ''}${diff})
+        </span>`;
+    }
+}
 
 function refreshTableTotals(tableId, categoryTotals) {
     Object.entries(categoryTotals).forEach(([code, total]) => {
@@ -71,11 +113,11 @@ function setTableStatusClass(tableId, newStatus) {
     card.className = card.className.replace(/\bstatus-\S+/g, '');
     card.classList.add(`status-${newStatus}`);
 }
-
 window.updateTableTotals = function(tableId) {
     const catValid = {};
     const catBlank = {};
     const catNull  = {};
+
     document.querySelectorAll(`#table-${tableId} .vote-input`).forEach(input => {
         const cat = input.dataset.category;
         catValid[cat] = (catValid[cat] ?? 0) + (parseInt(input.value) || 0);
@@ -88,19 +130,21 @@ window.updateTableTotals = function(tableId) {
         const cat = input.dataset.category;
         catNull[cat] = (catNull[cat] ?? 0) + (parseInt(input.value) || 0);
     });
+
     const allCats = new Set([
         ...Object.keys(catValid),
         ...Object.keys(catBlank),
         ...Object.keys(catNull),
     ]);
+
+    let firstCatTotal = 0;
     allCats.forEach(code => {
         const total = (catValid[code] ?? 0) + (catBlank[code] ?? 0) + (catNull[code] ?? 0);
         const el    = document.getElementById(`total-${code}-${tableId}`);
         if (el) el.textContent = total;
+        if (firstCatTotal === 0) firstCatTotal = total;
     });
-    const firstCatTotal = allCats.size > 0
-        ? (catValid[[...allCats][0]] ?? 0) + (catBlank[[...allCats][0]] ?? 0) + (catNull[[...allCats][0]] ?? 0)
-        : 0;
+
     const totalEl = document.getElementById(`total-${tableId}`);
     if (totalEl) totalEl.textContent = firstCatTotal;
     let footerValid = 0, footerBlank = 0, footerNull = 0;
@@ -113,22 +157,42 @@ window.updateTableTotals = function(tableId) {
     if (fv) fv.textContent = footerValid;
     if (fb) fb.textContent = footerBlank;
     if (fn) fn.textContent = footerNull;
+    const urnEl = document.getElementById(`urn-count-${tableId}`);
+    if (urnEl) urnEl.textContent = firstCatTotal.toLocaleString();
+    const tableCard      = document.getElementById(`table-${tableId}`);
+    const expectedVoters = tableCard
+        ? parseInt(tableCard.dataset.expectedVoters || '0')
+        : 0;
+    const participEl = document.getElementById(`participation-${tableId}`);
+    if (participEl && expectedVoters > 0) {
+        const pct = Math.round((firstCatTotal / expectedVoters) * 1000) / 10;
+        participEl.textContent = pct + '%';
+        participEl.className = participEl.className
+            .replace(/text-(success|warning|secondary|danger)/g, '');
+        participEl.classList.add(
+            pct >= 75 ? 'text-success' : pct >= 50 ? 'text-warning' : 'text-secondary'
+        );
+    }
+    updateBallotBalance(tableId, firstCatTotal);
 };
-
 async function saveTable(tableId, closeAfter = false) {
     const btn = document.querySelector(`[data-table-id="${tableId}"].save-table`);
     setButtonLoading(btn, true);
+
     try {
         const votes      = collectVotes(tableId);
         const blankVotes = collectSpecialVotes(tableId, 'blank');
         const nullVotes  = collectSpecialVotes(tableId, 'null');
+        const ballots    = collectBallotData(tableId);
+
         const body = {
             voting_table_id:  tableId,
             election_type_id: window.electionTypeId,
             votes,
             blank_votes: Object.keys(blankVotes).length ? blankVotes : undefined,
             null_votes:  Object.keys(nullVotes).length  ? nullVotes  : undefined,
-            close: closeAfter,
+            close:       closeAfter,
+            ...ballots,
         };
 
         const response = await fetch('/voting-table-votes/register', {
@@ -146,6 +210,10 @@ async function saveTable(tableId, closeAfter = false) {
         if (data.success) {
             refreshTableTotals(tableId, data.category_totals ?? {});
             setTableStatusClass(tableId, data.table_status);
+            const urnEl = document.getElementById(`urn-count-${tableId}`);
+            if (urnEl && data.total_voters !== undefined) {
+                urnEl.textContent = Number(data.total_voters).toLocaleString();
+            }
             showToast('success', data.message);
             document.dispatchEvent(new CustomEvent('tableSaved', { detail: { tableId: String(tableId) } }));
         } else {
@@ -174,6 +242,7 @@ async function reviewTable(tableId) {
         showError('No se pudieron cargar los votos de la mesa');
         return;
     }
+
     const byCategory = {};
     votes.forEach(v => {
         const cat = v.category_code || 'General';
@@ -284,6 +353,7 @@ async function correctTable(tableId) {
         if (!byCategory[cat]) byCategory[cat] = [];
         byCategory[cat].push(v);
     });
+
     const blankByCategory = {};
     document.querySelectorAll(`#table-${tableId} .blank-votes-input`)
         .forEach(inp => { blankByCategory[inp.dataset.category] = parseInt(inp.value) || 0; });
@@ -554,18 +624,27 @@ window.saveAllTables = async function() {
             fail++;
         }
     }
-
     showToast('success', `${ok} mesa(s) guardada(s)${fail > 0 ? `, ${fail} con error` : ''}`);
 };
-
+function bindBallotInputs() {
+    document.querySelectorAll(
+        '.ballot-leftover-input, .ballot-spoiled-input, .ballot-received-input'
+    ).forEach(input => {
+        input.addEventListener('focus', function () { this.select(); });
+        input.addEventListener('input', function () {
+            const tableId = this.dataset.table;
+            if (!tableId) return;
+            const urnEl  = document.getElementById(`urn-count-${tableId}`);
+            const urnVal = parseInt((urnEl?.textContent ?? '0').replace(/,/g, '')) || 0;
+            updateBallotBalance(tableId, urnVal);
+            if (window.pendingTables) window.pendingTables.add(String(tableId));
+        });
+    });
+}
 window.initVoteListeners = function() {
     document.querySelectorAll('.vote-input').forEach(input => {
-
-        // ✅ Select all on focus so you can type directly
         input.addEventListener('focus', function () { this.select(); });
-
         input.addEventListener('input', () => window.updateTableTotals(input.dataset.table));
-
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
                 const all = Array.from(
@@ -579,11 +658,12 @@ window.initVoteListeners = function() {
             }
         });
     });
+
     document.querySelectorAll('.blank-votes-input, .null-votes-input').forEach(input => {
         input.addEventListener('focus', function () { this.select(); });
-
         input.addEventListener('input', () => window.updateTableTotals(input.dataset.table));
     });
+
     document.querySelectorAll('.save-table').forEach(btn =>
         btn.addEventListener('click', () => saveTable(parseInt(btn.dataset.tableId)))
     );
@@ -601,6 +681,7 @@ window.initVoteListeners = function() {
     document.querySelectorAll('.reopen-table').forEach(btn =>
         btn.addEventListener('click', () => reopenTable(parseInt(btn.dataset.tableId)))
     );
+
     document.querySelectorAll('.observe-checkbox').forEach(cb => {
         cb.addEventListener('change', () => {
             if (cb.checked && !cb.dataset.voteId) {
@@ -612,8 +693,10 @@ window.initVoteListeners = function() {
             const allChecked = Array.from(
                 document.querySelectorAll(`#table-${tableId} .observe-checkbox:checked`)
             ).filter(c => c.dataset.voteId);
+
             const countEl = document.getElementById(`selected-count-${tableId}`);
             if (countEl) countEl.textContent = allChecked.length;
+
             const cats = {};
             allChecked.forEach(c => {
                 cats[c.dataset.category] = (cats[c.dataset.category] ?? 0) + 1;
@@ -627,5 +710,6 @@ window.initVoteListeners = function() {
             });
         });
     });
+    bindBallotInputs();
 };
 </script>

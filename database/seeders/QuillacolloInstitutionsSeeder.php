@@ -1,192 +1,130 @@
 <?php
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Department;
-use App\Models\Province;
-use App\Models\Municipality;
-use App\Models\Locality;
-use App\Models\Institution;
+use App\Models\{Locality, Institution, Municipality, VotingTable, VotingTableElection, ElectionType};
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class QuillacolloInstitutionsSeeder extends Seeder
 {
     protected $recintos = [
-        ['name' => 'UNIDAD EDUCATIVA NESTOR ADRIAZOLA', 'code' => 'REC-QUI-001', 'address' => 'Av. Constantino Morales y Blanco Galindo', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 6976],
-        ['name' => 'ESCUELA SIMON BOLIVAR', 'code' => 'REC-QUI-002', 'address' => 'Cleomedes Blanco y Atacama', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3501],
-        ['name' => 'INSTITUTO PARTICULAR QUILLACOLLO', 'code' => 'REC-QUI-003', 'address' => 'Av. General Pando', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3249],
-        ['name' => 'UNIDAD EDUCATIVA VILLA MODERNA', 'code' => 'REC-QUI-004', 'address' => 'Waldo Ballivian esq. Rafael Pabon', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 4247],
-        ['name' => 'CARCEL PENAL DE SAN PABLO', 'code' => 'REC-QUI-005', 'address' => 'Av. Abaroa', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 400],
-        ['name' => 'UNIDAD EDUCATIVA 1RO DE MAYO', 'code' => 'REC-QUI-006', 'address' => 'Calle 1ro de Mayo entre 21 de Septiembre y Tomas Bata', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 840],
-        ['name' => 'UNIDAD EDUCATIVA SAN MARTIN DE PORRES (TARDE)', 'code' => 'REC-QUI-007', 'address' => 'Av. Albina Patiño casi frente Fab. Manaco', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 250],
-        ['name' => 'COLEGIO CRISTINA PRADO', 'code' => 'REC-QUI-008', 'address' => '23 de Marzo y Carmela Serruto', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3072],
-        ['name' => 'COLEGIO FRANZ TAMAYO', 'code' => 'REC-QUI-009', 'address' => 'Av. Suarez Miranda Nro. 515', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 5109],
-        ['name' => 'LICEO AMERICA', 'code' => 'REC-QUI-010', 'address' => 'Gral. Pando y Pacheco', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 5175],
-        ['name' => 'ESCUELA FIDELIA C. DE SANCHEZ', 'code' => 'REC-QUI-011', 'address' => 'Calle 6 de Agosto y Cleomedes Blanco', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 2613],
-        ['name' => 'UNIDAD EDUCATIVA HEROINAS', 'code' => 'REC-QUI-012', 'address' => 'Calle Ayacucho entre Gral. Camacho y Pacheco', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 2910],
-        ['name' => 'TEOFILO VARGAS CANDIA B', 'code' => 'REC-QUI-013', 'address' => '23 de Marzo y Carmela Serruto', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 4985],
-        ['name' => 'UNIDAD EDUCATIVA FLORA SALINAS HINOJOSA - AMALIA ECHALAR', 'code' => 'REC-QUI-014', 'address' => 'Luis Uria y 23 de Marzo', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 166],
-        ['name' => 'UNIDAD EDUCATIVA NUESTRA SEÑORA DE URCUPIÑA', 'code' => 'REC-QUI-015', 'address' => 'Calle Ricardo Soruco entre Walker Mareño y Nataniel Aguirre', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 474],
-        ['name' => 'UNIDAD EDUCATIVA MILIVOY ETEROVIC MATENDA', 'code' => 'REC-QUI-016', 'address' => 'Km 12 1/2 Av. Blanco Galindo', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3048],
-        ['name' => 'ESCUELA 12 DE SEPTIEMBRE', 'code' => 'REC-QUI-017', 'address' => 'Calle Gral Camacho final Sud', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3486],
-        ['name' => 'ESCUELA TOMAS BATA', 'code' => 'REC-QUI-018', 'address' => 'Calle 12 de Enero', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 2894],
-        ['name' => 'UNIDAD EDUCATIVA 12 DE ENERO B', 'code' => 'REC-QUI-019', 'address' => 'Av. Gral. Camacho entre calle 10 y Fructuoso Mercado', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 1214],
-        ['name' => 'UNIDAD EDUCATIVA VILLA ASUNCION', 'code' => 'REC-QUI-020', 'address' => 'Villa Asuncion lado Centro de salud', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 944],
-        ['name' => 'UNIDAD EDUCATIVA SAN MARTIN DE PORRES', 'code' => 'REC-QUI-021', 'address' => 'Barrio Manaco, calle 12 de Enero casi Martin Cardenas', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 529],
-        ['name' => 'COLEGIO NACIONAL CALAMA', 'code' => 'REC-QUI-022', 'address' => 'Av. Ferroviaria Sud', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 1438],
-        ['name' => 'UNIDAD EDUCATIVA IRONCOLLO', 'code' => 'REC-QUI-023', 'address' => 'Ironcollo', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3147],
-        ['name' => 'UNIDAD EDUCATIVA MARTIN CARDENAS', 'code' => 'REC-QUI-024', 'address' => 'Barrio Fabril Esmeralda', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 2592],
-        ['name' => 'UNIDAD EDUCATIVA TUNARI', 'code' => 'REC-QUI-025', 'address' => 'Calle 23 de Marzo entre Nueva Luz y OTB Tunari', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 1787],
-        ['name' => 'UNIDAD EDUCATIVA 23 DE MARZO', 'code' => 'REC-QUI-026', 'address' => 'Calle Huachirancho', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 639],
-        ['name' => 'UNIDAD EDUCATIVA JOSE MIGUEL LANZA', 'code' => 'REC-QUI-027', 'address' => 'Illataco a 5 Km. al norte de Quillacollo', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 1978],
-        ['name' => 'NORMAL SIMON RODRIGUEZ', 'code' => 'REC-QUI-028', 'address' => 'A 4 Km al norte de Quillacollo', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3152],
-        ['name' => 'UNIDAD EDUCATIVA 21 DE SEPTIEMBRE', 'code' => 'REC-QUI-029', 'address' => 'OTB AASANA Villa Maria - calle 13 al frente de la plaza', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3045],
-        ['name' => 'ESCUELA FELIZ MARTINEZ', 'code' => 'REC-QUI-030', 'address' => 'Av. Blanco Galindo Km. 10 1/2 a 3 cuadras lado norte', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 6360],
-        ['name' => 'CENTRO INTEGRAL NIÑO JESUS FE Y ALEGRIA', 'code' => 'REC-QUI-031', 'address' => 'Calle 4 Miraflores', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 2048],
-        ['name' => 'UNIDAD EDUCATIVA POCPOCOLLO', 'code' => 'REC-QUI-032', 'address' => 'Comunidad Pocpocollo', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 502],
-        ['name' => 'UNIDAD EDUCATIVA VILLA URCUPIÑA', 'code' => 'REC-QUI-033', 'address' => 'Final Sud av. Martin Cardenas Calvario', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 4151],
-        ['name' => 'UNIDAD EDUCATIVA CERRO COTA', 'code' => 'REC-QUI-034', 'address' => 'Cerro Cota, OTB Cota, zona Calvario', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 466],
-        ['name' => 'UNIDAD EDUCATIVA COTAPACHI', 'code' => 'REC-QUI-035', 'address' => 'Carretera Quillacollo a Cochabamba, sindicato agrario Cotapachi', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 571],
-        ['name' => 'UNIDAD EDUCATIVA MARQUINA', 'code' => 'REC-QUI-036', 'address' => 'Quillacollo Marquina', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 4695],
-        ['name' => 'UNIDAD EDUCATIVA MARQUINA SECUNDARIA', 'code' => 'REC-QUI-037', 'address' => 'Zona Marquina a 6 Km de Quillacollo camino a Morochata', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 1006],
-        ['name' => 'UNIDAD EDUCATIVA BELLA VISTA', 'code' => 'REC-QUI-038', 'address' => 'Bella Vista a 7 Km de Quillacollo camino a Morochata', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 5338],
-        ['name' => 'UNIDAD EDUCATIVA POTRERO', 'code' => 'REC-QUI-039', 'address' => 'Comunidad Potrero al norte de Quillacollo', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 1471],
-        ['name' => 'ESCUELA ARTURO QUITON', 'code' => 'REC-QUI-040', 'address' => 'Calle Final Antofagasta', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 4278],
-        ['name' => 'UNIDAD EDUCATIVA RENE CRESPO RICO', 'code' => 'REC-QUI-041', 'address' => 'Quillacollo calle final Antofagasta', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 558],
-        ['name' => 'UNIDAD EDUCATIVA OSCAR ALFARO', 'code' => 'REC-QUI-042', 'address' => 'Pandoja Baja parada micro P', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 914],
-        ['name' => 'UNIDAD EDUCATIVA EL PASO', 'code' => 'REC-QUI-043', 'address' => 'El Paso', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 4006],
-        ['name' => 'UNIDAD EDUCATIVA MARIA AUXILIADORA', 'code' => 'REC-QUI-044', 'address' => 'A 17 Km de Quillacollo entre el Paso y Tiquipaya', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 1579],
-        ['name' => 'INSTITUTO TECNOLOGICO EL PASO', 'code' => 'REC-QUI-045', 'address' => 'Av. Elias Meneses', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 2133],
-        ['name' => 'UNIDAD EDUCATIVA EL PASO A', 'code' => 'REC-QUI-046', 'address' => 'Zona Central el Paso', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3770],
-        ['name' => 'UNIDAD EDUCATIVA MOLLE MOLLE', 'code' => 'REC-QUI-047', 'address' => 'Comunidad Molle Molle', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 443],
-        ['name' => 'UNIDAD EDUCATIVA SANTIAGO APOSTOL', 'code' => 'REC-QUI-048', 'address' => 'Zona Candelaria Urinsaya - El Paso', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 465],
-        ['name' => 'UNIDAD EDUCATIVA RENE BARRIENTOS ORTUÑO', 'code' => 'REC-QUI-049', 'address' => 'Misicuni', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 396],
-        ['name' => 'CENTRO INTERNADO MISICUNI', 'code' => 'REC-QUI-050', 'address' => 'Misicuni', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 580],
-        ['name' => 'UNIDAD EDUCATIVA LIRIUNI', 'code' => 'REC-QUI-051', 'address' => 'Liruini', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 246],
-        ['name' => 'UNIDAD EDUCATIVA JOSE BALLIVIAN', 'code' => 'REC-QUI-052', 'address' => 'Barrio Saavedra, av. Cap. Victor Ustariz entre av. Circunvalacion - Cotapachi', 'locality' => 'Quillacollo (Urbano)', 'registered_citizens' => 3237],
+        ['name' => 'UNIDAD EDUCATIVA NESTOR ADRIAZOLA', 'code' => '309010101', 'locality' => 'Quillacollo', 'mesas' => 31, 'last_mesa_voters' => 85, 'oep_inicio' => 303066],
+        ['name' => 'ESCUELA SIMON BOLIVAR', 'code' => '309010102', 'locality' => 'Quillacollo', 'mesas' => 16, 'last_mesa_voters' => 21, 'oep_inicio' => 303139],
+        ['name' => 'INSTITUTO PARTICULAR QUILLACOLLO', 'code' => '309010103', 'locality' => 'Quillacollo', 'mesas' => 14, 'last_mesa_voters' => 129, 'oep_inicio' => 303052],
+        ['name' => 'UNIDAD EDUCATIVA VILLA MODERNA', 'code' => '309010104', 'locality' => 'Quillacollo', 'mesas' => 19, 'last_mesa_voters' => 167, 'oep_inicio' => 303098],
+        ['name' => 'CARCEL PENAL DE SAN PABLO', 'code' => '309010105', 'locality' => 'Quillacollo', 'mesas' => 2, 'last_mesa_voters' => 177, 'oep_inicio' => 303027],
+        ['name' => 'UNIDAD EDUCATIVA 1RO DE MAYO', 'code' => '309010106', 'locality' => 'Quillacollo', 'mesas' => 4, 'last_mesa_voters' => 120, 'oep_inicio' => 303023],
+        ['name' => 'UNIDAD EDUCATIVA SAN MARTIN DE PORRES (TARDE)', 'code' => '309010107', 'locality' => 'Quillacollo', 'mesas' => 1, 'last_mesa_voters' => 250, 'oep_inicio' => 303218, 'suffix' => '-T'],
+        ['name' => 'COLEGIO CRISTINA PRADO', 'code' => '309010108', 'locality' => 'Quillacollo', 'mesas' => 14, 'last_mesa_voters' => 192, 'oep_inicio' => 303182],
+        ['name' => 'COLEGIO FRANZ TAMAYO', 'code' => '309010109', 'locality' => 'Quillacollo', 'mesas' => 22, 'last_mesa_voters' => 69, 'oep_inicio' => 303196],
+        ['name' => 'LICEO AMERICA', 'code' => '309010110', 'locality' => 'Quillacollo', 'mesas' => 23, 'last_mesa_voters' => 130, 'oep_inicio' => 303029],
+        ['name' => 'ESCUELA FIDELIA C. DE SANCHEZ', 'code' => '309010111', 'locality' => 'Quillacollo', 'mesas' => 12, 'last_mesa_voters' => 70, 'oep_inicio' => 303157],
+        ['name' => 'UNIDAD EDUCATIVA HEROINAS', 'code' => '309010112', 'locality' => 'Quillacollo', 'mesas' => 13, 'last_mesa_voters' => 30, 'oep_inicio' => 303169],
+        ['name' => 'TEOFILO VARGAS CANDIA B', 'code' => '309010113', 'locality' => 'Quillacollo', 'mesas' => 22, 'last_mesa_voters' => 185, 'oep_inicio' => 303117],
+        ['name' => 'UNIDAD EDUCATIVA FLORA SALINAS HINOJOSA - AMALIA ECHALAR', 'code' => '309010114', 'locality' => 'Quillacollo', 'mesas' => 1, 'last_mesa_voters' => 166, 'oep_inicio' => 303218, 'suffix' => '-F'],
+        ['name' => 'UNIDAD EDUCATIVA NUESTRA SEÑORA DE URCUPIÑA', 'code' => '309010115', 'locality' => 'Quillacollo', 'mesas' => 2, 'last_mesa_voters' => 234, 'oep_inicio' => 303155],
+        ['name' => 'UNIDAD EDUCATIVA MILIVOY ETEROVIC MATENDA', 'code' => '309010116', 'locality' => 'Quillacollo', 'mesas' => 14, 'last_mesa_voters' => 168, 'oep_inicio' => 303001],
+        ['name' => 'ESCUELA 12 DE SEPTIEMBRE', 'code' => '309010117', 'locality' => 'Quillacollo', 'mesas' => 16, 'last_mesa_voters' => 126, 'oep_inicio' => 303243],
+        ['name' => 'ESCUELA TOMAS BATA', 'code' => '309010118', 'locality' => 'Quillacollo', 'mesas' => 13, 'last_mesa_voters' => 14, 'oep_inicio' => 303223],
+        ['name' => 'UNIDAD EDUCATIVA 12 DE ENERO B', 'code' => '309010119', 'locality' => 'Quillacollo', 'mesas' => 5, 'last_mesa_voters' => 254, 'oep_inicio' => 303238],
+        ['name' => 'UNIDAD EDUCATIVA VILLA ASUNCION', 'code' => '309010120', 'locality' => 'Quillacollo', 'mesas' => 4, 'last_mesa_voters' => 224, 'oep_inicio' => 303219],
+        ['name' => 'UNIDAD EDUCATIVA SAN MARTIN DE PORRES', 'code' => '309010121', 'locality' => 'Quillacollo', 'mesas' => 2, 'last_mesa_voters' => 289, 'oep_inicio' => 303236],
+        ['name' => 'COLEGIO NACIONAL CALAMA', 'code' => '309010122', 'locality' => 'Quillacollo', 'mesas' => 6, 'last_mesa_voters' => 238, 'oep_inicio' => 303457],
+        ['name' => 'UNIDAD EDUCATIVA IRONCOLLO', 'code' => '309010123', 'locality' => 'Quillacollo', 'mesas' => 15, 'last_mesa_voters' => 267, 'oep_inicio' => 303281],
+        ['name' => 'UNIDAD EDUCATIVA MARTIN CARDENAS', 'code' => '309010124', 'locality' => 'Quillacollo', 'mesas' => 11, 'last_mesa_voters' => 192, 'oep_inicio' => 303270],
+        ['name' => 'UNIDAD EDUCATIVA TUNARI', 'code' => '309010125', 'locality' => 'Quillacollo', 'mesas' => 8, 'last_mesa_voters' => 107, 'oep_inicio' => 303259],
+        ['name' => 'UNIDAD EDUCATIVA 23 DE MARZO', 'code' => '309010126', 'locality' => 'Quillacollo', 'mesas' => 3, 'last_mesa_voters' => 159, 'oep_inicio' => 303267],
+        ['name' => 'ESCUELA FELIZ MARTINEZ', 'code' => '309010130', 'locality' => 'Quillacollo', 'mesas' => 29, 'last_mesa_voters' => 120, 'oep_inicio' => 303387],
+        ['name' => 'CENTRO INTEGRAL NIÑO JESUS FE Y ALEGRIA', 'code' => '309010131', 'locality' => 'Quillacollo', 'mesas' => 9, 'last_mesa_voters' => 128, 'oep_inicio' => 303416],
+        ['name' => 'UNIDAD EDUCATIVA VILLA URCUPIÑA', 'code' => '309010133', 'locality' => 'Quillacollo', 'mesas' => 18, 'last_mesa_voters' => 71, 'oep_inicio' => 303309, 'suffix' => '-U'],
+        ['name' => 'ESCUELA ARTURO QUITON', 'code' => '309010140', 'locality' => 'Quillacollo', 'mesas' => 19, 'last_mesa_voters' => 198, 'oep_inicio' => 303354],
+        ['name' => 'UNIDAD EDUCATIVA RENE CRESPO RICO', 'code' => '309010141', 'locality' => 'Quillacollo', 'mesas' => 3, 'last_mesa_voters' => 78, 'oep_inicio' => 303373],
+        ['name' => 'UNIDAD EDUCATIVA JOSE MIGUEL LANZA', 'code' => '309010201', 'locality' => 'Illataco', 'mesas' => 9, 'last_mesa_voters' => 58, 'oep_inicio' => 303376],
+        ['name' => 'NORMAL SIMON RODRIGUEZ', 'code' => '309010301', 'locality' => 'Piñami', 'mesas' => 14, 'last_mesa_voters' => 32, 'oep_inicio' => 303429],
+        ['name' => 'UNIDAD EDUCATIVA 21 DE SEPTIEMBRE', 'code' => '309010302', 'locality' => 'Piñami', 'mesas' => 13, 'last_mesa_voters' => 165, 'oep_inicio' => 303296],
+        ['name' => 'UNIDAD EDUCATIVA POCPOCOLLO', 'code' => '309010303', 'locality' => 'Piñami', 'mesas' => 2, 'last_mesa_voters' => 262, 'oep_inicio' => 303385],
+        ['name' => 'UNIDAD EDUCATIVA JOSE BALLIVIAN', 'code' => '309010304', 'locality' => 'Piñami', 'mesas' => 14, 'last_mesa_voters' => 117, 'oep_inicio' => 303465],
+        ['name' => 'UNIDAD EDUCATIVA OSCAR ALFARO', 'code' => '309010401', 'locality' => 'Paucarpata', 'mesas' => 4, 'last_mesa_voters' => 194, 'oep_inicio' => 303425],
+        ['name' => 'UNIDAD EDUCATIVA CERRO COTA', 'code' => '309010501', 'locality' => 'Cotapachi', 'mesas' => 2, 'last_mesa_voters' => 226, 'oep_inicio' => 303327],
+        ['name' => 'UNIDAD EDUCATIVA COTAPACHI', 'code' => '309010502', 'locality' => 'Cotapachi', 'mesas' => 2, 'last_mesa_voters' => 331, 'oep_inicio' => 303463],
+        ['name' => 'UNIDAD EDUCATIVA CALVARIO', 'code' => '309010503', 'locality' => 'Cotapachi', 'mesas' => 13, 'last_mesa_voters' => 222, 'oep_inicio' => 303309, 'suffix' => '-C'],
+        ['name' => 'UNIDAD EDUCATIVA PIÑAMI', 'code' => '309010504', 'locality' => 'Cotapachi', 'mesas' => 19, 'last_mesa_voters' => 266, 'oep_inicio' => 303354, 'suffix' => '-P'],
+        ['name' => 'UNIDAD EDUCATIVA EL PASO', 'code' => '309010601', 'locality' => 'El Paso', 'mesas' => 18, 'last_mesa_voters' => 166, 'oep_inicio' => 303486],
+        ['name' => 'UNIDAD EDUCATIVA MARIA AUXILIADORA', 'code' => '309010602', 'locality' => 'El Paso', 'mesas' => 7, 'last_mesa_voters' => 139, 'oep_inicio' => 303479],
+        ['name' => 'INSTITUTO TECNOLOGICO EL PASO', 'code' => '309010603', 'locality' => 'El Paso', 'mesas' => 9, 'last_mesa_voters' => 213, 'oep_inicio' => 303520],
+        ['name' => 'UNIDAD EDUCATIVA EL PASO A', 'code' => '309010604', 'locality' => 'El Paso', 'mesas' => 16, 'last_mesa_voters' => 170, 'oep_inicio' => 303504],
+        ['name' => 'UNIDAD EDUCATIVA MOLLE MOLLE', 'code' => '309010605', 'locality' => 'El Paso', 'mesas' => 2, 'last_mesa_voters' => 203, 'oep_inicio' => 303529],
+        ['name' => 'UNIDAD EDUCATIVA SANTIAGO APOSTOL', 'code' => '309010606', 'locality' => 'El Paso', 'mesas' => 2, 'last_mesa_voters' => 225, 'oep_inicio' => 303531],
+        ['name' => 'UNIDAD EDUCATIVA BELLA VISTA', 'code' => '309010701', 'locality' => 'Bella Vista', 'mesas' => 23, 'last_mesa_voters' => 220, 'oep_inicio' => 303533],
+        ['name' => 'UNIDAD EDUCATIVA RENE BARRIENTOS ORTUÑO', 'code' => '309010801', 'locality' => 'Misicuni', 'mesas' => 2, 'last_mesa_voters' => 156, 'oep_inicio' => 303556],
+        ['name' => 'CENTRO INTERNADO MISICUNI', 'code' => '309010802', 'locality' => 'Misicuni', 'mesas' => 3, 'last_mesa_voters' => 100, 'oep_inicio' => 303558],
+        ['name' => 'UNIDAD EDUCATIVA LIRIUNI', 'code' => '309010901', 'locality' => 'Liriuni', 'mesas' => 1, 'last_mesa_voters' => 246, 'oep_inicio' => 303561],
+        ['name' => 'UNIDAD EDUCATIVA POTRERO', 'code' => '309011001', 'locality' => 'Potrero', 'mesas' => 6, 'last_mesa_voters' => 271, 'oep_inicio' => 303443],
     ];
-
-    /**
-     * Generate a short name from the full institution name
-     */
-    private function generateShortName(string $fullName): ?string
-    {
-        // Remove common prefixes
-        $name = preg_replace('/^(UNIDAD EDUCATIVA|COLEGIO|ESCUELA|LICEO|INSTITUTO|CENTRO)\s+/i', '', $fullName);
-
-        // Take first 3-4 words maximum
-        $words = explode(' ', $name);
-        $shortName = implode(' ', array_slice($words, 0, 3));
-
-        // Limit length
-        if (strlen($shortName) > 50) {
-            $shortName = substr($shortName, 0, 47) . '...';
-        }
-
-        return $shortName ?: null;
-    }
 
     public function run(): void
     {
-        $department = Department::where('name', 'Cochabamba')->first();
-        if (!$department) {
-            $this->command->error('❌ No se encontró el departamento de Cochabamba');
-            return;
-        }
-        $province = Province::where('name', 'Quillacollo')
-            ->where('department_id', $department->id)
-            ->first();
-        if (!$province) {
-            $this->command->error('❌ No se encontró la provincia de Quillacollo');
-            return;
-        }
-        $municipality = Municipality::where('name', 'Quillacollo')
-            ->where('province_id', $province->id)
-            ->first();
-        if (!$municipality) {
-            $this->command->error('❌ No se encontró el municipio de Quillacollo');
-            return;
-        }
+        $municipality = Municipality::where('name', 'Quillacollo')->first();
+        $election = ElectionType::where('name', 'LIKE', '%Municipal%2026%')->first();
+        if (!$municipality || !$election) return;
+
         DB::beginTransaction();
         try {
-            $created = 0;
-            $skipped = 0;
-            $localitiesCreated = 0;
-            $totalVoters = 0;
-            foreach ($this->recintos as $index => $recinto) {
-                if (($index + 1) % 10 === 0) {
-                    $this->command->line("   Procesados " . ($index + 1) . "/" . count($this->recintos) . " recintos...");
-                }
-                $locality = Locality::firstOrCreate(
+            foreach ($this->recintos as $data) {
+                // Calcular total de ciudadanos real basado en actas
+                $totalCitizens = ($data['mesas'] > 1)
+                    ? (240 * ($data['mesas'] - 1)) + $data['last_mesa_voters']
+                    : $data['last_mesa_voters'];
+
+                // 1. Crear Localidad
+                $locality = Locality::firstOrCreate(['name' => $data['locality'], 'municipality_id' => $municipality->id]);
+
+                // 2. Crear Institución
+                $inst = Institution::updateOrCreate(
+                    ['code' => $data['code']],
                     [
-                        'name' => $recinto['locality'],
-                        'municipality_id' => $municipality->id
-                    ],
-                    [
-                        'latitude' => null,
-                        'longitude' => null
+                        'name' => $data['name'],
+                        'municipality_id' => $municipality->id,
+                        'locality_id' => $locality->id,
+                        'registered_citizens' => $totalCitizens,
+                        'total_voting_tables' => $data['mesas'],
+                        'status' => 'activo'
                     ]
                 );
-                if ($locality->wasRecentlyCreated) {
-                    $localitiesCreated++;
-                    $this->command->line("   📍 Localidad creada: {$recinto['locality']}");
-                }
-                $existingInstitution = Institution::where('name', $recinto['name'])
-                    ->where('locality_id', $locality->id)
-                    ->first();
-                if ($existingInstitution) {
-                    $skipped++;
-                    if ($existingInstitution->registered_citizens != $recinto['registered_citizens']) {
-                        $existingInstitution->update([
-                            'registered_citizens' => $recinto['registered_citizens']
-                        ]);
+
+                // 3. Generar Mesas con lógica OEP real
+                for ($i = 1; $i <= $data['mesas']; $i++) {
+                    $currentVoters = ($i < $data['mesas']) ? 240 : $data['last_mesa_voters'];
+
+                    // Manejo de recintos de mesa única
+                    if ($data['mesas'] === 1) {
+                        $currentVoters = $data['last_mesa_voters'];
                     }
 
-                    continue;
+                    $suffix = $data['suffix'] ?? '';
+                    $oepCode = ($data['oep_inicio'] + ($i - 1)) . "-1" . $suffix;
+
+                    $mesa = VotingTable::updateOrCreate(
+                        ['institution_id' => $inst->id, 'number' => $i],
+                        [
+                            'oep_code' => $oepCode,
+                            'internal_code' => "INT-{$inst->id}-" . str_pad($i, 2, '0', STR_PAD_LEFT) . $suffix,
+                            'expected_voters' => $currentVoters,
+                            'type' => 'mixta'
+                        ]
+                    );
+
+                    VotingTableElection::updateOrCreate(
+                        ['voting_table_id' => $mesa->id, 'election_type_id' => $election->id],
+                        ['status' => 'configurada', 'election_date' => $election->election_date]
+                    );
                 }
-                Institution::create([
-                    'code' => $recinto['code'],
-                    'name' => $recinto['name'],
-                    'short_name' => $this->generateShortName($recinto['name']),
-                    'municipality_id' => $municipality->id,
-                    'locality_id' => $locality->id,
-                    'district_id' => null,
-                    'zone_id' => null,
-                    'address' => $recinto['address'],
-                    'reference' => null,
-                    'latitude' => null,
-                    'longitude' => null,
-                    'registered_citizens' => $recinto['registered_citizens'],
-                    'total_voting_tables' => 0,
-                    'total_computed_records' => 0,
-                    'total_annulled_records' => 0,
-                    'total_enabled_records' => 0,
-                    'total_pending_records' => 0,
-                    'phone' => null,
-                    'email' => null,
-                    'responsible_name' => null,
-                    'status' => 'activo',
-                    'is_operative' => true,
-                    'observations' => null,
-                    'created_by' => null,
-                    'updated_by' => null,
-                ]);
-                $created++;
             }
             DB::commit();
-            $this->command->info("   • Total recintos: " . count($this->recintos));
-            $this->command->info("   • Creados: {$created}");
-            $this->command->info("   • Ya existían: {$skipped}");
-            $this->command->info("   • Localidades creadas: {$localitiesCreated}");
-            $this->command->info("   • Total votantes registrados: " . number_format($totalVoters, 0, ',', '.'));
+            $this->command->info("✅ Éxito: 52 recintos cargados con ciudadanos calculados desde actas reales.");
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->command->error('❌ Error: ' . $e->getMessage());
-            $this->command->error('   Archivo: ' . $e->getFile());
-            $this->command->error('   Línea: ' . $e->getLine());
-            throw $e;
+            $this->command->error("❌ Error: " . $e->getMessage());
         }
     }
 }
