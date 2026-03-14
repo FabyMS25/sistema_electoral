@@ -100,6 +100,7 @@ class HomeController extends Controller
         ));
     }
 
+
     private function buildDashboardData(Request $request, ?Dashboard $dashboard): array
     {
         $electionTypes       = ElectionType::where('active', true)->get();
@@ -111,10 +112,12 @@ class HomeController extends Controller
             ?? ($defaultDeptId ? Province::where('department_id', $defaultDeptId)->value('id') : null);
         $defaultMuniId = $dashboard?->default_municipality_id
             ?? ($defaultProvId ? Municipality::where('province_id', $defaultProvId)->value('id') : null);
+
         $electionTypeId = $request->get('election_type', $defaultElectionType?->id);
         $departmentId   = (int) $request->get('department',   $defaultDeptId);
         $provinceId     = (int) $request->get('province',     $defaultProvId);
         $municipalityId = (int) $request->get('municipality', $defaultMuniId);
+
         if (!$municipalityId) {
             return $this->emptyData(
                 $dashboard, $electionTypes, $departments,
@@ -123,11 +126,13 @@ class HomeController extends Controller
                 $departmentId, $provinceId, null
             );
         }
+
         $municipalityId = (int) $municipalityId;
         $departmentId   = (int) $departmentId;
         $provinceId     = (int) $provinceId;
         $provinces      = Province::where('department_id', $departmentId)->get();
         $municipalities = Municipality::where('province_id', $provinceId)->get();
+
         $selectedElectionType = ElectionType::find($electionTypeId);
         if (!$selectedElectionType) {
             return $this->emptyData(
@@ -136,77 +141,103 @@ class HomeController extends Controller
                 $departmentId, $provinceId, $municipalityId
             );
         }
+
+        // ── Voting tables in this municipality for this election ──────────────
+        $tableIds = VotingTable::whereHas('institution', function ($q) use ($municipalityId) {
+            $q->whereHas('locality', fn($q2) => $q2->where('municipality_id', $municipalityId));
+        })->pluck('id');
+
+        $totalTables = $tableIds->count();
+
+        // ── reportedTables: tables that have FINISHED counting (escrutada/transmitida)
+        //    for THIS election type ──────────────────────────────────────────────
+        $reportedTables = \App\Models\VotingTableElection::whereIn('voting_table_id', $tableIds)
+            ->where('election_type_id', $selectedElectionType->id)
+            ->whereIn('status', [
+                \App\Models\VotingTableElection::STATUS_ESCRUTADA,
+                \App\Models\VotingTableElection::STATUS_TRANSMITIDA,
+            ])
+            ->count();
+
+        $progressPercentage = $totalTables > 0
+            ? round(($reportedTables / $totalTables) * 100, 2)
+            : 0;
+
+        // ── Per-category stats ────────────────────────────────────────────────
         $typeCategories = ElectionTypeCategory::where('election_type_id', $selectedElectionType->id)
             ->with('electionCategory')
             ->orderBy('ballot_order')
             ->get();
-        $categoryStats      = [];
-        $totalBlankVotes    = 0;
-        $totalNullVotes     = 0;
+
+        $categoryStats   = [];
+        $totalBlankVotes = 0;
+        $totalNullVotes  = 0;
+
         foreach ($typeCategories as $tc) {
             $cat  = $tc->electionCategory;
             $code = $cat->code;
             $tcId = $tc->id;
+
             $candidates = Candidate::where('election_type_category_id', $tcId)
                 ->where('active', true)
                 ->orderBy('list_order')
                 ->get();
+
+            // Use Vote table for candidate-level counts
             $votes = Vote::select('candidate_id', DB::raw('SUM(quantity) as total_votes'))
                 ->where('election_type_id', $selectedElectionType->id)
                 ->where('election_type_category_id', $tcId)
-                ->whereHas('votingTable.institution.locality', fn($q) =>
-                    $q->where('municipality_id', $municipalityId)
-                )
+                ->whereIn('voting_table_id', $tableIds)
                 ->groupBy('candidate_id')
                 ->with('candidate')
                 ->orderByDesc('total_votes')
                 ->get();
-            $totalVotes = (int) $votes->sum('total_votes');
+
+            $totalValidVotes = (int) $votes->sum('total_votes');
+
+            // Blank/null come from VotingTableCategoryResult (entered per acta)
             $specialVotes = VotingTableCategoryResult::where('election_type_category_id', $tcId)
-                ->whereHas('votingTable.institution.locality', fn($q) =>
-                    $q->where('municipality_id', $municipalityId)
-                )
+                ->whereIn('voting_table_id', $tableIds)
                 ->selectRaw('COALESCE(SUM(blank_votes), 0) as blank, COALESCE(SUM(null_votes), 0) as null_v')
                 ->first();
+
             $catBlank = (int) ($specialVotes->blank  ?? 0);
             $catNull  = (int) ($specialVotes->null_v ?? 0);
+
+            // Total for percentage calculation = valid + blank + null (= papeletas en ánfora)
+            $catTotal = $totalValidVotes + $catBlank + $catNull;
+
             $totalBlankVotes += $catBlank;
             $totalNullVotes  += $catNull;
+
             $categoryStats[$code] = [
                 'category'       => $cat,
                 'typeCategoryId' => $tcId,
                 'candidates'     => $candidates,
-                'stats'          => $this->calculateStats($votes, $totalVotes),
-                'totalVotes'     => $totalVotes,
+                'stats'          => $this->calculateStats($votes, $catTotal),
+                'totalVotes'     => $totalValidVotes,
+                'totalBallots'   => $catTotal,   // valid + blank + null = ánfora
                 'blankVotes'     => $catBlank,
                 'nullVotes'      => $catNull,
             ];
         }
+
+        // ── Active category for display ───────────────────────────────────────
         $defaultCategoryCode = $dashboard?->defaultCategory?->code ?? array_key_first($categoryStats);
         $activeCategoryCode  = $request->get('category', $defaultCategoryCode);
         if (!isset($categoryStats[$activeCategoryCode])) {
             $activeCategoryCode = array_key_first($categoryStats);
         }
 
-        $totalTables = VotingTable::whereHas('institution.locality', fn($q) =>
-            $q->where('municipality_id', $municipalityId)
-        )->count();
+        // ── totalVotes = ánfora ballots for the active category ───────────────
+        // (all categories share the same ánfora, so any category total is equivalent)
+        $totalVotes = $categoryStats[$activeCategoryCode]['totalBallots'] ?? 0;
 
-        $reportedTables = Vote::where('election_type_id', $selectedElectionType->id)
-            ->whereHas('votingTable.institution.locality', fn($q) =>
-                $q->where('municipality_id', $municipalityId)
-            )
-            ->distinct('voting_table_id')
-            ->count('voting_table_id');
-
-        $progressPercentage = $totalTables > 0
-            ? round(($reportedTables / $totalTables) * 100, 2)
-            : 0;
-
+        // ── Locality breakdown ────────────────────────────────────────────────
         $localityResults = $this->getLocalityResults(
             $selectedElectionType->id, $municipalityId, $typeCategories
         );
-        $localityStats = $this->getLocalityStats($municipalityId);
+        $localityStats = $this->getLocalityStats($municipalityId, $selectedElectionType->id);
 
         return [
             'dashboard'            => $dashboard,
@@ -226,13 +257,14 @@ class HomeController extends Controller
             'progressPercentage'   => $progressPercentage,
             'localityResults'      => $localityResults,
             'localityStats'        => $localityStats,
+            // Convenience shortcuts kept for backwards-compat with existing partials
             'alcaldeCandidates'    => $categoryStats['ALC']['candidates']  ?? collect(),
             'alcaldeStats'         => $categoryStats['ALC']['stats']        ?? [],
             'concejalCandidates'   => $categoryStats['CON']['candidates']  ?? collect(),
             'concejalStats'        => $categoryStats['CON']['stats']        ?? [],
-            'totalVotesAlcalde'    => $categoryStats['ALC']['totalVotes']   ?? 0,
-            'totalVotesConcejal'   => $categoryStats['CON']['totalVotes']   ?? 0,
-            'totalVotes'           => $categoryStats[$activeCategoryCode]['totalVotes'] ?? 0,
+            'totalVotesAlcalde'    => $categoryStats['ALC']['totalBallots'] ?? 0,
+            'totalVotesConcejal'   => $categoryStats['CON']['totalBallots'] ?? 0,
+            'totalVotes'           => $totalVotes,
             'candidateStats'       => $categoryStats[$activeCategoryCode]['stats']      ?? [],
             'candidates'           => $categoryStats[$activeCategoryCode]['candidates'] ?? collect(),
             'totalBlankVotes'      => $totalBlankVotes,
@@ -240,6 +272,29 @@ class HomeController extends Controller
         ];
     }
 
+    // ── Also fix getLocalityStats to accept electionTypeId ────────────────────
+    private function getLocalityStats(int $municipalityId, int $electionTypeId = 0)
+    {
+        return Locality::where('municipality_id', $municipalityId)
+            ->withCount([
+                'institutions as total_institutions',
+                'institutions as total_tables' => fn($q) =>
+                    $q->select(DB::raw('COALESCE(SUM(institutions.total_voting_tables), 0)')),
+            ])
+            ->get()
+            ->map(function ($locality) use ($electionTypeId) {
+                // Count tables that are escrutada/transmitida for this election type
+                $locality->reported_tables = DB::table('voting_table_elections as vte')
+                    ->join('voting_tables as vt', 'vte.voting_table_id', '=', 'vt.id')
+                    ->join('institutions as inst', 'vt.institution_id', '=', 'inst.id')
+                    ->where('inst.locality_id', $locality->id)
+                    ->when($electionTypeId, fn($q) => $q->where('vte.election_type_id', $electionTypeId))
+                    ->whereIn('vte.status', ['escrutada', 'transmitida'])
+                    ->count();
+
+                return $locality;
+            });
+    }
     private function calculateStats($votes, int $totalVotes): array
     {
         $stats = [];
@@ -324,28 +379,6 @@ class HomeController extends Controller
         }
 
         return $results;
-    }
-
-    private function getLocalityStats(int $municipalityId)
-    {
-        return Locality::where('municipality_id', $municipalityId)
-            ->withCount([
-                'institutions as total_institutions',
-                'institutions as total_tables' => fn($q) =>
-                    $q->select(DB::raw('COALESCE(SUM(institutions.total_voting_tables), 0)')),
-            ])
-            ->get()
-            ->map(function ($locality) {
-                $locality->reported_tables = DB::table('voting_tables')
-                    ->join('institutions', 'voting_tables.institution_id', '=', 'institutions.id')
-                    ->where('institutions.locality_id', $locality->id)
-                    ->whereExists(fn($q) =>
-                        $q->select(DB::raw(1))->from('votes')
-                          ->whereRaw('votes.voting_table_id = voting_tables.id')
-                    )
-                    ->count();
-                return $locality;
-            });
     }
 
     private function emptyData($dashboard, $electionTypes, $departments, $provinces, $municipalities, $deptId, $provId, $muniId): array
